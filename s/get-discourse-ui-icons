@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Download the Discourse UI SVG icon set from a pinned Discourse commit and
+# write each icon as a standalone SVG file in discourse-ui-icons/.
+#
+# Output naming:
+#   discourse-ui-icons/fa-<discourse-icon-id>.svg
+#
+# Examples:
+#   s/get-discourse-ui-icons
+#   DISCOURSE_SHA=<sha> s/get-discourse-ui-icons
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OUT_DIR="${ROOT_DIR}/discourse-ui-icons"
+
+DISCOURSE_SHA="${DISCOURSE_SHA:-a2ec5720ceb745e09ed667c3b40391203f73ca15}"
+RAW_BASE="https://raw.githubusercontent.com/discourse/discourse/${DISCOURSE_SHA}"
+
+SVG_SPRITE_RB_URL="${RAW_BASE}/lib/svg_sprite.rb"
+SOLID_SVG_URL="${RAW_BASE}/vendor/assets/svg-icons/fontawesome/solid.svg"
+REGULAR_SVG_URL="${RAW_BASE}/vendor/assets/svg-icons/fontawesome/regular.svg"
+BRANDS_SVG_URL="${RAW_BASE}/vendor/assets/svg-icons/fontawesome/brands.svg"
+ADDITIONAL_SVG_URL="${RAW_BASE}/vendor/assets/svg-icons/discourse-additional.svg"
+
+tmpdir="$(mktemp -d)"
+cleanup() {
+  rm -rf "${tmpdir}"
+}
+trap cleanup EXIT
+
+echo "Fetching icon sources from discourse/discourse@${DISCOURSE_SHA}..."
+curl -L --fail --silent "${SVG_SPRITE_RB_URL}" > "${tmpdir}/svg_sprite.rb"
+curl -L --fail --silent "${SOLID_SVG_URL}" > "${tmpdir}/solid.svg"
+curl -L --fail --silent "${REGULAR_SVG_URL}" > "${tmpdir}/regular.svg"
+curl -L --fail --silent "${BRANDS_SVG_URL}" > "${tmpdir}/brands.svg"
+curl -L --fail --silent "${ADDITIONAL_SVG_URL}" > "${tmpdir}/additional.svg"
+
+if [[ ! -s "${tmpdir}/svg_sprite.rb" ]]; then
+  echo "Failed to download svg_sprite.rb" >&2
+  exit 1
+fi
+
+icons_file="${tmpdir}/icons.txt"
+awk '
+  /SVG_ICONS/ { in_icons = 1 }
+  in_icons && /%w\[/ { in_words = 1; next }
+  in_words {
+    if ($0 ~ /\]/) { in_words = 0; in_icons = 0; next }
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+    if (length($0) > 0) print $0
+  }
+' "${tmpdir}/svg_sprite.rb" > "${icons_file}"
+
+mkdir -p "${OUT_DIR}"
+find "${OUT_DIR}" -type f -name 'fa-*.svg' -delete
+
+extract_symbol_to_file() {
+  local sprite_file="$1"
+  local symbol_id="$2"
+  local output_file="$3"
+
+  local count
+  count="$(
+    xmllint --xpath "count(/*[local-name()='svg']/*[local-name()='symbol'][@id='${symbol_id}'])" "${sprite_file}" 2>/dev/null || true
+  )"
+  if [[ "${count}" != "1" ]]; then
+    return 1
+  fi
+
+  local view_box
+  view_box="$(
+    xmllint --xpath "string(/*[local-name()='svg']/*[local-name()='symbol'][@id='${symbol_id}']/@viewBox)" "${sprite_file}" 2>/dev/null || true
+  )"
+  if [[ -z "${view_box}" ]]; then
+    view_box="$(
+      xmllint --xpath "string(/*[local-name()='svg']/@viewBox)" "${sprite_file}" 2>/dev/null || true
+    )"
+  fi
+
+  local children
+  children="$(
+    xmllint --xpath "/*[local-name()='svg']/*[local-name()='symbol'][@id='${symbol_id}']/*" "${sprite_file}" 2>/dev/null || true
+  )"
+  if [[ -z "${children}" ]]; then
+    return 1
+  fi
+
+  {
+    echo "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"${view_box}\">"
+    echo "${children}"
+    echo "</svg>"
+  } > "${output_file}"
+}
+
+missing=()
+written=0
+
+while IFS= read -r icon; do
+  [[ -z "${icon}" ]] && continue
+
+  out_file="${OUT_DIR}/fa-${icon}.svg"
+
+  sprite_file="${tmpdir}/solid.svg"
+  symbol_id="${icon}"
+
+  case "${icon}" in
+    far-*)
+      sprite_file="${tmpdir}/regular.svg"
+      symbol_id="${icon#far-}"
+      ;;
+    fab-*)
+      sprite_file="${tmpdir}/brands.svg"
+      symbol_id="${icon#fab-}"
+      ;;
+  esac
+
+  if extract_symbol_to_file "${sprite_file}" "${symbol_id}" "${out_file}"; then
+    written=$((written + 1))
+    continue
+  fi
+
+  # Handle legacy Font Awesome alias naming still used in Discourse icon ids.
+  # Example: facebook-square -> square-facebook
+  if [[ "${icon}" == fab-* && "${symbol_id}" == *-square ]]; then
+    alias_symbol_id="square-${symbol_id%-square}"
+    if extract_symbol_to_file "${tmpdir}/brands.svg" "${alias_symbol_id}" "${out_file}"; then
+      written=$((written + 1))
+      continue
+    fi
+  fi
+
+  # Custom Discourse symbols live in discourse-additional.svg and use the
+  # icon id verbatim (for example: discourse-h1, discourse-sidebar, etc).
+  if extract_symbol_to_file "${tmpdir}/additional.svg" "${icon}" "${out_file}"; then
+    written=$((written + 1))
+    continue
+  fi
+
+  # Fallback: some ids may exist in a different Font Awesome style sprite.
+  if extract_symbol_to_file "${tmpdir}/solid.svg" "${icon}" "${out_file}" ||
+     extract_symbol_to_file "${tmpdir}/regular.svg" "${icon}" "${out_file}" ||
+     extract_symbol_to_file "${tmpdir}/brands.svg" "${icon}" "${out_file}"; then
+    written=$((written + 1))
+    continue
+  fi
+
+  missing+=("${icon}")
+done < "${icons_file}"
+
+echo "Wrote ${written} icons to ${OUT_DIR}"
+if [[ ${#missing[@]} -gt 0 ]]; then
+  echo "Missing ${#missing[@]} icons:" >&2
+  printf '  %s\n' "${missing[@]}" >&2
+  exit 1
+fi
