@@ -5,6 +5,7 @@ use crate::config::Config;
 use crate::utils::slugify;
 use anyhow::{Context, Result, anyhow};
 use base64::Engine;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
@@ -17,6 +18,14 @@ pub fn add_emoji(
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
+    let mut existing_names = existing_emoji_names(&client).unwrap_or_else(|err| {
+        eprintln!(
+            "Warning: failed to list existing emojis for idempotent checks: {}",
+            err
+        );
+        HashSet::new()
+    });
+
     if emoji_path.is_dir() {
         if emoji_name.is_some() {
             return Err(anyhow!(
@@ -41,10 +50,53 @@ pub fn add_emoji(
         if files.is_empty() {
             return Err(anyhow!("no emoji image files found in directory"));
         }
+
+        let mut uploaded = 0usize;
+        let mut skipped_existing = 0usize;
+        let mut failures: Vec<(String, String, String)> = Vec::new();
         for path in files {
             let name = emoji_name_from_path(&path)?;
-            client.upload_emoji(&path, &name)?;
-            println!("Uploaded emoji {} from {}", name, path.display());
+            let key = emoji_key(&name);
+            if existing_names.contains(&key) {
+                skipped_existing += 1;
+                println!("Skipped existing emoji {} from {}", name, path.display());
+                continue;
+            }
+
+            match client.upload_emoji(&path, &name) {
+                Ok(_) => {
+                    uploaded += 1;
+                    existing_names.insert(key);
+                    println!("Uploaded emoji {} from {}", name, path.display());
+                }
+                Err(err) if is_duplicate_emoji_error(&err) => {
+                    skipped_existing += 1;
+                    existing_names.insert(key);
+                    println!("Skipped existing emoji {} from {}", name, path.display());
+                }
+                Err(err) => {
+                    failures.push((name, path.display().to_string(), err.to_string()));
+                }
+            }
+        }
+
+        if !failures.is_empty() {
+            eprintln!("Emoji upload failures:");
+            for (name, path, reason) in &failures {
+                eprintln!("- {} ({}) => {}", name, path, reason);
+            }
+        }
+        println!(
+            "Emoji bulk upload summary: uploaded={}, skipped_existing={}, failed={}",
+            uploaded,
+            skipped_existing,
+            failures.len()
+        );
+        if !failures.is_empty() {
+            return Err(anyhow!(
+                "{} emoji uploads failed; see failure summary above",
+                failures.len()
+            ));
         }
         return Ok(());
     }
@@ -53,8 +105,31 @@ pub fn add_emoji(
         Some(name) => name.to_string(),
         None => emoji_name_from_path(emoji_path)?,
     };
-    client.upload_emoji(emoji_path, &name)?;
-    println!("Uploaded emoji {} from {}", name, emoji_path.display());
+    let key = emoji_key(&name);
+    if existing_names.contains(&key) {
+        println!(
+            "Skipped existing emoji {} from {}",
+            name,
+            emoji_path.display()
+        );
+        return Ok(());
+    }
+
+    match client.upload_emoji(emoji_path, &name) {
+        Ok(_) => {
+            println!("Uploaded emoji {} from {}", name, emoji_path.display());
+            Ok(())
+        }
+        Err(err) if is_duplicate_emoji_error(&err) => {
+            println!(
+                "Skipped existing emoji {} from {}",
+                name,
+                emoji_path.display()
+            );
+            Ok(())
+        }
+        Err(err) => Err(err),
+    }?;
     Ok(())
 }
 
@@ -205,4 +280,43 @@ fn is_emoji_file(path: &Path) -> bool {
         ext.to_ascii_lowercase().as_str(),
         "png" | "jpg" | "jpeg" | "gif" | "svg"
     )
+}
+
+fn existing_emoji_names(client: &DiscourseClient) -> Result<HashSet<String>> {
+    let emojis = client.list_custom_emojis()?;
+    Ok(emojis
+        .into_iter()
+        .map(|emoji| emoji_key(&emoji.name))
+        .collect())
+}
+
+fn emoji_key(name: &str) -> String {
+    name.trim().to_ascii_lowercase()
+}
+
+fn is_duplicate_emoji_error(err: &anyhow::Error) -> bool {
+    let msg = err.to_string().to_ascii_lowercase();
+    msg.contains("already been taken")
+        || msg.contains("already exists")
+        || msg.contains("emoji already exists")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_duplicate_emoji_error;
+    use anyhow::anyhow;
+
+    #[test]
+    fn duplicate_error_is_detected() {
+        let err = anyhow!(
+            "emoji upload failed with 422: {{\"errors\":[\"Name has already been taken\"]}}"
+        );
+        assert!(is_duplicate_emoji_error(&err));
+    }
+
+    #[test]
+    fn non_duplicate_error_is_not_detected() {
+        let err = anyhow!("emoji upload failed with 413: payload too large");
+        assert!(!is_duplicate_emoji_error(&err));
+    }
 }
