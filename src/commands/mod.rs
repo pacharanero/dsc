@@ -7,6 +7,7 @@ pub mod emoji;
 pub mod group;
 pub mod import;
 pub mod list;
+pub mod open;
 pub mod palette;
 pub mod plugin;
 pub mod setting;

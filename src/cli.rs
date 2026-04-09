@@ -108,6 +108,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: SettingCommand,
     },
+    /// Open a Discourse in the default browser.
+    Open {
+        /// Discourse name.
+        discourse: String,
+    },
     /// Generate shell completion scripts.
     Completions {
         /// Target shell.

@@ -1,7 +1,8 @@
 use crate::api::DiscourseClient;
 use crate::config::{Config, DiscourseConfig, find_discourse};
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use std::fmt::Display;
+use std::process::Command;
 
 pub fn select_discourse<'a>(
     config: &'a Config,
@@ -68,5 +69,36 @@ pub fn fetch_fullname_from_url(baseurl: &str) -> Option<String> {
             println!("Failed to query site title for {}: {}", baseurl, err);
             None
         }
+    }
+}
+
+pub fn open_url(url: &str) -> Result<()> {
+    if url.trim().is_empty() {
+        return Err(anyhow!("cannot open empty base URL"));
+    }
+
+    let mut cmd = if let Ok(opener) = std::env::var("DSC_BROWSER_OPENER") {
+        let mut cmd = Command::new(opener);
+        cmd.arg(url);
+        cmd
+    } else if cfg!(target_os = "macos") {
+        let mut cmd = Command::new("open");
+        cmd.arg(url);
+        cmd
+    } else if cfg!(target_os = "windows") {
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", "start", "", url]);
+        cmd
+    } else {
+        let mut cmd = Command::new("xdg-open");
+        cmd.arg(url);
+        cmd
+    };
+
+    let status = cmd.status().context("failed to launch browser opener")?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("browser opener exited with status {}", status))
     }
 }

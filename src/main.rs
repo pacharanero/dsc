@@ -279,6 +279,8 @@ fn main() -> Result<()> {
                 },
         } => commands::setting::list_site_settings(&config, &discourse, format, verbose),
 
+        Commands::Open { discourse } => commands::open::open_discourse(&config, &discourse),
+
         Commands::Completions { shell, dir } => {
             commands::completions::write_completions(shell, dir.as_deref())
         }

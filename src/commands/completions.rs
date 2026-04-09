@@ -97,7 +97,37 @@ fn inject_zsh_dynamic_discourse_completion(mut content: String) -> String {
         }
     }
 
+    let content = replace_discourse_arg_completion(content);
     replace_update_name_completion(content)
+}
+
+/// Replace `:_default` with `:_dsc_discourse_names` for all `':discourse ...`
+/// positional args across every subcommand.
+fn replace_discourse_arg_completion(content: String) -> String {
+    // Each generated argument looks like:
+    //   ':discourse -- Discourse name:_default'
+    // We find every `':discourse` and replace the `:_default'` that closes it.
+    let mut result = String::with_capacity(content.len());
+    let mut remaining = content.as_str();
+
+    while let Some(pos) = remaining.find("':discourse") {
+        // Copy everything up to and including the match start.
+        result.push_str(&remaining[..pos]);
+        let after = &remaining[pos..];
+
+        if let Some(default_pos) = after.find(":_default'") {
+            // Copy the argument text up to the `:_default'`, replacing it.
+            result.push_str(&after[..default_pos]);
+            result.push_str(":_dsc_discourse_names'");
+            remaining = &after[default_pos + ":_default'".len()..];
+        } else {
+            // No `:_default'` found — copy the token as-is and move on.
+            result.push_str(&after[.."':discourse".len()]);
+            remaining = &after["':discourse".len()..];
+        }
+    }
+    result.push_str(remaining);
+    result
 }
 
 fn replace_update_name_completion(content: String) -> String {

@@ -46,6 +46,9 @@ _dsc() {
             dsc,ls)
                 cmd="dsc__list"
                 ;;
+            dsc,open)
+                cmd="dsc__open"
+                ;;
             dsc,palette)
                 cmd="dsc__palette"
                 ;;
@@ -63,6 +66,9 @@ _dsc() {
                 ;;
             dsc,update)
                 cmd="dsc__update"
+                ;;
+            dsc,version)
+                cmd="dsc__version"
                 ;;
             dsc__backup,create)
                 cmd="dsc__backup__create"
@@ -193,6 +199,9 @@ _dsc() {
             dsc__help,list)
                 cmd="dsc__help__list"
                 ;;
+            dsc__help,open)
+                cmd="dsc__help__open"
+                ;;
             dsc__help,palette)
                 cmd="dsc__help__palette"
                 ;;
@@ -210,6 +219,9 @@ _dsc() {
                 ;;
             dsc__help,update)
                 cmd="dsc__help__update"
+                ;;
+            dsc__help,version)
+                cmd="dsc__help__version"
                 ;;
             dsc__help__backup,create)
                 cmd="dsc__help__backup__create"
@@ -280,11 +292,20 @@ _dsc() {
             dsc__help__setting,set)
                 cmd="dsc__help__setting__set"
                 ;;
+            dsc__help__theme,duplicate)
+                cmd="dsc__help__theme__duplicate"
+                ;;
             dsc__help__theme,install)
                 cmd="dsc__help__theme__install"
                 ;;
             dsc__help__theme,list)
                 cmd="dsc__help__theme__list"
+                ;;
+            dsc__help__theme,pull)
+                cmd="dsc__help__theme__pull"
+                ;;
+            dsc__help__theme,push)
+                cmd="dsc__help__theme__push"
                 ;;
             dsc__help__theme,remove)
                 cmd="dsc__help__theme__remove"
@@ -382,6 +403,9 @@ _dsc() {
             dsc__setting__help,set)
                 cmd="dsc__setting__help__set"
                 ;;
+            dsc__theme,duplicate)
+                cmd="dsc__theme__duplicate"
+                ;;
             dsc__theme,help)
                 cmd="dsc__theme__help"
                 ;;
@@ -391,8 +415,17 @@ _dsc() {
             dsc__theme,list)
                 cmd="dsc__theme__list"
                 ;;
+            dsc__theme,pull)
+                cmd="dsc__theme__pull"
+                ;;
+            dsc__theme,push)
+                cmd="dsc__theme__push"
+                ;;
             dsc__theme,remove)
                 cmd="dsc__theme__remove"
+                ;;
+            dsc__theme__help,duplicate)
+                cmd="dsc__theme__help__duplicate"
                 ;;
             dsc__theme__help,help)
                 cmd="dsc__theme__help__help"
@@ -402,6 +435,12 @@ _dsc() {
                 ;;
             dsc__theme__help,list)
                 cmd="dsc__theme__help__list"
+                ;;
+            dsc__theme__help,pull)
+                cmd="dsc__theme__help__pull"
+                ;;
+            dsc__theme__help,push)
+                cmd="dsc__theme__help__push"
                 ;;
             dsc__theme__help,remove)
                 cmd="dsc__theme__help__remove"
@@ -437,7 +476,7 @@ _dsc() {
 
     case "${cmd}" in
         dsc)
-            opts="-c -h --config --help list ls add import update emoji topic category group backup palette plugin theme setting completions help"
+            opts="-c -h --config --help list ls add import update emoji topic category group backup palette plugin theme setting open completions version help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1091,7 +1130,7 @@ _dsc() {
             return 0
             ;;
         dsc__help)
-            opts="list add import update emoji topic category group backup palette plugin theme setting completions help"
+            opts="list add import update emoji topic category group backup palette plugin theme setting open completions version help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1426,6 +1465,20 @@ _dsc() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        dsc__help__open)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         dsc__help__palette)
             opts="list pull push"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
@@ -1595,8 +1648,22 @@ _dsc() {
             return 0
             ;;
         dsc__help__theme)
-            opts="list install remove"
+            opts="list install remove pull push duplicate"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__help__theme__duplicate)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -1623,6 +1690,34 @@ _dsc() {
             return 0
             ;;
         dsc__help__theme__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__help__theme__pull)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__help__theme__push)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1707,6 +1802,20 @@ _dsc() {
             return 0
             ;;
         dsc__help__update)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__help__version)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1805,6 +1914,20 @@ _dsc() {
         dsc__list__tidy)
             opts="-h --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__open)
+            opts="-h --help <DISCOURSE>"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -2223,7 +2346,7 @@ _dsc() {
             return 0
             ;;
         dsc__theme)
-            opts="-h --help list install remove help"
+            opts="-h --help list install remove pull push duplicate help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2236,9 +2359,37 @@ _dsc() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        dsc__theme__help)
-            opts="list install remove help"
+        dsc__theme__duplicate)
+            opts="-h --help <DISCOURSE> <THEME_ID>"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__theme__help)
+            opts="list install remove pull push duplicate help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__theme__help__duplicate)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -2279,6 +2430,34 @@ _dsc() {
             return 0
             ;;
         dsc__theme__help__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__theme__help__pull)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__theme__help__push)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2335,6 +2514,34 @@ _dsc() {
                     COMPREPLY=($(compgen -W "text json yaml" -- "${cur}"))
                     return 0
                     ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__theme__pull)
+            opts="-h --help <DISCOURSE> <THEME_ID> [LOCAL_PATH]"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__theme__push)
+            opts="-h --help <DISCOURSE> <LOCAL_PATH> [THEME_ID]"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
                 *)
                     COMPREPLY=()
                     ;;
@@ -2497,6 +2704,20 @@ _dsc() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        dsc__version)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
                 *)
                     COMPREPLY=()
                     ;;
