@@ -16,17 +16,32 @@ _dsc() {
             ",$1")
                 cmd="dsc"
                 ;;
+            dsc,a)
+                cmd="dsc__add"
+                ;;
             dsc,add)
                 cmd="dsc__add"
                 ;;
             dsc,backup)
                 cmd="dsc__backup"
                 ;;
+            dsc,bk)
+                cmd="dsc__backup"
+                ;;
+            dsc,cat)
+                cmd="dsc__category"
+                ;;
             dsc,category)
                 cmd="dsc__category"
                 ;;
+            dsc,comp)
+                cmd="dsc__completions"
+                ;;
             dsc,completions)
                 cmd="dsc__completions"
+                ;;
+            dsc,em)
+                cmd="dsc__emoji"
                 ;;
             dsc,emoji)
                 cmd="dsc__emoji"
@@ -34,8 +49,14 @@ _dsc() {
             dsc,group)
                 cmd="dsc__group"
                 ;;
+            dsc,grp)
+                cmd="dsc__group"
+                ;;
             dsc,help)
                 cmd="dsc__help"
+                ;;
+            dsc,imp)
+                cmd="dsc__import"
                 ;;
             dsc,import)
                 cmd="dsc__import"
@@ -46,17 +67,35 @@ _dsc() {
             dsc,ls)
                 cmd="dsc__list"
                 ;;
+            dsc,o)
+                cmd="dsc__open"
+                ;;
             dsc,open)
                 cmd="dsc__open"
+                ;;
+            dsc,pal)
+                cmd="dsc__palette"
                 ;;
             dsc,palette)
                 cmd="dsc__palette"
                 ;;
+            dsc,plg)
+                cmd="dsc__plugin"
+                ;;
             dsc,plugin)
                 cmd="dsc__plugin"
                 ;;
+            dsc,set)
+                cmd="dsc__setting"
+                ;;
             dsc,setting)
                 cmd="dsc__setting"
+                ;;
+            dsc,t)
+                cmd="dsc__topic"
+                ;;
+            dsc,th)
+                cmd="dsc__theme"
                 ;;
             dsc,theme)
                 cmd="dsc__theme"
@@ -64,11 +103,20 @@ _dsc() {
             dsc,topic)
                 cmd="dsc__topic"
                 ;;
+            dsc,up)
+                cmd="dsc__update"
+                ;;
             dsc,update)
                 cmd="dsc__update"
                 ;;
+            dsc,ver)
+                cmd="dsc__version"
+                ;;
             dsc,version)
                 cmd="dsc__version"
+                ;;
+            dsc__backup,cr)
+                cmd="dsc__backup__create"
                 ;;
             dsc__backup,create)
                 cmd="dsc__backup__create"
@@ -79,7 +127,13 @@ _dsc() {
             dsc__backup,list)
                 cmd="dsc__backup__list"
                 ;;
+            dsc__backup,ls)
+                cmd="dsc__backup__list"
+                ;;
             dsc__backup,restore)
+                cmd="dsc__backup__restore"
+                ;;
+            dsc__backup,rs)
                 cmd="dsc__backup__restore"
                 ;;
             dsc__backup__help,create)
@@ -97,11 +151,23 @@ _dsc() {
             dsc__category,copy)
                 cmd="dsc__category__copy"
                 ;;
+            dsc__category,cp)
+                cmd="dsc__category__copy"
+                ;;
             dsc__category,help)
                 cmd="dsc__category__help"
                 ;;
             dsc__category,list)
                 cmd="dsc__category__list"
+                ;;
+            dsc__category,ls)
+                cmd="dsc__category__list"
+                ;;
+            dsc__category,pl)
+                cmd="dsc__category__pull"
+                ;;
+            dsc__category,ps)
+                cmd="dsc__category__push"
                 ;;
             dsc__category,pull)
                 cmd="dsc__category__pull"
@@ -124,6 +190,9 @@ _dsc() {
             dsc__category__help,push)
                 cmd="dsc__category__help__push"
                 ;;
+            dsc__emoji,a)
+                cmd="dsc__emoji__add"
+                ;;
             dsc__emoji,add)
                 cmd="dsc__emoji__add"
                 ;;
@@ -131,6 +200,9 @@ _dsc() {
                 cmd="dsc__emoji__help"
                 ;;
             dsc__emoji,list)
+                cmd="dsc__emoji__list"
+                ;;
+            dsc__emoji,ls)
                 cmd="dsc__emoji__list"
                 ;;
             dsc__emoji__help,add)
@@ -145,14 +217,26 @@ _dsc() {
             dsc__group,copy)
                 cmd="dsc__group__copy"
                 ;;
+            dsc__group,cp)
+                cmd="dsc__group__copy"
+                ;;
             dsc__group,help)
                 cmd="dsc__group__help"
+                ;;
+            dsc__group,i)
+                cmd="dsc__group__info"
                 ;;
             dsc__group,info)
                 cmd="dsc__group__info"
                 ;;
             dsc__group,list)
                 cmd="dsc__group__list"
+                ;;
+            dsc__group,ls)
+                cmd="dsc__group__list"
+                ;;
+            dsc__group,m)
+                cmd="dsc__group__members"
                 ;;
             dsc__group,members)
                 cmd="dsc__group__members"
@@ -325,6 +409,9 @@ _dsc() {
             dsc__list,tidy)
                 cmd="dsc__list__tidy"
                 ;;
+            dsc__list,ty)
+                cmd="dsc__list__tidy"
+                ;;
             dsc__list__help,help)
                 cmd="dsc__list__help__help"
                 ;;
@@ -336,6 +423,15 @@ _dsc() {
                 ;;
             dsc__palette,list)
                 cmd="dsc__palette__list"
+                ;;
+            dsc__palette,ls)
+                cmd="dsc__palette__list"
+                ;;
+            dsc__palette,pl)
+                cmd="dsc__palette__pull"
+                ;;
+            dsc__palette,ps)
+                cmd="dsc__palette__push"
                 ;;
             dsc__palette,pull)
                 cmd="dsc__palette__pull"
@@ -358,13 +454,22 @@ _dsc() {
             dsc__plugin,help)
                 cmd="dsc__plugin__help"
                 ;;
+            dsc__plugin,i)
+                cmd="dsc__plugin__install"
+                ;;
             dsc__plugin,install)
                 cmd="dsc__plugin__install"
                 ;;
             dsc__plugin,list)
                 cmd="dsc__plugin__list"
                 ;;
+            dsc__plugin,ls)
+                cmd="dsc__plugin__list"
+                ;;
             dsc__plugin,remove)
+                cmd="dsc__plugin__remove"
+                ;;
+            dsc__plugin,rm)
                 cmd="dsc__plugin__remove"
                 ;;
             dsc__plugin__help,help)
@@ -379,6 +484,9 @@ _dsc() {
             dsc__plugin__help,remove)
                 cmd="dsc__plugin__help__remove"
                 ;;
+            dsc__setting,g)
+                cmd="dsc__setting__get"
+                ;;
             dsc__setting,get)
                 cmd="dsc__setting__get"
                 ;;
@@ -387,6 +495,12 @@ _dsc() {
                 ;;
             dsc__setting,list)
                 cmd="dsc__setting__list"
+                ;;
+            dsc__setting,ls)
+                cmd="dsc__setting__list"
+                ;;
+            dsc__setting,s)
+                cmd="dsc__setting__set"
                 ;;
             dsc__setting,set)
                 cmd="dsc__setting__set"
@@ -403,17 +517,32 @@ _dsc() {
             dsc__setting__help,set)
                 cmd="dsc__setting__help__set"
                 ;;
+            dsc__theme,dup)
+                cmd="dsc__theme__duplicate"
+                ;;
             dsc__theme,duplicate)
                 cmd="dsc__theme__duplicate"
                 ;;
             dsc__theme,help)
                 cmd="dsc__theme__help"
                 ;;
+            dsc__theme,i)
+                cmd="dsc__theme__install"
+                ;;
             dsc__theme,install)
                 cmd="dsc__theme__install"
                 ;;
             dsc__theme,list)
                 cmd="dsc__theme__list"
+                ;;
+            dsc__theme,ls)
+                cmd="dsc__theme__list"
+                ;;
+            dsc__theme,pl)
+                cmd="dsc__theme__pull"
+                ;;
+            dsc__theme,ps)
+                cmd="dsc__theme__push"
                 ;;
             dsc__theme,pull)
                 cmd="dsc__theme__pull"
@@ -422,6 +551,9 @@ _dsc() {
                 cmd="dsc__theme__push"
                 ;;
             dsc__theme,remove)
+                cmd="dsc__theme__remove"
+                ;;
+            dsc__theme,rm)
                 cmd="dsc__theme__remove"
                 ;;
             dsc__theme__help,duplicate)
@@ -448,11 +580,20 @@ _dsc() {
             dsc__topic,help)
                 cmd="dsc__topic__help"
                 ;;
+            dsc__topic,pl)
+                cmd="dsc__topic__pull"
+                ;;
+            dsc__topic,ps)
+                cmd="dsc__topic__push"
+                ;;
             dsc__topic,pull)
                 cmd="dsc__topic__pull"
                 ;;
             dsc__topic,push)
                 cmd="dsc__topic__push"
+                ;;
+            dsc__topic,sy)
+                cmd="dsc__topic__sync"
                 ;;
             dsc__topic,sync)
                 cmd="dsc__topic__sync"
@@ -476,7 +617,7 @@ _dsc() {
 
     case "${cmd}" in
         dsc)
-            opts="-c -h --config --help list ls add import update emoji topic category group backup palette plugin theme setting open completions version help"
+            opts="-c -h --config --help list ls add a import imp update up emoji em topic t category cat group grp backup bk palette pal plugin plg theme th setting set open o completions comp version ver help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -512,7 +653,7 @@ _dsc() {
             return 0
             ;;
         dsc__backup)
-            opts="-h --help create list restore help"
+            opts="-h --help create cr list ls restore rs help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -646,7 +787,7 @@ _dsc() {
             return 0
             ;;
         dsc__category)
-            opts="-h --help list copy pull push help"
+            opts="-h --help list ls copy cp pull pl push ps help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -838,7 +979,7 @@ _dsc() {
             return 0
             ;;
         dsc__emoji)
-            opts="-h --help add list help"
+            opts="-h --help add a list ls help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -944,7 +1085,7 @@ _dsc() {
             return 0
             ;;
         dsc__group)
-            opts="-h --help list info members copy help"
+            opts="-h --help list ls info i members m copy cp help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1844,7 +1985,7 @@ _dsc() {
             return 0
             ;;
         dsc__list)
-            opts="-f -o -v -h --format --tags --open --verbose --help tidy help"
+            opts="-f -o -v -h --format --tags --open --verbose --help tidy ty help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1940,7 +2081,7 @@ _dsc() {
             return 0
             ;;
         dsc__palette)
-            opts="-h --help list pull push help"
+            opts="-h --help list ls pull pl push ps help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2074,7 +2215,7 @@ _dsc() {
             return 0
             ;;
         dsc__plugin)
-            opts="-h --help list install remove help"
+            opts="-h --help list ls install i remove rm help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2208,7 +2349,7 @@ _dsc() {
             return 0
             ;;
         dsc__setting)
-            opts="-h --help set get list help"
+            opts="-h --help set s get g list ls help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2346,7 +2487,7 @@ _dsc() {
             return 0
             ;;
         dsc__theme)
-            opts="-h --help list install remove pull push duplicate help"
+            opts="-h --help list ls install i remove rm pull pl push ps duplicate dup help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2564,7 +2705,7 @@ _dsc() {
             return 0
             ;;
         dsc__topic)
-            opts="-h --help pull push sync help"
+            opts="-h --help pull pl push ps sync sy help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

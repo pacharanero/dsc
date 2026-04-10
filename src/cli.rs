@@ -34,6 +34,7 @@ pub enum Commands {
         command: Option<ListCommand>,
     },
     /// Add one or more Discourses to the config.
+    #[command(visible_alias = "a")]
     Add {
         /// Comma-separated discourse names to add.
         names: String,
@@ -42,11 +43,13 @@ pub enum Commands {
         interactive: bool,
     },
     /// Import Discourses from a file or stdin.
+    #[command(visible_alias = "imp")]
     Import {
         /// Path to import input (text/CSV). Reads stdin when omitted.
         path: Option<PathBuf>,
     },
     /// Run remote OS + Discourse update workflow for one or all Discourses.
+    #[command(visible_alias = "up")]
     Update {
         /// Discourse name, or 'all' to update every configured Discourse.
         name: String,
@@ -64,56 +67,67 @@ pub enum Commands {
         yes: bool,
     },
     /// Manage custom emoji.
+    #[command(visible_alias = "em")]
     Emoji {
         #[command(subcommand)]
         command: EmojiCommand,
     },
     /// Pull/push/sync topics as local Markdown.
+    #[command(visible_alias = "t")]
     Topic {
         #[command(subcommand)]
         command: TopicCommand,
     },
     /// List/copy/pull/push categories.
+    #[command(visible_alias = "cat")]
     Category {
         #[command(subcommand)]
         command: CategoryCommand,
     },
     /// List/inspect/copy groups.
+    #[command(visible_alias = "grp")]
     Group {
         #[command(subcommand)]
         command: GroupCommand,
     },
     /// Create/list/restore backups.
+    #[command(visible_alias = "bk")]
     Backup {
         #[command(subcommand)]
         command: BackupCommand,
     },
     /// List/pull/push color palettes.
+    #[command(visible_alias = "pal")]
     Palette {
         #[command(subcommand)]
         command: PaletteCommand,
     },
     /// List/install/remove plugins.
+    #[command(visible_alias = "plg")]
     Plugin {
         #[command(subcommand)]
         command: PluginCommand,
     },
     /// List/install/remove/pull/push/duplicate themes.
+    #[command(visible_alias = "th")]
     Theme {
         #[command(subcommand)]
         command: ThemeCommand,
     },
     /// Update site settings.
+    #[command(visible_alias = "set")]
     Setting {
         #[command(subcommand)]
         command: SettingCommand,
     },
     /// Open a Discourse in the default browser.
+    #[command(visible_alias = "o")]
     Open {
         /// Discourse name.
         discourse: String,
     },
     /// Generate shell completion scripts.
+    #[command(visible_alias = "comp")]
     Completions {
         /// Target shell.
         #[arg(value_enum)]
@@ -123,6 +137,7 @@ pub enum Commands {
         dir: Option<PathBuf>,
     },
     /// Print the dsc version.
+    #[command(visible_alias = "ver")]
     Version,
 }
 
@@ -130,12 +145,14 @@ pub enum Commands {
 pub enum ListCommand {
     /// Sort discourse entries by name and rewrite config in-place.
     /// Also inserts placeholder values for unset template keys.
+    #[command(visible_alias = "ty")]
     Tidy,
 }
 
 #[derive(Subcommand)]
 pub enum EmojiCommand {
     /// Upload one emoji file, or bulk-upload from a directory.
+    #[command(visible_alias = "a")]
     Add {
         /// Discourse name.
         discourse: String,
@@ -146,6 +163,7 @@ pub enum EmojiCommand {
     },
 
     /// List custom emojis on a Discourse.
+    #[command(visible_alias = "ls")]
     List {
         /// Discourse name.
         discourse: String,
@@ -164,6 +182,7 @@ pub enum EmojiCommand {
 #[derive(Subcommand)]
 pub enum TopicCommand {
     /// Pull a topic to a local Markdown file.
+    #[command(visible_alias = "pl")]
     Pull {
         /// Discourse name.
         discourse: String,
@@ -173,6 +192,7 @@ pub enum TopicCommand {
         local_path: Option<PathBuf>,
     },
     /// Push a local Markdown file to a topic.
+    #[command(visible_alias = "ps")]
     Push {
         /// Discourse name.
         discourse: String,
@@ -182,6 +202,7 @@ pub enum TopicCommand {
         topic_id: u64,
     },
     /// Sync a topic and local Markdown file using newest timestamp.
+    #[command(visible_alias = "sy")]
     Sync {
         /// Discourse name.
         discourse: String,
@@ -198,6 +219,7 @@ pub enum TopicCommand {
 #[derive(Subcommand)]
 pub enum CategoryCommand {
     /// List categories.
+    #[command(visible_alias = "ls")]
     List {
         /// Discourse name.
         discourse: String,
@@ -212,6 +234,7 @@ pub enum CategoryCommand {
         tree: bool,
     },
     /// Copy a category to another Discourse.
+    #[command(visible_alias = "cp")]
     Copy {
         /// Source discourse name.
         discourse: String,
@@ -222,6 +245,7 @@ pub enum CategoryCommand {
         category: String,
     },
     /// Pull all topics from a category into local Markdown files.
+    #[command(visible_alias = "pl")]
     Pull {
         /// Discourse name.
         discourse: String,
@@ -231,6 +255,7 @@ pub enum CategoryCommand {
         local_path: Option<PathBuf>,
     },
     /// Push local Markdown files into a category.
+    #[command(visible_alias = "ps")]
     Push {
         /// Discourse name.
         discourse: String,
@@ -244,6 +269,7 @@ pub enum CategoryCommand {
 #[derive(Subcommand)]
 pub enum GroupCommand {
     /// List groups.
+    #[command(visible_alias = "ls")]
     List {
         /// Discourse name.
         discourse: String,
@@ -255,6 +281,7 @@ pub enum GroupCommand {
         verbose: bool,
     },
     /// Show group details.
+    #[command(visible_alias = "i")]
     Info {
         /// Discourse name.
         discourse: String,
@@ -265,6 +292,7 @@ pub enum GroupCommand {
         format: StructuredFormat,
     },
     /// List members of a group.
+    #[command(visible_alias = "m")]
     Members {
         /// Discourse name.
         discourse: String,
@@ -275,6 +303,7 @@ pub enum GroupCommand {
         format: ListFormat,
     },
     /// Copy a group to another Discourse.
+    #[command(visible_alias = "cp")]
     Copy {
         /// Source discourse name.
         discourse: String,
@@ -289,11 +318,13 @@ pub enum GroupCommand {
 #[derive(Subcommand)]
 pub enum BackupCommand {
     /// Create a new backup.
+    #[command(visible_alias = "cr")]
     Create {
         /// Discourse name.
         discourse: String,
     },
     /// List backups.
+    #[command(visible_alias = "ls")]
     List {
         /// Discourse name.
         discourse: String,
@@ -305,6 +336,7 @@ pub enum BackupCommand {
         verbose: bool,
     },
     /// Restore a backup.
+    #[command(visible_alias = "rs")]
     Restore {
         /// Discourse name.
         discourse: String,
@@ -316,6 +348,7 @@ pub enum BackupCommand {
 #[derive(Subcommand)]
 pub enum PaletteCommand {
     /// List color palettes.
+    #[command(visible_alias = "ls")]
     List {
         /// Discourse name.
         discourse: String,
@@ -327,6 +360,7 @@ pub enum PaletteCommand {
         verbose: bool,
     },
     /// Pull a palette to local JSON.
+    #[command(visible_alias = "pl")]
     Pull {
         /// Discourse name.
         discourse: String,
@@ -336,6 +370,7 @@ pub enum PaletteCommand {
         local_path: Option<PathBuf>,
     },
     /// Push local JSON to create or update a palette.
+    #[command(visible_alias = "ps")]
     Push {
         /// Discourse name.
         discourse: String,
@@ -349,6 +384,7 @@ pub enum PaletteCommand {
 #[derive(Subcommand)]
 pub enum PluginCommand {
     /// List installed plugins.
+    #[command(visible_alias = "ls")]
     List {
         /// Discourse name.
         discourse: String,
@@ -360,6 +396,7 @@ pub enum PluginCommand {
         verbose: bool,
     },
     /// Install a plugin from URL.
+    #[command(visible_alias = "i")]
     Install {
         /// Discourse name.
         discourse: String,
@@ -367,6 +404,7 @@ pub enum PluginCommand {
         url: String,
     },
     /// Remove a plugin by name.
+    #[command(visible_alias = "rm")]
     Remove {
         /// Discourse name.
         discourse: String,
@@ -378,6 +416,7 @@ pub enum PluginCommand {
 #[derive(Subcommand)]
 pub enum ThemeCommand {
     /// List installed themes.
+    #[command(visible_alias = "ls")]
     List {
         /// Discourse name.
         discourse: String,
@@ -389,6 +428,7 @@ pub enum ThemeCommand {
         verbose: bool,
     },
     /// Install a theme from URL.
+    #[command(visible_alias = "i")]
     Install {
         /// Discourse name.
         discourse: String,
@@ -396,6 +436,7 @@ pub enum ThemeCommand {
         url: String,
     },
     /// Remove a theme by name.
+    #[command(visible_alias = "rm")]
     Remove {
         /// Discourse name.
         discourse: String,
@@ -403,6 +444,7 @@ pub enum ThemeCommand {
         name: String,
     },
     /// Pull a theme to a local JSON file.
+    #[command(visible_alias = "pl")]
     Pull {
         /// Discourse name.
         discourse: String,
@@ -412,6 +454,7 @@ pub enum ThemeCommand {
         local_path: Option<PathBuf>,
     },
     /// Push a local JSON file to create or update a theme.
+    #[command(visible_alias = "ps")]
     Push {
         /// Discourse name.
         discourse: String,
@@ -421,6 +464,7 @@ pub enum ThemeCommand {
         theme_id: Option<u64>,
     },
     /// Duplicate a theme and print the new theme ID.
+    #[command(visible_alias = "dup")]
     Duplicate {
         /// Discourse name.
         discourse: String,
@@ -432,6 +476,7 @@ pub enum ThemeCommand {
 #[derive(Subcommand)]
 pub enum SettingCommand {
     /// Set a site setting on a Discourse (or all tagged Discourses).
+    #[command(visible_alias = "s")]
     Set {
         /// Discourse name. Required when targeting a single discourse.
         discourse: String,
@@ -445,6 +490,7 @@ pub enum SettingCommand {
     },
 
     /// Get the current value of a site setting.
+    #[command(visible_alias = "g")]
     Get {
         /// Discourse name.
         discourse: String,
@@ -453,6 +499,7 @@ pub enum SettingCommand {
     },
 
     /// List all site settings.
+    #[command(visible_alias = "ls")]
     List {
         /// Discourse name.
         discourse: String,
