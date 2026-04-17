@@ -15,5 +15,8 @@ dsc.toml
 test-dsc.toml
 testdsc.toml
 
+### Generated shell completions (regenerate with `dsc completions <shell>`)
+/completions/
+
 ### Private notes
 .marcus/

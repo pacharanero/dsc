@@ -54,6 +54,18 @@ test_theme_url = "https://github.com/discourse/discourse-brand-header"
 test_theme_name = "discourse-brand-header"
 ```
 
+## Shell completions
+
+Completion scripts are generated on demand by the binary itself — they are not committed to the repo. Regenerate them for any supported shell with:
+
+```bash
+cargo run -- completions zsh  --dir completions/
+cargo run -- completions bash --dir completions/
+cargo run -- completions fish --dir completions/
+```
+
+The `completions/` directory is gitignored. See [docs/completions.md](completions.md) for user-facing installation instructions.
+
 ## Release
 
 Releases are automated via Git tags and GitHub Actions using cargo-dist.
