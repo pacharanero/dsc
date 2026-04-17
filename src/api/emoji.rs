@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::path::Path;
 
 impl DiscourseClient {
-    /// Upload a custom emoji.
+    /// Upload a custom emoji. Retries on 429 via the shared client helper.
     pub fn upload_emoji(&self, emoji_path: &Path, emoji_name: &str) -> Result<()> {
         let make_form_legacy = || -> Result<reqwest::blocking::multipart::Form> {
             let file = std::fs::read(emoji_path)
@@ -50,23 +50,15 @@ impl DiscourseClient {
         let upload_path = emoji_admin_path("/admin/customize/emojis");
 
         let mut response = self
-            .post(&upload_v2_json_path)?
-            .multipart(make_form_v2()?)
-            .send()
-            .context("uploading emoji")?;
+            .send_retrying(|| Ok(self.post(&upload_v2_json_path)?.multipart(make_form_v2()?)))?;
         if response.status() == StatusCode::NOT_FOUND {
-            response = self
-                .post(&upload_json_path)?
-                .multipart(make_form_legacy()?)
-                .send()
-                .context("uploading emoji")?;
+            response = self.send_retrying(|| {
+                Ok(self.post(&upload_json_path)?.multipart(make_form_legacy()?))
+            })?;
         }
         if response.status() == StatusCode::NOT_FOUND {
             response = self
-                .post(&upload_path)?
-                .multipart(make_form_legacy()?)
-                .send()
-                .context("uploading emoji")?;
+                .send_retrying(|| Ok(self.post(&upload_path)?.multipart(make_form_legacy()?)))?;
         }
         if !response.status().is_success() {
             let status = response.status();
@@ -268,3 +260,4 @@ fn normalize_emoji_url(baseurl: &str, url: &str) -> String {
         format!("{}/{}", baseurl, url)
     }
 }
+

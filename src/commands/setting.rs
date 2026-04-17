@@ -13,10 +13,18 @@ pub fn set_site_setting(
     setting: &str,
     value: &str,
     tags: Option<&str>,
+    dry_run: bool,
 ) -> Result<()> {
     if let Some(name) = discourse_name {
         let discourse = select_discourse(config, Some(name))?;
         ensure_api_credentials(discourse)?;
+        if dry_run {
+            println!(
+                "[dry-run] {}: would set {} = {}",
+                discourse.name, setting, value
+            );
+            return Ok(());
+        }
         let client = DiscourseClient::new(discourse)?;
         client.update_site_setting(setting, value)?;
         println!("{}: updated {}", discourse.name, setting);
@@ -47,6 +55,13 @@ pub fn set_site_setting(
     for discourse in config.discourse.iter().filter(|d| matches_filter(d)) {
         matched += 1;
         ensure_api_credentials(discourse)?;
+        if dry_run {
+            println!(
+                "[dry-run] {}: would set {} = {}",
+                discourse.name, setting, value
+            );
+            continue;
+        }
         let client = DiscourseClient::new(discourse)?;
         client.update_site_setting(setting, value)?;
         println!("{}: updated {}", discourse.name, setting);

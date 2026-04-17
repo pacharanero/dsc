@@ -8,6 +8,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let config_path = cli.config.unwrap_or_else(resolve_default_config_path);
     let mut config = load_config(&config_path)?;
+    let dry_run = cli.dry_run;
 
     match cli.command {
         Commands::List {
@@ -101,6 +102,30 @@ fn main() -> Result<()> {
                 local_path,
                 yes,
             } => commands::topic::topic_sync(&config, &discourse, topic_id, &local_path, yes),
+
+            TopicCommand::Reply {
+                discourse,
+                topic_id,
+                local_path,
+            } => commands::topic::topic_reply(
+                &config,
+                &discourse,
+                topic_id,
+                local_path.as_deref(),
+            ),
+
+            TopicCommand::New {
+                discourse,
+                category_id,
+                title,
+                local_path,
+            } => commands::topic::topic_new(
+                &config,
+                &discourse,
+                category_id,
+                &title,
+                local_path.as_deref(),
+            ),
         },
 
         Commands::Category { command } => match command {
@@ -175,7 +200,7 @@ fn main() -> Result<()> {
             BackupCommand::Restore {
                 discourse,
                 backup_path,
-            } => commands::backup::backup_restore(&config, &discourse, &backup_path),
+            } => commands::backup::backup_restore(&config, &discourse, &backup_path, dry_run),
         },
 
         Commands::Palette { command } => match command {
@@ -264,6 +289,7 @@ fn main() -> Result<()> {
             &setting,
             &value,
             tags.as_deref(),
+            dry_run,
         ),
 
         Commands::Setting {
@@ -280,6 +306,10 @@ fn main() -> Result<()> {
         } => commands::setting::list_site_settings(&config, &discourse, format, verbose),
 
         Commands::Open { discourse } => commands::open::open_discourse(&config, &discourse),
+
+        Commands::Config {
+            command: ConfigCommand::Check { format, skip_ssh },
+        } => commands::config::config_check(&config, format, skip_ssh),
 
         Commands::Completions { shell, dir } => {
             commands::completions::write_completions(shell, dir.as_deref())

@@ -1,9 +1,15 @@
 use super::models::{AboutResponse, SiteResponse};
+use super::rate_limit::{
+    RETRY_BUFFER, parse_rate_limit_wait, summarize_rate_limit_body,
+};
 use crate::config::DiscourseConfig;
 use crate::utils::normalize_baseurl;
 use anyhow::{Context, Result, anyhow};
-use reqwest::blocking::{Client, Response};
+use reqwest::StatusCode;
+use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::{HeaderMap, HeaderValue};
+
+const MAX_RATE_LIMIT_RETRIES: u32 = 5;
 
 #[derive(Debug, Clone)]
 pub struct VersionInfo {
@@ -74,6 +80,45 @@ impl DiscourseClient {
     pub(crate) fn delete(&self, path: &str) -> Result<reqwest::blocking::Response> {
         let url = format!("{}{}", self.baseurl, path);
         self.client.delete(url).send().context("sending delete request")
+    }
+
+    /// Send a request, retrying up to 5 times on HTTP 429 responses.
+    ///
+    /// The `build` closure is called once per attempt and must produce a fresh
+    /// `RequestBuilder` each time; this lets callers with non-cloneable bodies
+    /// (e.g. multipart forms) participate in retries.
+    pub(crate) fn send_retrying<F>(&self, mut build: F) -> Result<Response>
+    where
+        F: FnMut() -> Result<RequestBuilder>,
+    {
+        let mut attempt: u32 = 0;
+        loop {
+            let rb = build()?;
+            let response = rb.send().context("sending request")?;
+            if response.status() != StatusCode::TOO_MANY_REQUESTS {
+                return Ok(response);
+            }
+            let headers = response.headers().clone();
+            let body = response
+                .text()
+                .unwrap_or_else(|_| "<failed to read 429 body>".to_string());
+            if attempt >= MAX_RATE_LIMIT_RETRIES {
+                return Err(anyhow!(
+                    "rate-limited after {} retries: {}",
+                    MAX_RATE_LIMIT_RETRIES,
+                    summarize_rate_limit_body(&body)
+                ));
+            }
+            attempt += 1;
+            let wait = parse_rate_limit_wait(&headers, &body) + RETRY_BUFFER;
+            eprintln!(
+                "Rate limited, waiting {}s (retry {}/{})",
+                wait.as_secs(),
+                attempt,
+                MAX_RATE_LIMIT_RETRIES
+            );
+            std::thread::sleep(wait);
+        }
     }
 
     /// Fetch the Discourse site title.

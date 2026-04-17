@@ -16,6 +16,10 @@ If `emoji-path` is a directory, uploads all `.png`, `.jpg`, `.jpeg`, `.gif`, `.s
 
 If your instance requires a `client_id` query parameter for admin emoji endpoints, set `DSC_EMOJI_CLIENT_ID` to append it automatically.
 
+Bulk uploads retry automatically on HTTP 429 responses, reading the wait time from the `Retry-After` header, the `extras.wait_seconds` JSON field, or the message body.
+
+If you consistently hit rate limits on large batches, raise `DISCOURSE_MAX_ADMIN_API_REQS_PER_MINUTE` (default 60). This is a Discourse global setting, not a site setting — it is not visible in the Admin UI. On a standard Docker install, set it under `env:` in `/var/discourse/containers/app.yml` and rebuild the container. Nginx-level 429s (HTML body, `nginx` in the response) come from the reverse proxy, not Discourse itself, and must be raised in the proxy config.
+
 ## dsc emoji list
 
 ```

@@ -9,6 +9,10 @@ pub struct Cli {
     /// Path to the config file. If omitted, dsc searches standard locations.
     #[arg(long, short = 'c')]
     pub config: Option<PathBuf>,
+    /// Describe destructive actions without sending them. Supported on a subset
+    /// of commands; unsupported commands run normally.
+    #[arg(long, short = 'n', global = true)]
+    pub dry_run: bool,
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -126,6 +130,12 @@ pub enum Commands {
         /// Discourse name.
         discourse: String,
     },
+    /// Inspect and validate configuration.
+    #[command(visible_alias = "cfg")]
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
     /// Generate shell completion scripts.
     #[command(visible_alias = "comp")]
     Completions {
@@ -139,6 +149,20 @@ pub enum Commands {
     /// Print the dsc version.
     #[command(visible_alias = "ver")]
     Version,
+}
+
+#[derive(Subcommand)]
+pub enum ConfigCommand {
+    /// Probe each configured Discourse: API auth and (optionally) SSH reachability.
+    #[command(visible_alias = "ck")]
+    Check {
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+        /// Skip the SSH reachability probe.
+        #[arg(long)]
+        skip_ssh: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -196,10 +220,10 @@ pub enum TopicCommand {
     Push {
         /// Discourse name.
         discourse: String,
-        /// Local Markdown file path.
-        local_path: PathBuf,
         /// Topic ID.
         topic_id: u64,
+        /// Local Markdown file path.
+        local_path: PathBuf,
     },
     /// Sync a topic and local Markdown file using newest timestamp.
     #[command(visible_alias = "sy")]
@@ -213,6 +237,29 @@ pub enum TopicCommand {
         /// Skip sync confirmation prompt.
         #[arg(long, short = 'y')]
         yes: bool,
+    },
+    /// Reply to a topic with content from a file or stdin.
+    #[command(visible_alias = "r")]
+    Reply {
+        /// Discourse name.
+        discourse: String,
+        /// Topic ID.
+        topic_id: u64,
+        /// Input file path. Reads stdin when omitted or `-`.
+        local_path: Option<PathBuf>,
+    },
+    /// Create a new topic in a category, body from a file or stdin.
+    #[command(visible_alias = "n")]
+    New {
+        /// Discourse name.
+        discourse: String,
+        /// Target category ID.
+        category_id: u64,
+        /// Topic title.
+        #[arg(long, short = 't')]
+        title: String,
+        /// Input file path. Reads stdin when omitted or `-`.
+        local_path: Option<PathBuf>,
     },
 }
 
@@ -259,10 +306,10 @@ pub enum CategoryCommand {
     Push {
         /// Discourse name.
         discourse: String,
-        /// Local directory containing Markdown files.
-        local_path: PathBuf,
         /// Category ID or slug.
         category: String,
+        /// Local directory containing Markdown files.
+        local_path: PathBuf,
     },
 }
 

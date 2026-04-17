@@ -7,11 +7,7 @@ impl DiscourseClient {
     /// Trigger a backup on the Discourse instance.
     pub fn create_backup(&self) -> Result<()> {
         let payload = [("with_uploads", "true")];
-        let response = self
-            .post("/admin/backups.json")?
-            .form(&payload)
-            .send()
-            .context("creating backup")?;
+        let response = self.send_retrying(|| Ok(self.post("/admin/backups.json")?.form(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading backup create response")?;
         if !status.is_success() {
@@ -35,7 +31,7 @@ impl DiscourseClient {
     /// Restore a backup by filename/path.
     pub fn restore_backup(&self, backup_path: &str) -> Result<()> {
         let path = format!("/admin/backups/{}/restore", backup_path);
-        let response = self.post(&path)?.send().context("restoring backup")?;
+        let response = self.send_retrying(|| Ok(self.post(&path)?))?;
         let status = response.status();
         let text = response.text().context("reading backup restore response")?;
         if !status.is_success() {

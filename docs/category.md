@@ -24,8 +24,8 @@ Pulls the category into a directory of Markdown files. If `<local-path>` is omit
 
 ## dsc category push
 
-```
-dsc category push <discourse> <local-path> <category-id-or-slug>
+```text
+dsc category push <discourse> <category-id-or-slug> <local-path>
 ```
 
 Pushes local Markdown files up to the category, creating or updating topics as necessary.

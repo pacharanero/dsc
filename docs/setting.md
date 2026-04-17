@@ -20,8 +20,14 @@ Gets the value of a site setting.
 
 ## dsc setting set
 
-```
+```text
 dsc setting set <discourse> <setting> <value>
 ```
 
 Updates a site setting.
+
+Add `--dry-run` (or `-n`) to preview the change without sending it. Combine with `--tags` to verify a bulk update before it fans out:
+
+```bash
+dsc --dry-run setting set --tags production title "My Forum"
+```

@@ -192,11 +192,7 @@ impl DiscourseClient {
             group.flair_background_color.as_deref(),
         );
         push_opt(&mut payload, "group[bio_raw]", group.bio_raw.as_deref());
-        let response = self
-            .post("/admin/groups")?
-            .form(&payload)
-            .send()
-            .context("creating group")?;
+        let response = self.send_retrying(|| Ok(self.post("/admin/groups")?.form(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading group response body")?;
         if !status.is_success() {

@@ -3,6 +3,7 @@ pub mod backup;
 pub mod category;
 pub mod common;
 pub mod completions;
+pub mod config;
 pub mod emoji;
 pub mod group;
 pub mod import;

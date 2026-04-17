@@ -16,12 +16,9 @@ impl DiscourseClient {
                 setting
             ));
         }
+        let path = format!("/admin/site_settings/{}.json", setting);
         let payload = [("value", value)];
-        let response = self
-            .put(&format!("/admin/site_settings/{}.json", setting))?
-            .form(&payload)
-            .send()
-            .context("updating site setting")?;
+        let response = self.send_retrying(|| Ok(self.put(&path)?.form(&payload)))?;
         let status = response.status();
         let text = response
             .text()

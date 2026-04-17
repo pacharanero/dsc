@@ -17,20 +17,36 @@ Most functionality uses the Discourse REST API. `dsc update` runs remote rebuild
 
 ## Installation
 
-Prerequisites: a recent Rust toolchain (edition 2024; install via [rustup](https://rustup.rs)).
+### Shell installer (Linux and macOS)
 
 ```bash
-# Clone and install
-git clone https://github.com/bawmedical/dsc.git
-cd dsc
-cargo install --path .
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/pacharanero/dsc/releases/latest/download/dsc-rs-installer.sh | sh
 ```
 
-Or build without installing:
+Downloads a prebuilt binary for your platform and installs it to `~/.cargo/bin` (or `$CARGO_HOME/bin` if set). Supports `x86_64` and `aarch64` on both Linux and macOS.
+
+### From crates.io
+
+If you already have a Rust toolchain:
 
 ```bash
-cargo build --release
-./target/release/dsc --help
+cargo install dsc-rs
+```
+
+The crate is published as `dsc-rs` (the `dsc` name was taken), but the installed binary is still `dsc`.
+
+### Direct download
+
+Prebuilt archives for Linux, macOS, and Windows are attached to every [GitHub release](https://github.com/pacharanero/dsc/releases/latest). Download, extract, and drop `dsc` (or `dsc.exe`) anywhere on your `PATH`.
+
+### From source
+
+Requires a recent Rust toolchain (edition 2024; install via [rustup](https://rustup.rs)).
+
+```bash
+git clone https://github.com/pacharanero/dsc.git
+cd dsc
+cargo install --path .
 ```
 
 ## Quick start
@@ -54,7 +70,7 @@ dsc list
 dsc topic pull myforum 42
 
 # Push the edited topic back up
-dsc topic push myforum ./topic-title.md 42
+dsc topic push myforum 42 ./topic-title.md
 
 # Update a forum over SSH
 dsc update myforum
@@ -78,6 +94,7 @@ dsc update myforum
   - [group](docs/group.md) — list, inspect, and copy groups
   - [backup](docs/backup.md) — create, list, and restore backups
   - [setting](docs/setting.md) — get and set site settings
+  - [config](docs/config.md) — inspect and validate the dsc config itself
 - [Shell completions](docs/completions.md) — bash, zsh, and fish
 - [Development](docs/development.md) — building, testing, releasing, project layout
 

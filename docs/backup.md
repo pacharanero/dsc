@@ -20,8 +20,14 @@ Lists all backups on the specified Discourse. Supports the same formats as `dsc 
 
 ## dsc backup restore
 
-```
+```text
 dsc backup restore <discourse> <backup-path>
 ```
 
 Restores the specified backup. `<backup-path>` is the backup filename as shown by `dsc backup list`.
+
+Restoration is destructive and irreversible. Use `--dry-run` (or `-n`) to preview the operation before committing:
+
+```bash
+dsc --dry-run backup restore myforum discourse-2026-04-17-230000.tar.gz
+```

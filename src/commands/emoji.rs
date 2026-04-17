@@ -5,6 +5,7 @@ use crate::config::Config;
 use crate::utils::slugify;
 use anyhow::{Context, Result, anyhow};
 use base64::Engine;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
@@ -54,12 +55,21 @@ pub fn add_emoji(
         let mut uploaded = 0usize;
         let mut skipped_existing = 0usize;
         let mut failures: Vec<(String, String, String)> = Vec::new();
+
+        let bar = ProgressBar::new(files.len() as u64);
+        bar.set_style(
+            ProgressStyle::with_template("{bar:30} {pos}/{len} {msg}")
+                .unwrap_or_else(|_| ProgressStyle::default_bar()),
+        );
+
         for path in files {
             let name = emoji_name_from_path(&path)?;
             let key = emoji_key(&name);
+            bar.set_message(name.clone());
             if existing_names.contains(&key) {
                 skipped_existing += 1;
-                println!("Skipped existing emoji {} from {}", name, path.display());
+                bar.println(format!("skip  {} (already exists)", name));
+                bar.inc(1);
                 continue;
             }
 
@@ -67,18 +77,21 @@ pub fn add_emoji(
                 Ok(_) => {
                     uploaded += 1;
                     existing_names.insert(key);
-                    println!("Uploaded emoji {} from {}", name, path.display());
+                    bar.println(format!("add   {}", name));
                 }
                 Err(err) if is_duplicate_emoji_error(&err) => {
                     skipped_existing += 1;
                     existing_names.insert(key);
-                    println!("Skipped existing emoji {} from {}", name, path.display());
+                    bar.println(format!("skip  {} (already exists)", name));
                 }
                 Err(err) => {
+                    bar.println(format!("FAIL  {} — {}", name, err));
                     failures.push((name, path.display().to_string(), err.to_string()));
                 }
             }
+            bar.inc(1);
         }
+        bar.finish_and_clear();
 
         if !failures.is_empty() {
             eprintln!("Emoji upload failures:");

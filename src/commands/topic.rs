@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::utils::{read_markdown, resolve_topic_path, write_markdown};
 use anyhow::{Context, Result, anyhow};
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::Path;
 
 pub fn topic_pull(
@@ -114,6 +114,90 @@ pub fn topic_sync(
     }
 
     Ok(())
+}
+
+pub fn topic_reply(
+    config: &Config,
+    discourse_name: &str,
+    topic_id: u64,
+    local_path: Option<&Path>,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    let raw = read_reply_input(local_path)?;
+    if raw.trim().is_empty() {
+        return Err(anyhow!("reply body is empty"));
+    }
+
+    let post_id = client.create_post(topic_id, &raw)?;
+    println!("Replied to topic {} (post id {})", topic_id, post_id);
+    Ok(())
+}
+
+pub fn topic_new(
+    config: &Config,
+    discourse_name: &str,
+    category_id: u64,
+    title: &str,
+    local_path: Option<&Path>,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    if title.trim().is_empty() {
+        return Err(anyhow!("topic title is empty"));
+    }
+    let raw = read_reply_input(local_path)?;
+    if raw.trim().is_empty() {
+        return Err(anyhow!("topic body is empty"));
+    }
+
+    let topic_id = client.create_topic(category_id, title, &raw)?;
+    println!("Created topic {} in category {}", topic_id, category_id);
+    Ok(())
+}
+
+fn read_reply_input(local_path: Option<&Path>) -> Result<String> {
+    let from_stdin = match local_path {
+        None => true,
+        Some(p) => p.as_os_str() == "-",
+    };
+    if from_stdin {
+        let mut buf = String::new();
+        io::stdin()
+            .read_to_string(&mut buf)
+            .context("reading reply from stdin")?;
+        Ok(buf)
+    } else {
+        let path = local_path.unwrap();
+        fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_reply_input;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn read_reply_input_reads_from_file() {
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "hello from file").unwrap();
+        let got = read_reply_input(Some(f.path())).unwrap();
+        assert_eq!(got.trim(), "hello from file");
+    }
+
+    #[test]
+    fn read_reply_input_missing_file_surfaces_path_in_error() {
+        let bogus = std::path::Path::new("/definitely/does/not/exist.md");
+        let err = read_reply_input(Some(bogus)).unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("/definitely/does/not/exist.md"));
+    }
 }
 
 fn confirm_sync(pull: bool) -> Result<bool> {

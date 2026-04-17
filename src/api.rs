@@ -7,6 +7,7 @@ mod groups;
 mod models;
 mod palettes;
 mod plugins;
+mod rate_limit;
 mod settings;
 mod themes;
 mod topics;

@@ -107,3 +107,68 @@ pub fn color_discourse_label(label: &str, key: &str) -> String {
     let code = discourse_color_code(key);
     format!("\x1b[1;{}m{}\x1b[0m", code, label)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slugify_simple_ascii() {
+        assert_eq!(slugify("Hello World"), "hello-world");
+    }
+
+    #[test]
+    fn slugify_collapses_runs_of_non_alnum() {
+        assert_eq!(slugify("a   b___c!!!d"), "a-b-c-d");
+    }
+
+    #[test]
+    fn slugify_trims_leading_and_trailing_dashes() {
+        assert_eq!(slugify("   hello   "), "hello");
+        assert_eq!(slugify("!!!foo!!!"), "foo");
+    }
+
+    #[test]
+    fn slugify_empty_input_returns_untitled() {
+        assert_eq!(slugify(""), "untitled");
+        assert_eq!(slugify("   "), "untitled");
+        assert_eq!(slugify("!!!"), "untitled");
+    }
+
+    #[test]
+    fn slugify_preserves_numbers() {
+        assert_eq!(slugify("Topic 42 - intro"), "topic-42-intro");
+    }
+
+    #[test]
+    fn slugify_lowercases() {
+        assert_eq!(slugify("ABCxyz"), "abcxyz");
+    }
+
+    #[test]
+    fn normalize_baseurl_strips_trailing_slashes() {
+        assert_eq!(normalize_baseurl("https://example.com/"), "https://example.com");
+        assert_eq!(normalize_baseurl("https://example.com///"), "https://example.com");
+        assert_eq!(normalize_baseurl("https://example.com"), "https://example.com");
+    }
+
+    #[test]
+    fn normalize_baseurl_preserves_no_trailing() {
+        assert_eq!(normalize_baseurl(""), "");
+    }
+
+    #[test]
+    fn resolve_topic_path_uses_title_when_no_path_given() {
+        let default_dir = Path::new("/tmp/dsc-test");
+        let out = resolve_topic_path(None, "Hello World", default_dir).unwrap();
+        assert_eq!(out, default_dir.join("hello-world.md"));
+    }
+
+    #[test]
+    fn resolve_topic_path_uses_given_path_with_extension() {
+        let default_dir = Path::new("/tmp/dsc-test");
+        let explicit = Path::new("/tmp/custom.md");
+        let out = resolve_topic_path(Some(explicit), "Ignored", default_dir).unwrap();
+        assert_eq!(out, explicit);
+    }
+}

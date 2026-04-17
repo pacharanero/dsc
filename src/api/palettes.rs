@@ -46,10 +46,7 @@ impl DiscourseClient {
             payload.push((format!("color_scheme[colors][{}]", key), value.to_string()));
         }
         let response = self
-            .post("/admin/color_schemes.json")?
-            .form(&payload)
-            .send()
-            .context("creating color scheme")?;
+            .send_retrying(|| Ok(self.post("/admin/color_schemes.json")?.form(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading color scheme response")?;
         if !status.is_success() {
@@ -82,11 +79,8 @@ impl DiscourseClient {
         for (key, value) in colors {
             payload.push((format!("color_scheme[colors][{}]", key), value.to_string()));
         }
-        let response = self
-            .put(&format!("/admin/color_schemes/{}.json", scheme_id))?
-            .form(&payload)
-            .send()
-            .context("updating color scheme")?;
+        let path = format!("/admin/color_schemes/{}.json", scheme_id);
+        let response = self.send_retrying(|| Ok(self.put(&path)?.form(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading color scheme response")?;
         if !status.is_success() {

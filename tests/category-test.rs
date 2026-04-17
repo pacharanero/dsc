@@ -137,8 +137,8 @@ fn category_push() {
             "category",
             "push",
             &test.name,
-            dir.path().to_str().unwrap(),
             &category_id.to_string(),
+            dir.path().to_str().unwrap(),
         ],
         &config_path,
     );

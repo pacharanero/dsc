@@ -64,8 +64,8 @@ fn topic_push() {
             "topic",
             "push",
             &test.name,
-            file_path.to_str().unwrap(),
             &topic_id.to_string(),
+            file_path.to_str().unwrap(),
         ],
         &config_path,
     );

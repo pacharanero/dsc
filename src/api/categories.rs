@@ -17,7 +17,7 @@ impl DiscourseClient {
             if status == StatusCode::NOT_FOUND {
                 return Err(anyhow!("category not found: {}", category_id));
             }
-            return Err(anyhow!("category request failed with {}", status));
+            return Err(http_error("category request", status, &text));
         }
         let body: CategoryResponse =
             serde_json::from_str(&text).context("reading category json")?;
@@ -32,7 +32,7 @@ impl DiscourseClient {
             .text()
             .context("reading categories response body")?;
         if !status.is_success() {
-            return Err(anyhow!("categories request failed with {}", status));
+            return Err(http_error("categories request", status, &text));
         }
         let body: CategoriesResponse =
             serde_json::from_str(&text).context("reading categories json")?;
@@ -67,15 +67,11 @@ impl DiscourseClient {
         if let Some(text_color) = category.text_color.clone() {
             payload.push(("text_color", text_color));
         }
-        let response = self
-            .post("/categories")?
-            .form(&payload)
-            .send()
-            .context("creating category")?;
+        let response = self.send_retrying(|| Ok(self.post("/categories")?.form(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading category response body")?;
         if !status.is_success() {
-            return Err(anyhow!("create category failed with {}", status));
+            return Err(http_error("create category request", status, &text));
         }
         let body: CreateCategoryResponse =
             serde_json::from_str(&text).context("reading category response")?;

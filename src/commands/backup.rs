@@ -138,9 +138,21 @@ pub fn backup_list(
     Ok(())
 }
 
-pub fn backup_restore(config: &Config, discourse_name: &str, backup_path: &str) -> Result<()> {
+pub fn backup_restore(
+    config: &Config,
+    discourse_name: &str,
+    backup_path: &str,
+    dry_run: bool,
+) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
+    if dry_run {
+        println!(
+            "[dry-run] {}: would restore backup {}",
+            discourse.name, backup_path
+        );
+        return Ok(());
+    }
     let client = DiscourseClient::new(discourse)?;
     client.restore_backup(backup_path)?;
     Ok(())

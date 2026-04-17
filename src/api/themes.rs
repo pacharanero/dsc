@@ -32,11 +32,7 @@ impl DiscourseClient {
     /// Create a new theme and return its ID.
     pub fn create_theme(&self, theme: &Value) -> Result<u64> {
         let payload = json!({ "theme": theme });
-        let response = self
-            .post("/admin/themes.json")?
-            .json(&payload)
-            .send()
-            .context("creating theme")?;
+        let response = self.send_retrying(|| Ok(self.post("/admin/themes.json")?.json(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading create theme response")?;
         if !status.is_success() {
@@ -67,11 +63,8 @@ impl DiscourseClient {
     /// Update an existing theme.
     pub fn update_theme(&self, theme_id: u64, theme: &Value) -> Result<()> {
         let payload = json!({ "theme": theme });
-        let response = self
-            .put(&format!("/admin/themes/{}.json", theme_id))?
-            .json(&payload)
-            .send()
-            .context("updating theme")?;
+        let path = format!("/admin/themes/{}.json", theme_id);
+        let response = self.send_retrying(|| Ok(self.put(&path)?.json(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading update theme response")?;
         if !status.is_success() {
