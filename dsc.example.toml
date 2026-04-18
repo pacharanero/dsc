@@ -1,16 +1,25 @@
-# each Discourse should have its own [[discourse]] above, in double square brackets
-[[discourse]]
-name = "myforum" # unique name for this Discourse install
-fullname = "My Forum" # Discourse site title (optional)
-baseurl = "https://forum.example.com" # base URL of the Discourse install
-apikey = "your_api_key_here" # API key with appropriate permissions
-api_username = "system" # API username
-changelog_topic_id = 123
+# Each Discourse install gets its own [[discourse]] block.
+# Only `name` and `baseurl` are required; everything else is optional but
+# unlocks more functionality (admin commands need apikey/api_username, SSH
+# rebuilds need ssh_host, filtering needs tags, changelog posting needs
+# changelog_topic_id).
 
 [[discourse]]
-name = "otherforum" # unique name for this Discourse install
-fullname = "Other Forum" # Discourse site title (optional)
-baseurl = "https://community.example.org" # base URL of the Discourse install
-apikey = "your_other_api_key_here" # API key with appropriate permissions
-api_username = "system" # API username
-changelog_topic_id = 456 # topic ID of a Changelog Topic on the forum
+name = "myforum"                                   # unique short name; used everywhere in the CLI
+fullname = "My Forum"                              # Discourse site title (optional; display-only)
+baseurl = "https://forum.example.com"              # base URL of the Discourse install
+apikey = "your_api_key_here"                       # admin API key
+api_username = "system"                            # API username the key acts as
+ssh_host = "forum.example.com"                     # host used by `dsc update` over SSH (optional)
+tags = ["production", "uk"]                        # free-form tags; used by `--tags` filters (optional)
+changelog_topic_id = 123                           # topic id to post rebuild changelogs into (optional)
+
+[[discourse]]
+name = "otherforum"
+fullname = "Other Forum"
+baseurl = "https://community.example.org"
+apikey = "your_other_api_key_here"
+api_username = "system"
+ssh_host = "community.example.org"
+tags = ["staging"]
+changelog_topic_id = 456
