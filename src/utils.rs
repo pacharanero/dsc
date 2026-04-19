@@ -108,6 +108,59 @@ pub fn color_discourse_label(label: &str, key: &str) -> String {
     format!("\x1b[1;{}m{}\x1b[0m", code, label)
 }
 
+/// Parse a `--since`-style value. Accepts either a relative duration
+/// (`7d`, `24h`, `30m`, `1w`, `90s`) or an ISO-8601 absolute timestamp
+/// (`2026-04-01`, `2026-04-01T12:00:00Z`). Returns the resulting cutoff
+/// instant (now - duration, or the ISO value itself).
+pub fn parse_since_cutoff(input: &str) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
+    use anyhow::anyhow;
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Err(anyhow!("empty --since value"));
+    }
+
+    if let Some(duration) = parse_relative_duration(trimmed) {
+        return Ok(chrono::Utc::now() - duration);
+    }
+
+    // Try RFC3339 (full timestamp).
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(trimmed) {
+        return Ok(dt.with_timezone(&chrono::Utc));
+    }
+    // Try date-only — treat as midnight UTC.
+    if let Ok(d) = chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
+        return Ok(
+            chrono::NaiveDateTime::new(d, chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap())
+                .and_utc(),
+        );
+    }
+
+    Err(anyhow!(
+        "unrecognised --since value: {:?} (expected e.g. `7d`, `24h`, `30m`, `1w`, or an ISO-8601 timestamp)",
+        input
+    ))
+}
+
+/// Parse a relative duration like `7d`, `24h`, `30m`, `1w`, `90s`.
+/// Intentionally does not support months/years (imprecise) — use ISO-8601
+/// for those.
+pub fn parse_relative_duration(input: &str) -> Option<chrono::Duration> {
+    let s = input.trim();
+    if s.len() < 2 {
+        return None;
+    }
+    let (digits, unit) = s.split_at(s.len() - 1);
+    let n: i64 = digits.parse().ok()?;
+    match unit {
+        "s" => Some(chrono::Duration::seconds(n)),
+        "m" => Some(chrono::Duration::minutes(n)),
+        "h" => Some(chrono::Duration::hours(n)),
+        "d" => Some(chrono::Duration::days(n)),
+        "w" => Some(chrono::Duration::weeks(n)),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,4 +224,69 @@ mod tests {
         let out = resolve_topic_path(Some(explicit), "Ignored", default_dir).unwrap();
         assert_eq!(out, explicit);
     }
+
+    #[test]
+    fn parse_relative_duration_common_units() {
+        assert_eq!(
+            parse_relative_duration("7d"),
+            Some(chrono::Duration::days(7))
+        );
+        assert_eq!(
+            parse_relative_duration("24h"),
+            Some(chrono::Duration::hours(24))
+        );
+        assert_eq!(
+            parse_relative_duration("30m"),
+            Some(chrono::Duration::minutes(30))
+        );
+        assert_eq!(
+            parse_relative_duration("1w"),
+            Some(chrono::Duration::weeks(1))
+        );
+        assert_eq!(
+            parse_relative_duration("90s"),
+            Some(chrono::Duration::seconds(90))
+        );
+    }
+
+    #[test]
+    fn parse_relative_duration_rejects_nonsense() {
+        assert!(parse_relative_duration("").is_none());
+        assert!(parse_relative_duration("d").is_none());
+        assert!(parse_relative_duration("7x").is_none());
+        assert!(parse_relative_duration("abc").is_none());
+        assert!(parse_relative_duration("7y").is_none());
+    }
+
+    #[test]
+    fn parse_since_cutoff_iso_date() {
+        let cutoff = parse_since_cutoff("2026-01-01").unwrap();
+        assert_eq!(cutoff.to_rfc3339(), "2026-01-01T00:00:00+00:00");
+    }
+
+    #[test]
+    fn parse_since_cutoff_iso_timestamp() {
+        let cutoff = parse_since_cutoff("2026-04-15T12:30:00Z").unwrap();
+        assert_eq!(cutoff.to_rfc3339(), "2026-04-15T12:30:00+00:00");
+    }
+
+    #[test]
+    fn parse_since_cutoff_relative_is_in_the_past() {
+        let now = chrono::Utc::now();
+        let cutoff = parse_since_cutoff("7d").unwrap();
+        let diff = now - cutoff;
+        // Should be very close to 7 days (within a second).
+        assert!(
+            (diff - chrono::Duration::days(7)).num_seconds().abs() < 2,
+            "expected ~7 day delta, got {}",
+            diff
+        );
+    }
+
+    #[test]
+    fn parse_since_cutoff_rejects_garbage() {
+        assert!(parse_since_cutoff("not a date").is_err());
+        assert!(parse_since_cutoff("").is_err());
+    }
 }
+

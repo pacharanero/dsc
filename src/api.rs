@@ -16,6 +16,7 @@ mod tags;
 mod themes;
 mod topics;
 mod uploads;
+mod user_actions;
 mod users;
 
 pub use api_keys::{ApiKeySummary, CreatedApiKey};
@@ -27,4 +28,5 @@ pub use search::SearchHit;
 pub use tags::TagInfo;
 pub use topics::{PmTopicSummary, PostInfo};
 pub use uploads::UploadInfo;
+pub use user_actions::UserAction;
 pub use users::{UserDetail, UserSummary};

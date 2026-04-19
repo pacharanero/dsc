@@ -95,7 +95,7 @@ dsc update myforum
   - [plugin](docs/plugin.md) — list, install, and remove plugins
   - [theme](docs/theme.md) — list, install, remove, pull, push, and duplicate themes
   - [group](docs/group.md) — list, inspect, copy, and bulk-add members
-  - [user](docs/user.md) — list, inspect, suspend, and manage group memberships
+  - [user](docs/user.md) — list, inspect, suspend, archive activity, and manage group memberships
   - [invite](docs/invite.md) — send invites, single or bulk from a file
   - [pm](docs/pm.md) — send and list private messages
   - [api-key](docs/api-key.md) — manage Discourse API keys

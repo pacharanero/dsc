@@ -2,13 +2,23 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use dsc::cli::*;
 use dsc::commands;
-use dsc::commands::user::Role;
+use dsc::commands::user::{ActivityFormat, Role};
 use dsc::config::{load_config, resolve_default_config_path, save_config};
 
 fn map_role(role: RoleArg) -> Role {
     match role {
         RoleArg::Admin => Role::Admin,
         RoleArg::Moderator => Role::Moderator,
+    }
+}
+
+fn map_activity_format(f: ActivityFormatArg) -> ActivityFormat {
+    match f {
+        ActivityFormatArg::Text => ActivityFormat::Text,
+        ActivityFormatArg::Json => ActivityFormat::Json,
+        ActivityFormatArg::Yaml => ActivityFormat::Yaml,
+        ActivityFormatArg::Markdown => ActivityFormat::Markdown,
+        ActivityFormatArg::Csv => ActivityFormat::Csv,
     }
 }
 
@@ -364,6 +374,25 @@ fn main() -> Result<()> {
                 map_role(role),
                 dry_run,
             ),
+            UserCommand::Activity {
+                discourse,
+                username,
+                since,
+                types,
+                limit,
+                format,
+            } => {
+                let names: Vec<String> = vec![types];
+                commands::user::user_activity(
+                    &config,
+                    &discourse,
+                    &username,
+                    &names,
+                    since.as_deref(),
+                    limit,
+                    map_activity_format(format),
+                )
+            }
             UserCommand::Groups { command } => match command {
                 UserGroupsCommand::List {
                     discourse,

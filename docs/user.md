@@ -71,6 +71,45 @@ dsc user demote <discourse> <username> --role admin|moderator
 
 Revokes the role from the user. Honours `--dry-run`.
 
+## dsc user activity
+
+```text
+dsc user activity <discourse> <username> [--since <when>] [--types <csv>] [--limit N] [--format text|json|yaml|markdown|csv]
+```
+
+Reads the user's public activity feed (`/user_actions.json`) and renders it in the chosen format. Default output is **markdown**, defaulting to **topics + replies** for the last time window you specify.
+
+### Use case: archive your activity to a personal journal Discourse
+
+The command is built for this workflow: keep a personal "journal" Discourse of your own, and use a nightly/weekly cron to roll up everything you posted on another forum into a single topic. Because the output is a markdown list of `- [Title](URL) — date`, it drops straight into a reply on the journal forum without any massaging.
+
+**Weekly roll-up via cron** — one topic per week, subject containing the ISO week:
+
+```bash
+dsc user activity someforum marcus --since 7d \
+  | dsc topic new bawmedical 42 --title "Activity for $(date -u +%Y-W%V)"
+```
+
+**Appending to a single rolling archive topic** — one topic forever, daily reply:
+
+```bash
+dsc user activity someforum marcus --since 24h \
+  | dsc topic reply bawmedical 1234
+```
+
+Put either in `crontab -e` or a systemd timer and the archive maintains itself.
+
+### Flags
+
+- `--since` accepts a relative duration (`7d`, `24h`, `30m`, `1w`, `90s`) or an ISO-8601 date/timestamp. Omit to paginate everything available.
+- `--types` is a comma-separated list. Default `topics,replies`. Recognised names: `topics`, `replies`, `mentions`, `quotes`, `likes`, `edits`, `responses`.
+- `--limit` caps the number of items, independently of `--since`.
+- `--format markdown` (default) prints `- [Title](URL) — date` lines; `text` is a wider one-row-per-item human view; `json`, `yaml`, `csv` are structured.
+
+### Scope
+
+Activity endpoint only returns entries the caller is allowed to see, so PMs and private-category posts are filtered out automatically — exactly what you want for a public archive.
+
 ## dsc user groups list
 
 ```text

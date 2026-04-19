@@ -801,12 +801,48 @@ pub enum UserCommand {
         #[arg(long, short = 'r', value_enum)]
         role: RoleArg,
     },
+    /// Show a user's recent public activity (topics + replies by default).
+    ///
+    /// Built for the "archive my own activity to a journal forum" loop —
+    /// pipe the markdown output straight into `dsc topic reply`/`topic new`.
+    #[command(visible_alias = "act")]
+    Activity {
+        /// Discourse name (the *source* forum to read activity from).
+        discourse: String,
+        /// Username whose activity to read.
+        username: String,
+        /// How far back to look. Accepts `7d`, `24h`, `30m`, `1w`, `90s`, or
+        /// an ISO-8601 timestamp / date. Omit to fetch everything available.
+        #[arg(long, short = 's')]
+        since: Option<String>,
+        /// Action types to include, comma-separated. Default: topics,replies.
+        /// Also recognises: mentions, quotes, likes, edits, responses.
+        #[arg(long, short = 't', default_value = "topics,replies")]
+        types: String,
+        /// Hard cap on number of items returned.
+        #[arg(long, short = 'L')]
+        limit: Option<u32>,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "markdown")]
+        format: ActivityFormatArg,
+    },
     /// Manage a user's group memberships.
     #[command(visible_alias = "g")]
     Groups {
         #[command(subcommand)]
         command: UserGroupsCommand,
     },
+}
+
+#[derive(ValueEnum, Clone, Copy)]
+pub enum ActivityFormatArg {
+    Text,
+    Json,
+    #[value(alias = "yml")]
+    Yaml,
+    #[value(alias = "md")]
+    Markdown,
+    Csv,
 }
 
 #[derive(ValueEnum, Clone, Copy)]

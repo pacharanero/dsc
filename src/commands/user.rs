@@ -1,8 +1,9 @@
-use crate::api::DiscourseClient;
+use crate::api::{DiscourseClient, UserAction};
 use crate::cli::ListFormat;
 use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
-use anyhow::Result;
+use crate::utils::{normalize_baseurl, parse_since_cutoff};
+use anyhow::{Result, anyhow};
 
 pub fn user_list(
     config: &Config,
@@ -408,4 +409,262 @@ pub fn user_groups_remove(
     client.remove_group_members_by_username(group_id, &usernames)?;
     println!("Removed {} from group {}", username, group_id);
     Ok(())
+}
+
+/// Output format variants for `dsc user activity`. Superset of ListFormat —
+/// adds `markdown` and `csv`.
+#[derive(Clone, Copy)]
+pub enum ActivityFormat {
+    Text,
+    Json,
+    Yaml,
+    Markdown,
+    Csv,
+}
+
+/// Fetch a user's recent activity and render it.
+pub fn user_activity(
+    config: &Config,
+    discourse_name: &str,
+    username: &str,
+    type_names: &[String],
+    since: Option<&str>,
+    limit: Option<u32>,
+    format: ActivityFormat,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    let filter_types = resolve_activity_types(type_names)?;
+    let cutoff = match since {
+        Some(raw) => Some(parse_since_cutoff(raw)?),
+        None => None,
+    };
+
+    let mut collected: Vec<UserAction> = Vec::new();
+    let mut offset: u32 = 0;
+    let page_hint: u32 = 30; // Discourse returns ~10-30 depending on version
+    let max = limit.unwrap_or(u32::MAX);
+    loop {
+        let page = client.fetch_user_actions(username, &filter_types, offset)?;
+        if page.is_empty() {
+            break;
+        }
+        let page_len = page.len() as u32;
+
+        let mut past_cutoff = false;
+        for action in page {
+            if let Some(cutoff) = cutoff {
+                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&action.created_at) {
+                    if created.with_timezone(&chrono::Utc) < cutoff {
+                        past_cutoff = true;
+                        continue;
+                    }
+                }
+            }
+            collected.push(action);
+            if collected.len() as u32 >= max {
+                break;
+            }
+        }
+
+        if past_cutoff || collected.len() as u32 >= max {
+            break;
+        }
+        offset = offset.saturating_add(page_len.max(page_hint));
+    }
+
+    render_activity(&collected, &normalize_baseurl(&discourse.baseurl), format)
+}
+
+fn render_activity(
+    actions: &[UserAction],
+    baseurl: &str,
+    format: ActivityFormat,
+) -> Result<()> {
+    match format {
+        ActivityFormat::Text => {
+            if actions.is_empty() {
+                println!("No activity in that window.");
+                return Ok(());
+            }
+            for a in actions {
+                let date = a.created_at.split('T').next().unwrap_or(&a.created_at);
+                let title = a.title.as_deref().unwrap_or("(untitled)");
+                let kind = action_type_label(a.action_type);
+                println!(
+                    "{}  [{:<6}]  {}  {}",
+                    date,
+                    kind,
+                    title,
+                    activity_url(baseurl, a)
+                );
+            }
+        }
+        ActivityFormat::Markdown => {
+            for a in actions {
+                let date = a.created_at.split('T').next().unwrap_or(&a.created_at);
+                let title = a.title.as_deref().unwrap_or("(untitled)");
+                println!(
+                    "- [{}]({}) — {}",
+                    title,
+                    activity_url(baseurl, a),
+                    date
+                );
+            }
+        }
+        ActivityFormat::Csv => {
+            println!("date,type,title,url");
+            for a in actions {
+                let date = a.created_at.split('T').next().unwrap_or(&a.created_at);
+                let title = a.title.as_deref().unwrap_or("").replace('"', "\"\"");
+                println!(
+                    "{},{},\"{}\",{}",
+                    date,
+                    action_type_label(a.action_type),
+                    title,
+                    activity_url(baseurl, a)
+                );
+            }
+        }
+        ActivityFormat::Json => println!("{}", serde_json::to_string_pretty(&actions)?),
+        ActivityFormat::Yaml => println!("{}", serde_yaml::to_string(&actions)?),
+    }
+    Ok(())
+}
+
+/// Construct the public URL for a user-action row.
+pub(crate) fn activity_url(baseurl: &str, a: &UserAction) -> String {
+    let slug = a.slug.as_deref().unwrap_or("-");
+    match a.post_number {
+        Some(n) if n > 1 => format!("{}/t/{}/{}/{}", baseurl, slug, a.topic_id, n),
+        _ => format!("{}/t/{}/{}", baseurl, slug, a.topic_id),
+    }
+}
+
+/// Discourse's UserAction::Types numeric constants.
+const ACTION_LIKE: u32 = 1;
+const ACTION_NEW_TOPIC: u32 = 4;
+const ACTION_REPLY: u32 = 5;
+const ACTION_RESPONSE: u32 = 6;
+const ACTION_MENTION: u32 = 7;
+const ACTION_QUOTE: u32 = 9;
+const ACTION_EDIT: u32 = 11;
+
+fn action_type_label(n: u32) -> &'static str {
+    match n {
+        ACTION_LIKE => "like",
+        ACTION_NEW_TOPIC => "topic",
+        ACTION_REPLY => "reply",
+        ACTION_RESPONSE => "resp",
+        ACTION_MENTION => "@",
+        ACTION_QUOTE => "quote",
+        ACTION_EDIT => "edit",
+        _ => "?",
+    }
+}
+
+/// Map friendly type names on the command line to Discourse's numeric filters.
+pub(crate) fn resolve_activity_types(names: &[String]) -> Result<Vec<u32>> {
+    if names.is_empty() {
+        return Ok(vec![ACTION_NEW_TOPIC, ACTION_REPLY]);
+    }
+    let mut out = Vec::new();
+    for raw in names {
+        for piece in raw.split(',') {
+            let piece = piece.trim().to_ascii_lowercase();
+            if piece.is_empty() {
+                continue;
+            }
+            let n = match piece.as_str() {
+                "topic" | "topics" | "new_topic" => ACTION_NEW_TOPIC,
+                "reply" | "replies" => ACTION_REPLY,
+                "response" | "responses" => ACTION_RESPONSE,
+                "mention" | "mentions" => ACTION_MENTION,
+                "quote" | "quotes" => ACTION_QUOTE,
+                "like" | "likes" => ACTION_LIKE,
+                "edit" | "edits" => ACTION_EDIT,
+                other => {
+                    return Err(anyhow!(
+                        "unknown activity type: {:?} (known: topics, replies, mentions, quotes, likes, edits, responses)",
+                        other
+                    ));
+                }
+            };
+            if !out.contains(&n) {
+                out.push(n);
+            }
+        }
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::UserAction;
+
+    #[test]
+    fn default_activity_types_are_topics_and_replies() {
+        assert_eq!(
+            resolve_activity_types(&[]).unwrap(),
+            vec![ACTION_NEW_TOPIC, ACTION_REPLY]
+        );
+    }
+
+    #[test]
+    fn activity_types_accept_plural_and_csv() {
+        let got = resolve_activity_types(&["topics,mentions".to_string()]).unwrap();
+        assert_eq!(got, vec![ACTION_NEW_TOPIC, ACTION_MENTION]);
+    }
+
+    #[test]
+    fn activity_types_dedupe() {
+        let got = resolve_activity_types(&["reply,reply,replies".to_string()]).unwrap();
+        assert_eq!(got, vec![ACTION_REPLY]);
+    }
+
+    #[test]
+    fn activity_types_reject_unknown() {
+        assert!(resolve_activity_types(&["nonsense".to_string()]).is_err());
+    }
+
+    #[test]
+    fn activity_url_for_reply_includes_post_number() {
+        let a = UserAction {
+            action_type: ACTION_REPLY,
+            created_at: "2026-04-15T12:00:00Z".to_string(),
+            title: Some("Hi".to_string()),
+            slug: Some("hi-there".to_string()),
+            topic_id: 42,
+            post_id: Some(999),
+            post_number: Some(3),
+            username: Some("alice".to_string()),
+            excerpt: None,
+        };
+        assert_eq!(
+            activity_url("https://f.example", &a),
+            "https://f.example/t/hi-there/42/3"
+        );
+    }
+
+    #[test]
+    fn activity_url_for_op_omits_post_number() {
+        let a = UserAction {
+            action_type: ACTION_NEW_TOPIC,
+            created_at: "2026-04-15T12:00:00Z".to_string(),
+            title: Some("Hi".to_string()),
+            slug: Some("hi-there".to_string()),
+            topic_id: 42,
+            post_id: Some(999),
+            post_number: Some(1),
+            username: Some("alice".to_string()),
+            excerpt: None,
+        };
+        assert_eq!(
+            activity_url("https://f.example", &a),
+            "https://f.example/t/hi-there/42"
+        );
+    }
 }
