@@ -110,6 +110,18 @@ Put either in `crontab -e` or a systemd timer and the archive maintains itself.
 
 Activity endpoint only returns entries the caller is allowed to see, so PMs and private-category posts are filtered out automatically — exactly what you want for a public archive.
 
+### Works without an API key
+
+Because `/user_actions.json` returns public data to anyone who can read the forum in a browser, `dsc user activity` does **not** require `apikey` / `api_username` in your config. A minimal entry like:
+
+```toml
+[[discourse]]
+name = "meta"
+baseurl = "https://meta.discourse.org"
+```
+
+is enough to archive your public activity from a forum where you're a regular user (not an admin). If the forum is login-walled or the user profile is private, the server will return 401/403 and `dsc` will surface the usual credentials hint.
+
 ## dsc user groups list
 
 ```text

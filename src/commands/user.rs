@@ -433,7 +433,11 @@ pub fn user_activity(
     format: ActivityFormat,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
-    ensure_api_credentials(discourse)?;
+    // Activity is read-only, and Discourse's user_actions.json is public for
+    // forums that allow anonymous read. Skip the apikey/api_username guard so
+    // this command works on forums where the caller only has a config entry
+    // with baseurl (no admin access). If the forum is login-walled, the API
+    // call will surface a 403/401 with the normal credentials hint.
     let client = DiscourseClient::new(discourse)?;
 
     let filter_types = resolve_activity_types(type_names)?;
