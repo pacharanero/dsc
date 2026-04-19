@@ -219,6 +219,28 @@ fn main() -> Result<()> {
             ),
         },
 
+        Commands::Pm { command } => match command {
+            PmCommand::Send {
+                discourse,
+                recipients,
+                title,
+                local_path,
+            } => commands::pm::pm_send(
+                &config,
+                &discourse,
+                &recipients,
+                &title,
+                local_path.as_deref(),
+                dry_run,
+            ),
+            PmCommand::List {
+                discourse,
+                username,
+                direction,
+                format,
+            } => commands::pm::pm_list(&config, &discourse, &username, &direction, format),
+        },
+
         Commands::ApiKey { command } => match command {
             ApiKeyCommand::List { discourse, format } => {
                 commands::api_key::api_key_list(&config, &discourse, format)

@@ -112,6 +112,12 @@ pub enum Commands {
         #[command(subcommand)]
         command: ApiKeyCommand,
     },
+    /// Send and list private messages.
+    #[command(visible_alias = "msg")]
+    Pm {
+        #[command(subcommand)]
+        command: PmCommand,
+    },
     /// Create/list/restore backups.
     #[command(visible_alias = "bk")]
     Backup {
@@ -590,6 +596,37 @@ pub enum ThemeCommand {
         discourse: String,
         /// Theme ID to duplicate (from `dsc theme list`).
         theme_id: u64,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PmCommand {
+    /// Send a private message.
+    #[command(visible_alias = "s")]
+    Send {
+        /// Discourse name.
+        discourse: String,
+        /// Recipient(s) — comma-separated usernames or group names.
+        recipients: String,
+        /// PM title / subject.
+        #[arg(long, short = 't')]
+        title: String,
+        /// Input file path. Reads stdin when omitted or `-`.
+        local_path: Option<PathBuf>,
+    },
+    /// List PMs for a user.
+    #[command(visible_alias = "ls")]
+    List {
+        /// Discourse name.
+        discourse: String,
+        /// Username whose PMs to list.
+        username: String,
+        /// Direction / view: inbox | sent | archive | unread | new.
+        #[arg(long, short = 'd', default_value = "inbox")]
+        direction: String,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
     },
 }
 

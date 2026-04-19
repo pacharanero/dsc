@@ -16,6 +16,7 @@ pub mod tag;
 pub mod upload;
 pub mod palette;
 pub mod plugin;
+pub mod pm;
 pub mod post;
 pub mod setting;
 pub mod theme;

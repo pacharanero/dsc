@@ -15,6 +15,24 @@ pub struct PostInfo {
     pub raw: Option<String>,
 }
 
+/// Distilled row from /topics/private-messages-*.json.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PmTopicSummary {
+    pub id: u64,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub slug: Option<String>,
+    #[serde(default)]
+    pub posts_count: Option<u64>,
+    #[serde(default)]
+    pub last_posted_at: Option<String>,
+    #[serde(default)]
+    pub last_poster_username: Option<String>,
+    #[serde(default)]
+    pub unread: Option<u64>,
+}
+
 impl DiscourseClient {
     /// Fetch a topic by ID.
     pub fn fetch_topic(&self, topic_id: u64, include_raw: bool) -> Result<TopicResponse> {
@@ -130,6 +148,69 @@ impl DiscourseClient {
         let body: CreatePostResponse =
             serde_json::from_str(&text).context("parsing create topic response")?;
         Ok(body.topic_id)
+    }
+
+    /// Send a private message. `recipients` is comma-joined into Discourse's
+    /// `target_recipients` field (usernames or group names accepted).
+    /// Returns the new topic_id of the PM thread.
+    pub fn create_private_message(
+        &self,
+        recipients: &[String],
+        title: &str,
+        raw: &str,
+    ) -> Result<u64> {
+        let recipients_csv = recipients.join(",");
+        let payload = [
+            ("title", title),
+            ("raw", raw),
+            ("archetype", "private_message"),
+            ("target_recipients", recipients_csv.as_str()),
+        ];
+        let response = self.send_retrying(|| Ok(self.post("/posts.json")?.form(&payload)))?;
+        let status = response.status();
+        let text = response.text().context("reading PM create response body")?;
+        if !status.is_success() {
+            return Err(http_error("create PM request", status, &text));
+        }
+        let body: CreatePostResponse =
+            serde_json::from_str(&text).context("parsing PM create response")?;
+        Ok(body.topic_id)
+    }
+
+    /// List private messages for the given user. `direction` is one of
+    /// `inbox` (received), `sent`, `archive`, `unread`, `new`. Returns
+    /// distilled topic summaries.
+    pub fn list_private_messages(
+        &self,
+        username: &str,
+        direction: &str,
+    ) -> Result<Vec<PmTopicSummary>> {
+        let path = match direction {
+            "inbox" => format!("/topics/private-messages/{}.json", username),
+            "sent" => format!("/topics/private-messages-sent/{}.json", username),
+            "archive" => format!("/topics/private-messages-archive/{}.json", username),
+            "unread" => format!("/topics/private-messages-unread/{}.json", username),
+            "new" => format!("/topics/private-messages-new/{}.json", username),
+            other => format!("/topics/private-messages-{}/{}.json", other, username),
+        };
+        let response = self.get(&path)?;
+        let status = response.status();
+        let text = response.text().context("reading PM list response")?;
+        if !status.is_success() {
+            return Err(http_error("PM list request", status, &text));
+        }
+        let value: Value = serde_json::from_str(&text).context("parsing PM list response")?;
+        let topics = value
+            .get("topic_list")
+            .and_then(|tl| tl.get("topics"))
+            .and_then(|t| t.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| serde_json::from_value::<PmTopicSummary>(v.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(topics)
     }
 
     /// Create a reply post in a topic.
