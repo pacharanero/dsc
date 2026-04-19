@@ -1,4 +1,5 @@
 pub mod add;
+pub mod api_key;
 pub mod backup;
 pub mod category;
 pub mod common;

@@ -219,6 +219,28 @@ fn main() -> Result<()> {
             ),
         },
 
+        Commands::ApiKey { command } => match command {
+            ApiKeyCommand::List { discourse, format } => {
+                commands::api_key::api_key_list(&config, &discourse, format)
+            }
+            ApiKeyCommand::Create {
+                discourse,
+                description,
+                username,
+                format,
+            } => commands::api_key::api_key_create(
+                &config,
+                &discourse,
+                &description,
+                username.as_deref(),
+                format,
+                dry_run,
+            ),
+            ApiKeyCommand::Revoke { discourse, key_id } => {
+                commands::api_key::api_key_revoke(&config, &discourse, key_id, dry_run)
+            }
+        },
+
         Commands::Invite { command } => match command {
             InviteCommand::Send {
                 discourse,

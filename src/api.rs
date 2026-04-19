@@ -1,3 +1,4 @@
+mod api_keys;
 mod backup;
 mod categories;
 mod client;
@@ -17,6 +18,7 @@ mod topics;
 mod uploads;
 mod users;
 
+pub use api_keys::{ApiKeySummary, CreatedApiKey};
 pub use client::{DiscourseClient, VersionInfo};
 pub use models::*;
 pub use groups::AddMembersOutcome;

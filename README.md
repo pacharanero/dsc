@@ -97,6 +97,7 @@ dsc update myforum
   - [group](docs/group.md) — list, inspect, copy, and bulk-add members
   - [user](docs/user.md) — list, inspect, suspend, and manage group memberships
   - [invite](docs/invite.md) — send invites, single or bulk from a file
+  - [api-key](docs/api-key.md) — manage Discourse API keys
   - [backup](docs/backup.md) — create, list, and restore backups
   - [setting](docs/setting.md) — get and set site settings
   - [tag](docs/tag.md) — list tags and apply/remove them on topics

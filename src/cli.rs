@@ -106,6 +106,12 @@ pub enum Commands {
         #[command(subcommand)]
         command: InviteCommand,
     },
+    /// Manage API keys (admin scope).
+    #[command(visible_alias = "ak")]
+    ApiKey {
+        #[command(subcommand)]
+        command: ApiKeyCommand,
+    },
     /// Create/list/restore backups.
     #[command(visible_alias = "bk")]
     Backup {
@@ -584,6 +590,42 @@ pub enum ThemeCommand {
         discourse: String,
         /// Theme ID to duplicate (from `dsc theme list`).
         theme_id: u64,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ApiKeyCommand {
+    /// List API keys.
+    #[command(visible_alias = "ls")]
+    List {
+        /// Discourse name.
+        discourse: String,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Create a new API key. The secret is only shown at creation time —
+    /// capture it from the output.
+    #[command(visible_alias = "cr")]
+    Create {
+        /// Discourse name.
+        discourse: String,
+        /// Description / label for the key (shown in admin UI).
+        description: String,
+        /// Username the key acts as. Omit for a global all-users key.
+        #[arg(long, short = 'u')]
+        username: Option<String>,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Revoke an API key by ID.
+    #[command(visible_alias = "rm")]
+    Revoke {
+        /// Discourse name.
+        discourse: String,
+        /// API key ID (from `dsc api-key list`).
+        key_id: u64,
     },
 }
 
