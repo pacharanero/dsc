@@ -8,9 +8,15 @@ mod models;
 mod palettes;
 mod plugins;
 mod rate_limit;
+mod search;
 mod settings;
+mod tags;
 mod themes;
 mod topics;
+mod uploads;
 
 pub use client::{DiscourseClient, VersionInfo};
 pub use models::*;
+pub use search::SearchHit;
+pub use tags::TagInfo;
+pub use uploads::UploadInfo;

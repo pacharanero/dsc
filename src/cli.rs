@@ -124,11 +124,45 @@ pub enum Commands {
         #[command(subcommand)]
         command: SettingCommand,
     },
+    /// List tags and apply/remove them on topics.
+    #[command(visible_alias = "tg")]
+    Tag {
+        #[command(subcommand)]
+        command: TagCommand,
+    },
     /// Open a Discourse in the default browser.
     #[command(visible_alias = "o")]
     Open {
         /// Discourse name.
         discourse: String,
+    },
+    /// Search topics on a Discourse.
+    #[command(visible_alias = "s")]
+    Search {
+        /// Discourse name.
+        discourse: String,
+        /// Search query (passed through verbatim, including any
+        /// Discourse filter syntax like `category:foo` or `@user`).
+        query: String,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Upload a file. Prints the resulting upload:// short URL by default.
+    #[command(visible_alias = "u")]
+    Upload {
+        /// Discourse name.
+        discourse: String,
+        /// Path to the file to upload.
+        file: PathBuf,
+        /// Discourse upload context. Default `composer` is correct for
+        /// embedding in posts; other values include `avatar`,
+        /// `profile_background`, `card_background`, `custom_emoji`.
+        #[arg(long, short = 't', default_value = "composer")]
+        upload_type: String,
+        /// Output format. Text mode prints just the short URL.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
     },
     /// Inspect and validate configuration.
     #[command(visible_alias = "cfg")]
@@ -517,6 +551,39 @@ pub enum ThemeCommand {
         discourse: String,
         /// Theme ID to duplicate (from `dsc theme list`).
         theme_id: u64,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum TagCommand {
+    /// List every tag on the Discourse.
+    #[command(visible_alias = "ls")]
+    List {
+        /// Discourse name.
+        discourse: String,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Add a tag to a topic.
+    #[command(visible_alias = "a")]
+    Apply {
+        /// Discourse name.
+        discourse: String,
+        /// Topic ID.
+        topic_id: u64,
+        /// Tag to add.
+        tag: String,
+    },
+    /// Remove a tag from a topic.
+    #[command(visible_alias = "rm")]
+    Remove {
+        /// Discourse name.
+        discourse: String,
+        /// Topic ID.
+        topic_id: u64,
+        /// Tag to remove.
+        tag: String,
     },
 }
 

@@ -307,6 +307,35 @@ fn main() -> Result<()> {
 
         Commands::Open { discourse } => commands::open::open_discourse(&config, &discourse),
 
+        Commands::Search {
+            discourse,
+            query,
+            format,
+        } => commands::search::search(&config, &discourse, &query, format),
+
+        Commands::Upload {
+            discourse,
+            file,
+            upload_type,
+            format,
+        } => commands::upload::upload(&config, &discourse, &file, &upload_type, format),
+
+        Commands::Tag { command } => match command {
+            TagCommand::List { discourse, format } => {
+                commands::tag::tag_list(&config, &discourse, format)
+            }
+            TagCommand::Apply {
+                discourse,
+                topic_id,
+                tag,
+            } => commands::tag::tag_apply(&config, &discourse, topic_id, &tag, dry_run),
+            TagCommand::Remove {
+                discourse,
+                topic_id,
+                tag,
+            } => commands::tag::tag_remove(&config, &discourse, topic_id, &tag, dry_run),
+        },
+
         Commands::Config {
             command: ConfigCommand::Check { format, skip_ssh },
         } => commands::config::config_check(&config, format, skip_ssh),

@@ -85,6 +85,8 @@ dsc update myforum
   - [add](docs/add.md) — add installs to config
   - [import](docs/import.md) — import installs from file or stdin
   - [update](docs/update.md) — run OS and Discourse updates over SSH
+  - [search](docs/search.md) — search topics on a Discourse
+  - [upload](docs/upload.md) — upload a file and return its short URL
   - [emoji](docs/emoji.md) — upload and list custom emoji
   - [topic](docs/topic.md) — pull, push, and sync topics as Markdown
   - [category](docs/category.md) — list, pull, push, and copy categories
@@ -94,6 +96,7 @@ dsc update myforum
   - [group](docs/group.md) — list, inspect, and copy groups
   - [backup](docs/backup.md) — create, list, and restore backups
   - [setting](docs/setting.md) — get and set site settings
+  - [tag](docs/tag.md) — list tags and apply/remove them on topics
   - [config](docs/config.md) — inspect and validate the dsc config itself
 - [Shell completions](docs/completions.md) — bash, zsh, and fish
 - [Development](docs/development.md) — building, testing, releasing, project layout

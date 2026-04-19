@@ -1,0 +1,97 @@
+use super::client::DiscourseClient;
+use super::error::http_error;
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+
+/// One result row in a search response — distilled from the topic stanza of
+/// `/search.json` (which contains far more than we need).
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct SearchHit {
+    pub id: u64,
+    pub title: String,
+    #[serde(default)]
+    pub slug: String,
+    #[serde(default)]
+    pub posts_count: u64,
+    #[serde(default)]
+    pub category_id: Option<u64>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawSearchResponse {
+    #[serde(default)]
+    topics: Vec<SearchHit>,
+}
+
+impl DiscourseClient {
+    /// Search for topics. The `query` is passed through to Discourse verbatim
+    /// (so callers can use `category:`, `status:`, `@user`, etc. filters).
+    pub fn search_topics(&self, query: &str) -> Result<Vec<SearchHit>> {
+        let path = format!(
+            "/search.json?q={}",
+            urlencode_form(query)
+        );
+        let response = self.get(&path)?;
+        let status = response.status();
+        let text = response.text().context("reading search response body")?;
+        if !status.is_success() {
+            return Err(http_error("search request", status, &text));
+        }
+        let body: RawSearchResponse =
+            serde_json::from_str(&text).context("parsing search response json")?;
+        Ok(body.topics)
+    }
+}
+
+/// Minimal `application/x-www-form-urlencoded` encoder for the query string.
+/// Avoids pulling in an extra crate just for one field.
+fn urlencode_form(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for byte in input.as_bytes() {
+        let b = *byte;
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(b as char);
+        } else if b == b' ' {
+            out.push('+');
+        } else {
+            out.push_str(&format!("%{:02X}", b));
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::urlencode_form;
+
+    #[test]
+    fn encodes_spaces_as_plus() {
+        assert_eq!(urlencode_form("hello world"), "hello+world");
+    }
+
+    #[test]
+    fn encodes_special_chars_percent() {
+        assert_eq!(urlencode_form("a&b=c"), "a%26b%3Dc");
+    }
+
+    #[test]
+    fn passes_alnum_unchanged() {
+        assert_eq!(urlencode_form("Topic42"), "Topic42");
+    }
+
+    #[test]
+    fn passes_unreserved_unchanged() {
+        assert_eq!(urlencode_form("a-b_c.d~e"), "a-b_c.d~e");
+    }
+
+    #[test]
+    fn encodes_discourse_filter_syntax() {
+        // Things like `category:foo @user` should round-trip through Discourse fine.
+        assert_eq!(
+            urlencode_form("hello category:foo @bob"),
+            "hello+category%3Afoo+%40bob"
+        );
+    }
+}
