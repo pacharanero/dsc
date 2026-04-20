@@ -1,5 +1,36 @@
 #!/usr/bin/env bash
+#
+# Serve the docs locally with hot-reload at http://localhost:8000.
+#
+# Requires `zensical` — install with `pip install -r requirements.txt`
+# in a venv, then re-run this script with that venv activated (or
+# invoke ./.venv/bin/zensical directly).
+#
+# Common gotcha on Linux: Zensical's watcher consumes inotify
+# instances. The kernel default (128 per user) runs out quickly on
+# a dev machine with editors and file-syncers already open. If you
+# see `Too many open files` / inotify panics, raise the cap:
+#
+#     sudo sysctl fs.inotify.max_user_instances=512
+#
+# Persist it with:
+#
+#     echo 'fs.inotify.max_user_instances=512' \
+#       | sudo tee /etc/sysctl.d/99-inotify.conf
+#     sudo sysctl --system
+#
 
 set -euo pipefail
-cd "$(git rev-parse --show-toplevel)"
-exec zensical serve
+
+# Proactive warning if the limit is still the stock 128 — the watcher
+# will almost certainly fail. We warn, not block, so someone who has
+# raised their limit via other means isn't blocked.
+limit=$(sysctl -n fs.inotify.max_user_instances 2>/dev/null || echo 0)
+if [[ "$limit" -gt 0 && "$limit" -le 128 ]]; then
+  echo >&2 "warning: fs.inotify.max_user_instances=$limit is likely too low for Zensical's watcher."
+  echo >&2 "         if the build panics with \"Too many open files\", bump it:"
+  echo >&2 "           sudo sysctl fs.inotify.max_user_instances=512"
+  echo >&2
+fi
+
+exec zensical serve "$@"

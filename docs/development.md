@@ -66,6 +66,39 @@ cargo run -- completions fish --dir completions/
 
 The `completions/` directory is gitignored. See [docs/completions.md](completions.md) for user-facing installation instructions.
 
+## Documentation site
+
+The docs you're reading are built with [Zensical](https://zensical.org) and deployed to GitHub Pages by `.github/workflows/deploy-docs-to-ghpages.yml` on every push to `main` that touches `docs/`, `mkdocs.yml`, or `requirements.txt`.
+
+To preview locally:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+s/docs                 # serves at http://localhost:8000 with hot reload
+```
+
+`s/docs` is a thin wrapper around `zensical serve`.
+
+### Gotcha: inotify instances on Linux
+
+Zensical's file watcher consumes inotify *instances*. The kernel default on most Linux distros is `fs.inotify.max_user_instances=128`, which runs out fast once you've got editors, file syncers and the like open. Symptoms:
+
+```text
+thread 'zrx/monitor' panicked … Too many open files
+Build started
+```
+
+Fix (one-liner to try the current session, then the persistent form):
+
+```bash
+sudo sysctl fs.inotify.max_user_instances=512
+echo 'fs.inotify.max_user_instances=512' | sudo tee /etc/sysctl.d/99-inotify.conf
+sudo sysctl --system
+```
+
+The `s/docs` script warns if the limit is at its stock 128 value.
+
 ## Release
 
 Releases are automated via Git tags and GitHub Actions using cargo-dist.
