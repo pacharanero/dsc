@@ -17,13 +17,32 @@ Most functionality uses the Discourse REST API. `dsc update` runs remote rebuild
 
 ## Installation
 
-### Shell installer (Linux and macOS)
+### Shell installer — Linux and macOS
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/pacharanero/dsc/releases/latest/download/dsc-rs-installer.sh | sh
 ```
 
 Downloads a prebuilt binary for your platform and installs it to `~/.cargo/bin` (or `$CARGO_HOME/bin` if set). Supports `x86_64` and `aarch64` on both Linux and macOS.
+
+### PowerShell installer — Windows
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/pacharanero/dsc/releases/latest/download/dsc-rs-installer.ps1 | iex"
+```
+
+Downloads the Windows `x86_64` binary and installs it to `%CARGO_HOME%\bin`.
+
+### Homebrew — Linux and macOS
+
+```bash
+brew tap pacharanero/tap
+brew install dsc
+```
+
+### Windows installer (MSI)
+
+Download `dsc-rs-x86_64-pc-windows-msvc.msi` from the [latest release](https://github.com/pacharanero/dsc/releases/latest) and double-click. The installer is unsigned, so Windows will show a SmartScreen warning the first time — click "More info" → "Run anyway".
 
 ### From crates.io
 

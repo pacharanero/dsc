@@ -2,6 +2,7 @@
 name = "dsc-rs"
 version = "0.8.2"
 edition = "2024"
+authors = ["Marcus Baw <marcus@bawmedical.co.uk>"]
 description = "Discourse CLI tool for managing multiple Discourse forums: track installs, run upgrades over SSH, manage emojis, sync topics and categories as Markdown, and more."
 license = "MIT"
 repository = "https://github.com/pacharanero/dsc"
@@ -9,6 +10,12 @@ homepage = "https://github.com/pacharanero/dsc"
 readme = "README.md"
 keywords = ["discourse", "cli", "forum", "sysadmin", "ssh"]
 categories = ["command-line-utilities"]
+
+[package.metadata.wix]
+upgrade-guid = "1E1DDAAC-E772-481A-9806-30A5B3564BA2"
+path-guid = "47EBE96D-DB77-42D0-B8FC-3442D69B8947"
+license = false
+eula = false
 
 [lib]
 name = "dsc"
@@ -28,13 +35,19 @@ cargo-dist-version = "0.31.0"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
-installers = ["shell"]
+installers = ["shell", "powershell", "homebrew", "msi"]
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Whether to install an updater program
 install-updater = false
+# Homebrew tap to publish formulas to. A HOMEBREW_TAP_TOKEN secret (a PAT
+# with write access to the tap repo) must be set on this repo for the
+# release workflow to push formulas there.
+tap = "pacharanero/homebrew-tap"
+publish-jobs = ["homebrew"]
+publish-prereleases = false
 
 [dependencies]
 anyhow = "1.0"

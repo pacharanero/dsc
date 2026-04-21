@@ -6,20 +6,26 @@ Most functionality uses the Discourse REST API; `dsc update` runs remote rebuild
 
 ## Install
 
-The one-liner (Linux and macOS):
+Pick the one that fits your platform:
 
 ```bash
+# Linux / macOS one-liner
 curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/pacharanero/dsc/releases/latest/download/dsc-rs-installer.sh | sh
-```
 
-Or via Cargo:
+# macOS / Linux via Homebrew
+brew tap pacharanero/tap && brew install dsc
 
-```bash
+# Windows one-liner (PowerShell)
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/pacharanero/dsc/releases/latest/download/dsc-rs-installer.ps1 | iex"
+
+# Or via Cargo if you already have a Rust toolchain
 cargo install dsc-rs
 ```
 
-The crate is named `dsc-rs` (the `dsc` name was taken on crates.io), but the installed binary is `dsc`. See the [project README](https://github.com/pacharanero/dsc#readme) for other platforms.
+Windows users who prefer a GUI installer: download the `.msi` from the [latest release](https://github.com/pacharanero/dsc/releases/latest).
+
+The crate is named `dsc-rs` (the `dsc` name was taken on crates.io), but the installed binary is always `dsc`. See the [project README](https://github.com/pacharanero/dsc#readme) for more ways in.
 
 ## A minimal config
 
