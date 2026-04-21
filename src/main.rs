@@ -374,6 +374,32 @@ fn main() -> Result<()> {
                 map_role(role),
                 dry_run,
             ),
+            UserCommand::Create {
+                discourse,
+                email,
+                username,
+                name,
+                password_stdin,
+                approve,
+            } => commands::user::user_create(
+                &config,
+                &discourse,
+                &email,
+                &username,
+                name.as_deref(),
+                password_stdin,
+                approve,
+                dry_run,
+            ),
+            UserCommand::PasswordReset {
+                discourse,
+                username,
+            } => commands::user::user_password_reset(&config, &discourse, &username, dry_run),
+            UserCommand::EmailSet {
+                discourse,
+                username,
+                email,
+            } => commands::user::user_email_set(&config, &discourse, &username, &email, dry_run),
             UserCommand::Activity {
                 discourse,
                 username,

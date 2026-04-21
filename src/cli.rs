@@ -801,6 +801,46 @@ pub enum UserCommand {
         #[arg(long, short = 'r', value_enum)]
         role: RoleArg,
     },
+    /// Create a new user. `--approve` also marks the account approved
+    /// (needed when site requires manual approval). Password is either
+    /// supplied via stdin (`--password-stdin`) or omitted — in the
+    /// latter case the user will have to set one via the reset flow.
+    #[command(visible_alias = "cr")]
+    Create {
+        /// Discourse name.
+        discourse: String,
+        /// New user's email address.
+        email: String,
+        /// New user's username.
+        username: String,
+        /// Display name (optional).
+        #[arg(long, short = 'N')]
+        name: Option<String>,
+        /// Read the password from stdin instead of auto-reset.
+        #[arg(long)]
+        password_stdin: bool,
+        /// Also mark the user approved (for sites with manual approval).
+        #[arg(long)]
+        approve: bool,
+    },
+    /// Trigger Discourse's password-reset email flow for a user.
+    #[command(name = "password-reset", visible_aliases = ["pwreset", "pw-reset"])]
+    PasswordReset {
+        /// Discourse name.
+        discourse: String,
+        /// Username or email.
+        username: String,
+    },
+    /// Set a user's primary email address. Requires admin scope.
+    #[command(name = "email-set", visible_alias = "email")]
+    EmailSet {
+        /// Discourse name.
+        discourse: String,
+        /// Username.
+        username: String,
+        /// New email address.
+        email: String,
+    },
     /// Show a user's recent public activity (topics + replies by default).
     ///
     /// Built for the "archive my own activity to a journal forum" loop —

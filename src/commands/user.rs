@@ -3,7 +3,8 @@ use crate::cli::ListFormat;
 use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
 use crate::utils::{normalize_baseurl, parse_since_cutoff};
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
+use std::io::{self, Read};
 
 pub fn user_list(
     config: &Config,
@@ -671,4 +672,123 @@ mod tests {
             "https://f.example/t/hi-there/42"
         );
     }
+}
+
+pub fn user_create(
+    config: &Config,
+    discourse_name: &str,
+    email: &str,
+    username: &str,
+    name: Option<&str>,
+    password_from_stdin: bool,
+    approve: bool,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    if !email.contains('@') {
+        return Err(anyhow!("invalid email: {:?}", email));
+    }
+    if username.trim().is_empty() {
+        return Err(anyhow!("username cannot be empty"));
+    }
+
+    let password = if password_from_stdin {
+        let mut buf = String::new();
+        io::stdin()
+            .read_to_string(&mut buf)
+            .context("reading password from stdin")?;
+        let trimmed = buf.trim_end_matches(['\r', '\n']).to_string();
+        if trimmed.is_empty() {
+            return Err(anyhow!("--password-stdin set but stdin was empty"));
+        }
+        Some(trimmed)
+    } else {
+        None
+    };
+
+    if dry_run {
+        println!(
+            "[dry-run] {}: would create user {} ({}){}{}{}",
+            discourse.name,
+            username,
+            email,
+            name.filter(|n| !n.is_empty())
+                .map(|n| format!(", name=\"{}\"", n))
+                .unwrap_or_default(),
+            if password.is_some() {
+                ", with password from stdin"
+            } else {
+                ", no password (triggers email reset flow)"
+            },
+            if approve { ", approved=true" } else { "" }
+        );
+        return Ok(());
+    }
+
+    let id = client.create_user(email, username, password.as_deref(), name, approve)?;
+    println!("Created user {} (id:{})", username, id);
+    if password.is_none() {
+        println!(
+            "  no password set — send them a reset email with:\n    dsc user password-reset {} {}",
+            discourse.name, username
+        );
+    }
+    Ok(())
+}
+
+pub fn user_password_reset(
+    config: &Config,
+    discourse_name: &str,
+    username: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    if dry_run {
+        println!(
+            "[dry-run] {}: would trigger password-reset email for {}",
+            discourse.name, username
+        );
+        return Ok(());
+    }
+
+    client.trigger_password_reset(username)?;
+    // Discourse deliberately returns a generic success even for unknown
+    // users to prevent enumeration — surface that so the caller doesn't
+    // over-trust the result.
+    println!("Password reset request sent for {} (if that user exists).", username);
+    Ok(())
+}
+
+pub fn user_email_set(
+    config: &Config,
+    discourse_name: &str,
+    username: &str,
+    email: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    if !email.contains('@') {
+        return Err(anyhow!("invalid email: {:?}", email));
+    }
+
+    if dry_run {
+        println!(
+            "[dry-run] {}: would set {}'s email to {}",
+            discourse.name, username, email
+        );
+        return Ok(());
+    }
+
+    client.set_user_email(username, email)?;
+    println!("Set {}'s email to {}", username, email);
+    Ok(())
 }

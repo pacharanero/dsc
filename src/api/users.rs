@@ -159,6 +159,89 @@ impl DiscourseClient {
         )
     }
 
+    /// Create a user. `password` is optional — omit to require the new user
+    /// to reset it via the email flow. `active=true` and `approved=true` are
+    /// passed so admin-created accounts skip the activation and approval
+    /// dances. Returns the new user id on success.
+    pub fn create_user(
+        &self,
+        email: &str,
+        username: &str,
+        password: Option<&str>,
+        name: Option<&str>,
+        approve: bool,
+    ) -> Result<u64> {
+        let mut payload: Vec<(&str, &str)> = vec![
+            ("email", email),
+            ("username", username),
+            ("active", "true"),
+        ];
+        if approve {
+            payload.push(("approved", "true"));
+        }
+        if let Some(p) = password {
+            payload.push(("password", p));
+        }
+        if let Some(n) = name {
+            if !n.is_empty() {
+                payload.push(("name", n));
+            }
+        }
+        let response = self.send_retrying(|| Ok(self.post("/u.json")?.form(&payload)))?;
+        let status = response.status();
+        let text = response.text().context("reading user create response")?;
+        if !status.is_success() {
+            return Err(http_error("user create request", status, &text));
+        }
+        let value: Value =
+            serde_json::from_str(&text).context("parsing user create response")?;
+        // Discourse wraps this variably depending on version; grab user_id from
+        // the top level first, then fall back to `user.id`.
+        let id = value
+            .get("user_id")
+            .and_then(|v| v.as_u64())
+            .or_else(|| {
+                value
+                    .get("user")
+                    .and_then(|u| u.get("id"))
+                    .and_then(|v| v.as_u64())
+            })
+            .ok_or_else(|| anyhow!("user create response missing user id: {}", text))?;
+        Ok(id)
+    }
+
+    /// Trigger the "forgot password" email flow for a user. Accepts username
+    /// or email as `login`. Discourse returns a generic success message
+    /// regardless of whether the user exists (to prevent enumeration).
+    pub fn trigger_password_reset(&self, login: &str) -> Result<()> {
+        let payload = [("login", login)];
+        let response = self
+            .send_retrying(|| Ok(self.post("/session/forgot_password.json")?.form(&payload)))?;
+        let status = response.status();
+        if !status.is_success() {
+            let text = response
+                .text()
+                .unwrap_or_else(|_| "<failed to read response body>".to_string());
+            return Err(http_error("password reset request", status, &text));
+        }
+        Ok(())
+    }
+
+    /// Admin-set a user's primary email address.
+    pub fn set_user_email(&self, username: &str, email: &str) -> Result<()> {
+        let path = format!("/u/{}/preferences/email.json", username);
+        let payload = [("email", email)];
+        let response = self.send_retrying(|| Ok(self.post(&path)?.form(&payload)))?;
+        let status = response.status();
+        if !status.is_success() {
+            let text = response
+                .text()
+                .unwrap_or_else(|_| "<failed to read response body>".to_string());
+            return Err(http_error("email set request", status, &text));
+        }
+        Ok(())
+    }
+
     fn put_admin_user_action(
         &self,
         user_id: u64,

@@ -13,8 +13,8 @@ Pick the one that fits your platform:
 curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/pacharanero/dsc/releases/latest/download/dsc-rs-installer.sh | sh
 
-# macOS / Linux via Homebrew
-brew tap pacharanero/tap && brew install dsc
+# macOS / Linux via Homebrew (formula name matches the crate)
+brew tap pacharanero/tap && brew install dsc-rs
 
 # Windows one-liner (PowerShell)
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/pacharanero/dsc/releases/latest/download/dsc-rs-installer.ps1 | iex"

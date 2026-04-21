@@ -37,8 +37,10 @@ Downloads the Windows `x86_64` binary and installs it to `%CARGO_HOME%\bin`.
 
 ```bash
 brew tap pacharanero/tap
-brew install dsc
+brew install dsc-rs
 ```
+
+The formula name matches the crate name (`dsc-rs`); the installed binary is still `dsc`.
 
 ### Windows installer (MSI)
 

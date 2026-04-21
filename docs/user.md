@@ -55,6 +55,44 @@ dsc user unsilence <discourse> <username>
 
 Lifts an existing silence. Honours `--dry-run`.
 
+## dsc user create
+
+```text
+dsc user create <discourse> <email> <username> [--name <text>] [--password-stdin] [--approve]
+```
+
+Creates a user with `active=true` so they don't need to click a confirmation email before logging in. Pass `--approve` if the site has manual approval enabled (`must_approve_users = true`).
+
+Password handling:
+- Omit `--password-stdin` to create with no password set. The user will receive a password-reset email when you run `dsc user password-reset`.
+- Pass `--password-stdin` to read a password securely from stdin. Useful for automation where you pipe from a password manager or Bitwarden:
+  ```bash
+  pwgen -s 24 1 | dsc user create myforum alice@example.com alice --password-stdin
+  bw get password some-item | dsc user create myforum alice@example.com alice --password-stdin
+  ```
+
+Honours `--dry-run`.
+
+## dsc user password-reset
+
+```text
+dsc user password-reset <discourse> <username>
+```
+
+Aliases: `pwreset`, `pw-reset`. Triggers Discourse's password-reset email for a user (the same flow as clicking "I forgot my password" on the login page). Discourse returns a generic success message whether or not the user exists — the response text from `dsc` reflects that, which prevents accidental enumeration.
+
+Honours `--dry-run`.
+
+## dsc user email-set
+
+```text
+dsc user email-set <discourse> <username> <new-email>
+```
+
+Alias: `email`. Sets the user's primary email address. With admin scope this bypasses the confirm-by-email step; without admin scope it falls through to Discourse's normal confirmation flow.
+
+Honours `--dry-run`.
+
 ## dsc user promote
 
 ```text
