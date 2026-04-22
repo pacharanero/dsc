@@ -573,6 +573,21 @@ fn main() -> Result<()> {
 
         Commands::Open { discourse } => commands::open::open_discourse(&config, &discourse),
 
+        Commands::Harden {
+            host,
+            ssh_user,
+            new_user,
+            ssh_port,
+            pubkey_file,
+        } => commands::harden::harden(
+            &host,
+            &ssh_user,
+            &new_user,
+            ssh_port,
+            &pubkey_file,
+            dry_run,
+        ),
+
         Commands::Search {
             discourse,
             query,

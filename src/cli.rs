@@ -166,6 +166,34 @@ pub enum Commands {
         /// Discourse name.
         discourse: String,
     },
+    /// Harden a fresh Ubuntu server reachable via `ssh root@host`.
+    ///
+    /// **Stage 1 (current):** creates a non-root sudo user, installs the
+    /// given pubkey to their authorized_keys, and verifies the new-user
+    /// SSH login works. Does NOT yet tighten sshd_config, install Docker
+    /// / fail2ban / etc — those come in follow-up releases.
+    #[command(visible_alias = "hd")]
+    Harden {
+        /// Target hostname or IP (reachable via SSH).
+        host: String,
+        /// Username to SSH in as initially. Defaults to `root`, which is
+        /// what a fresh cloud-provisioned box typically has.
+        #[arg(long, default_value = "root")]
+        ssh_user: String,
+        /// Username for the new sudo-enabled non-root account to create.
+        #[arg(long, default_value = "discourse")]
+        new_user: String,
+        /// SSH port to move the daemon to in stage 2. Parsed now so the
+        /// CLI is stable; not yet applied in stage 1.
+        #[arg(long, default_value_t = 2227)]
+        ssh_port: u16,
+        /// Path to an SSH public key file whose contents will be added to
+        /// the new user's authorized_keys. A typical value is
+        /// `~/.ssh/<hostname>.pub` — the per-server keypair pattern in
+        /// the Bawmedical hardening playbook.
+        #[arg(long)]
+        pubkey_file: PathBuf,
+    },
     /// Search topics on a Discourse.
     #[command(visible_alias = "s")]
     Search {
