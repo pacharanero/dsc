@@ -17,6 +17,24 @@ theme:
     - search.suggest
     - search.highlight
     - toc.follow
+  # Light/dark palette pair with a toggle in the header. The first entry
+  # is the default scheme; clicking the toggle switches to the second
+  # and remembers the choice via localStorage.
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
 
 nav:
   - Home: index.md
@@ -50,6 +68,10 @@ nav:
       - theme: theme.md
       - plugin: plugin.md
       - palette: palette.md
+  - Reports:
+      - analytics: analytics.md
+  - Provisioning:
+      - harden: harden.md
   - Development: development.md
 
 markdown_extensions:
