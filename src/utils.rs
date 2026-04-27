@@ -141,24 +141,44 @@ pub fn parse_since_cutoff(input: &str) -> anyhow::Result<chrono::DateTime<chrono
     ))
 }
 
-/// Parse a relative duration like `7d`, `24h`, `30m`, `1w`, `90s`, `1y`.
-/// `y` is treated as 365 days (good enough for analytics windows; for
-/// precise calendar arithmetic pass an ISO-8601 timestamp instead).
-/// Months are deliberately not supported because their length depends
-/// on the calendar.
+/// Parse a relative duration like `7d`, `24h`, `1w`, `1m`, `90s`, `1y`.
+///
+/// Calendar units (`m`, `y`) are imprecise; for windows we use these
+/// conventions:
+///
+/// - `s` — seconds
+/// - `min` — minutes (use this rather than `m` to avoid the months-vs-minutes
+///   ambiguity)
+/// - `h` — hours
+/// - `d` — days
+/// - `w` — weeks (= 7 days)
+/// - `m` — **months** (= 30 days; matches what most users mean by "1m" in
+///   analytics windows)
+/// - `y` — years (= 365 days)
+///
+/// For exact calendar math, pass an ISO-8601 timestamp instead.
 pub fn parse_relative_duration(input: &str) -> Option<chrono::Duration> {
     let s = input.trim();
     if s.len() < 2 {
         return None;
     }
+    // Order matters: `min` must be tried before `m` so we don't read
+    // "10min" as "10mi" + "n".
+    let multi_char_units = [("min", 60i64)];
+    for (suffix, secs_per_unit) in multi_char_units {
+        if let Some(digits) = s.strip_suffix(suffix) {
+            let n: i64 = digits.parse().ok()?;
+            return Some(chrono::Duration::seconds(n * secs_per_unit));
+        }
+    }
     let (digits, unit) = s.split_at(s.len() - 1);
     let n: i64 = digits.parse().ok()?;
     match unit {
         "s" => Some(chrono::Duration::seconds(n)),
-        "m" => Some(chrono::Duration::minutes(n)),
         "h" => Some(chrono::Duration::hours(n)),
         "d" => Some(chrono::Duration::days(n)),
         "w" => Some(chrono::Duration::weeks(n)),
+        "m" => Some(chrono::Duration::days(n * 30)),
         "y" => Some(chrono::Duration::days(n * 365)),
         _ => None,
     }
@@ -239,7 +259,7 @@ mod tests {
             Some(chrono::Duration::hours(24))
         );
         assert_eq!(
-            parse_relative_duration("30m"),
+            parse_relative_duration("30min"),
             Some(chrono::Duration::minutes(30))
         );
         assert_eq!(
@@ -258,7 +278,34 @@ mod tests {
         assert!(parse_relative_duration("d").is_none());
         assert!(parse_relative_duration("7x").is_none());
         assert!(parse_relative_duration("abc").is_none());
-        assert!(parse_relative_duration("3M").is_none()); // months deliberately unsupported
+        assert!(parse_relative_duration("3M").is_none()); // case-sensitive
+    }
+
+    #[test]
+    fn parse_relative_duration_treats_m_as_months() {
+        // `m` = months (= 30 days). Users naturally write `1m` for "one
+        // month" in analytics windows; we match that. Use `min` for the
+        // rare minutes case.
+        assert_eq!(
+            parse_relative_duration("1m"),
+            Some(chrono::Duration::days(30))
+        );
+        assert_eq!(
+            parse_relative_duration("3m"),
+            Some(chrono::Duration::days(90))
+        );
+    }
+
+    #[test]
+    fn parse_relative_duration_minutes_via_min_suffix() {
+        assert_eq!(
+            parse_relative_duration("5min"),
+            Some(chrono::Duration::minutes(5))
+        );
+        assert_eq!(
+            parse_relative_duration("90min"),
+            Some(chrono::Duration::minutes(90))
+        );
     }
 
     #[test]
