@@ -7,7 +7,9 @@ edit_uri: edit/main/docs/
 
 theme:
   variant: modern
-  logo: assets/logo.svg
+  # Light-mode variant by default; CSS in stylesheets/extra.css swaps to
+  # `logo-dark.svg` under `[data-md-color-scheme="slate"]`.
+  logo: assets/logo-light.svg
   favicon: assets/logo.svg
   features:
     - content.code.copy

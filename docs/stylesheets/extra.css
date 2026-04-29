@@ -29,3 +29,27 @@
   --md-accent-fg-color: #f47e4a;
   --md-accent-fg-color--transparent: rgba(244, 126, 74, 0.15);
 }
+
+/*
+ * Logo: roughly 2× the Material default size, and swap the source between
+ * light and dark schemes so the bubble silhouette has contrast against
+ * whatever surface the header currently shows.
+ *
+ * - Light scheme: `logo-light.svg` (orange text on black bubble) reads
+ *   cleanly against a white header.
+ * - Dark scheme: `logo-dark.svg` (orange text on white bubble) reads
+ *   cleanly against a slate header.
+ *
+ * The CSS `content:` override on `<img>` is the documented Material
+ * technique for theme-conditional logos — it replaces the rendered
+ * image without re-fetching, and works in every modern browser.
+ */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 2.4rem;
+  width: auto;
+}
+
+[data-md-color-scheme="slate"] .md-header__button.md-logo img {
+  content: url("../assets/logo-dark.svg");
+}
