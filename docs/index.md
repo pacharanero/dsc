@@ -6,7 +6,7 @@ Most functionality uses the Discourse REST API; `dsc update` runs remote rebuild
 
 ## Install
 
-=== "Linux / macOS"
+=== ":simple-linux: Linux / :simple-apple: macOS"
 
     One-liner shell installer:
 
@@ -17,7 +17,7 @@ Most functionality uses the Discourse REST API; `dsc update` runs remote rebuild
     Drops a prebuilt binary into `~/.cargo/bin` (or `$CARGO_HOME/bin`).
     Supports `x86_64` and `aarch64`.
 
-=== "Homebrew"
+=== ":simple-homebrew: Homebrew"
 
     Linux or macOS, no Rust toolchain needed:
 
@@ -29,7 +29,7 @@ Most functionality uses the Discourse REST API; `dsc update` runs remote rebuild
     The formula name matches the crate (`dsc-rs`); the installed binary
     is still `dsc`.
 
-=== "Windows (PowerShell)"
+=== ":material-microsoft-windows: Windows (PowerShell)"
 
     One-liner:
 
@@ -39,7 +39,7 @@ Most functionality uses the Discourse REST API; `dsc update` runs remote rebuild
 
     Drops `dsc.exe` into `%CARGO_HOME%\bin`.
 
-=== "Windows (MSI)"
+=== ":material-microsoft-windows: Windows (MSI)"
 
     Prefer a graphical installer? Download the `.msi` for
     `x86_64-pc-windows-msvc` from the
@@ -47,7 +47,7 @@ Most functionality uses the Discourse REST API; `dsc update` runs remote rebuild
     and double-click. Unsigned, so SmartScreen will warn the first
     time — click "More info" → "Run anyway".
 
-=== "Cargo"
+=== ":simple-rust: Cargo"
 
     If you already have a Rust toolchain (edition 2024):
 
