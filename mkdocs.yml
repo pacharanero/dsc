@@ -9,8 +9,8 @@ theme:
   variant: modern
   # Light-mode variant by default; CSS in stylesheets/extra.css swaps to
   # `logo-dark.svg` under `[data-md-color-scheme="slate"]`.
-  logo: assets/logo-light.svg
-  favicon: assets/logo.svg
+  logo: assets/dsc-logo-orange-on-white.svg
+  favicon: assets/dsc-logo-orange-on-white.svg
   features:
     - content.code.copy
     - content.code.annotate
