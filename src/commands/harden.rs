@@ -10,9 +10,11 @@
 
 use crate::config::HardenConfig;
 use anyhow::{Context, Result, anyhow};
+use base64::Engine as _;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
 
 /// SSH target: who + where + on what port. `port == 22` is the default and
 /// omitted from ssh args.
@@ -252,9 +254,236 @@ grep -qxF {key} /home/{user}/.ssh/authorized_keys || printf '%s\n' {key} >> /hom
         announce(&format!("✓ new-user SSH verified ({}@{})", new_user, host));
     }
 
-    announce("Stage 1 complete. sshd is still in its original state (root SSH + password auth still permitted).");
-    announce("Stages 2+ (sshd tightening, fail2ban, upgrades, swap, docker, ufw) land in a follow-up commit.");
+    announce("Stage 1 complete (user + sudoers + pubkey verified).");
+
+    // --- Stage 2: sshd tightening ---
+    run_stage_2(&initial, &opts, new_user, host, dry_run)?;
+
+    announce("Stages 1 + 2 complete. sshd is now locked down.");
+    announce("Stage 3 (fail2ban, upgrades, swap, docker, ufw) lands in a follow-up commit.");
     Ok(())
+}
+
+/// Stage 2 — drop a `sshd_config.d/90-dsc-harden.conf` that pins the new
+/// SSH port, disables root login, disables password auth, restricts to
+/// the new user, tightens auth attempt limits + idle timeouts, and pins a
+/// modern set of ciphers / KEX / MACs. `sshd -t` validates the file
+/// before it's installed; `systemctl reload ssh` then picks it up
+/// without dropping the still-open root session — a third-session
+/// connection on the new port verifies the change worked.
+///
+/// Idempotent: if the drop-in is already present and matches what we'd
+/// write, it's a no-op. If it exists with different content the command
+/// refuses to overwrite (use `--force` semantics later if needed).
+fn run_stage_2(
+    initial: &SshTarget,
+    opts: &Options,
+    new_user: &str,
+    host: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let drop_in = build_sshd_drop_in(opts, new_user);
+
+    // Idempotency probe — read whatever's already there.
+    let current = ssh_run(
+        initial,
+        "cat /etc/ssh/sshd_config.d/90-dsc-harden.conf 2>/dev/null || true",
+        dry_run,
+    )?;
+    let already_matches = !dry_run && normalise(&current) == normalise(&drop_in);
+    let already_exists_different =
+        !dry_run && !current.trim().is_empty() && !already_matches;
+
+    if already_matches {
+        announce("sshd drop-in already in place with matching content, skipping");
+    } else if already_exists_different {
+        return Err(anyhow!(
+            "/etc/ssh/sshd_config.d/90-dsc-harden.conf already exists with different content. \
+             Diff manually before re-running; if you want dsc to replace it, delete the file first."
+        ));
+    } else {
+        announce(&format!(
+            "writing sshd drop-in (Port {}, PermitRootLogin no, PasswordAuthentication no, AllowUsers {}, modern algorithm pins)",
+            opts.ssh_port, new_user
+        ));
+        // Base64 transport — sidesteps shell-quoting concerns for the
+        // multi-line drop-in. `sshd -t` validates the syntax BEFORE the
+        // file lands in /etc/ssh/sshd_config.d/, so a typo can't break
+        // the daemon's next reload.
+        let b64 = base64::engine::general_purpose::STANDARD.encode(drop_in.as_bytes());
+        let cmd = format!(
+            r#"
+set -e
+tmp=$(mktemp /tmp/sshd-harden.XXXXXX)
+printf '%s' {b64} | base64 -d > "$tmp"
+sshd -t -f "$tmp"
+install -m 0644 "$tmp" /etc/ssh/sshd_config.d/90-dsc-harden.conf
+rm -f "$tmp"
+"#,
+            b64 = shell_quote(&b64)
+        );
+        ssh_run(initial, cmd.trim(), dry_run)?;
+
+        // Modern Ubuntu (22.04+) ships sshd as **socket-activated** via
+        // `ssh.socket`. The drop-in we just installed makes sshd's
+        // *config* aware of the new port, but the *listening sockets*
+        // are owned by systemd, not sshd, so `Port 2227` in the drop-in
+        // alone is silently ignored at the bind layer. We need a parallel
+        // drop-in for the socket unit. On older systems without socket
+        // activation, this whole branch no-ops — we detect via
+        // `is-enabled`.
+        let socket_active = ssh_run(
+            initial,
+            "systemctl is-enabled ssh.socket 2>/dev/null || true",
+            dry_run,
+        )?;
+        let needs_socket_dropin = !dry_run && socket_active.trim() == "enabled";
+
+        if needs_socket_dropin {
+            announce(&format!(
+                "patching ssh.socket via drop-in (move listener to port {})",
+                opts.ssh_port
+            ));
+            // Empty `ListenStream=` resets the inherited list; the
+            // following entry then defines the ONLY port to listen on.
+            // This matches the Bawmedical playbook's "move SSH to a
+            // non-default port" intent rather than running on both
+            // (which is a half-hardened state — port 22 still gets
+            // probed by every drive-by scanner).
+            //
+            // Done in a single SSH command together with daemon-reload
+            // and `systemctl restart ssh.socket` because the restart
+            // itself flips the listener away from port 22, which would
+            // refuse any subsequent root@22 SSH attempts.
+            let socket_drop_in = format!(
+                "[Socket]\nListenStream=\nListenStream={}\n",
+                opts.ssh_port
+            );
+            let b64 = base64::engine::general_purpose::STANDARD.encode(socket_drop_in.as_bytes());
+            let cmd = format!(
+                r#"
+set -e
+mkdir -p /etc/systemd/system/ssh.socket.d
+printf '%s' {b64} | base64 -d > /etc/systemd/system/ssh.socket.d/90-dsc-harden.conf
+systemctl daemon-reload
+systemctl restart ssh.socket
+"#,
+                b64 = shell_quote(&b64)
+            );
+            ssh_run(initial, cmd.trim(), dry_run)?;
+        } else {
+            // Non-socket-activated systems: a normal sshd reload is
+            // enough to pick up the new Port directive.
+            announce("reloading sshd");
+            ssh_run(initial, "systemctl reload ssh", dry_run)?;
+        }
+
+        // sshd needs a moment to bind the new port.
+        if !dry_run {
+            std::thread::sleep(Duration::from_secs(2));
+        }
+    }
+
+    // --- Verification: third SSH session on the new port ---
+    //
+    // Whether we just installed the drop-in or it was already there, we
+    // verify discourse@host:new_port works *now*. If verification fails
+    // and the drop-in is fresh, the operator still has the original
+    // root@host:22 session live (reload doesn't kill sessions) — they
+    // can `rm /etc/ssh/sshd_config.d/90-dsc-harden.conf && systemctl
+    // reload ssh` to roll back manually.
+    let new_target = SshTarget {
+        user: new_user.to_string(),
+        host: host.to_string(),
+        port: opts.ssh_port,
+    };
+    if dry_run {
+        announce(&format!(
+            "[dry-run] would verify SSH on port {} works for `{}@{}`",
+            opts.ssh_port, new_user, host
+        ));
+    } else {
+        announce(&format!(
+            "verifying SSH on port {} works as `{}`…",
+            opts.ssh_port, new_user
+        ));
+        let who = ssh_run(&new_target, "whoami", false).context(
+            "post-stage-2 SSH on the new port failed. The drop-in is in place. \
+             Roll back from your still-open root session: \
+             `rm /etc/ssh/sshd_config.d/90-dsc-harden.conf && systemctl reload ssh`",
+        )?;
+        if who.trim() != new_user {
+            return Err(anyhow!(
+                "SSH on port {} succeeded but `whoami` returned {:?} (expected {})",
+                opts.ssh_port,
+                who.trim(),
+                new_user
+            ));
+        }
+        announce(&format!(
+            "✓ SSH verified on port {} ({}@{})",
+            opts.ssh_port, new_user, host
+        ));
+    }
+
+    Ok(())
+}
+
+/// Build the `sshd_config.d/90-dsc-harden.conf` content from the
+/// resolved options. Pure function — easy to unit-test.
+fn build_sshd_drop_in(opts: &Options, new_user: &str) -> String {
+    format!(
+        "\
+# Generated by `dsc harden`. Edit dsc.toml's [harden] block + re-run
+# instead of editing this file by hand. To revert manually:
+#   sudo rm /etc/ssh/sshd_config.d/90-dsc-harden.conf
+#   sudo systemctl reload ssh
+
+Port {port}
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+MaxAuthTries 3
+LoginGraceTime 30
+AllowUsers {user}
+X11Forwarding no
+AllowAgentForwarding no
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+# Modern algorithm pins (drops CBC ciphers and weak KEX/MACs).
+Ciphers {ciphers}
+KexAlgorithms {kex}
+MACs {macs}
+",
+        port = opts.ssh_port,
+        user = new_user,
+        ciphers = opts.sshd_ciphers,
+        kex = opts.sshd_kex,
+        macs = opts.sshd_macs,
+    )
+}
+
+/// Trim every line and collapse runs of blank lines so we can compare
+/// drop-in content for idempotency without false-mismatch on whitespace.
+fn normalise(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut last_blank = false;
+    for line in s.lines() {
+        let t = line.trim();
+        if t.is_empty() {
+            if last_blank {
+                continue;
+            }
+            last_blank = true;
+            out.push('\n');
+        } else {
+            last_blank = false;
+            out.push_str(t);
+            out.push('\n');
+        }
+    }
+    out
 }
 
 // --- helpers ---
@@ -520,5 +749,84 @@ mod tests {
         let opts = resolve_options(Some("custom"), Some(40022), &cfg);
         assert_eq!(opts.new_user, "custom");
         assert_eq!(opts.ssh_port, 40022);
+    }
+
+    #[test]
+    fn drop_in_contains_all_required_directives() {
+        let opts = resolve_options(None, Some(2227), &HardenConfig::default());
+        let s = build_sshd_drop_in(&opts, "discourse");
+        // The hardening directives the playbook calls out by name.
+        for needle in [
+            "Port 2227",
+            "PermitRootLogin no",
+            "PasswordAuthentication no",
+            "PubkeyAuthentication yes",
+            "MaxAuthTries 3",
+            "LoginGraceTime 30",
+            "AllowUsers discourse",
+            "X11Forwarding no",
+            "AllowAgentForwarding no",
+            "ClientAliveInterval 300",
+            "ClientAliveCountMax 2",
+        ] {
+            assert!(
+                s.contains(needle),
+                "drop-in missing `{}`:\n{}",
+                needle,
+                s
+            );
+        }
+    }
+
+    #[test]
+    fn drop_in_uses_modern_algorithm_pins() {
+        let opts = resolve_options(None, None, &HardenConfig::default());
+        let s = build_sshd_drop_in(&opts, "discourse");
+        // Spot-check the modern algorithms ARE listed.
+        assert!(s.contains("chacha20-poly1305@openssh.com"));
+        assert!(s.contains("curve25519-sha256"));
+        assert!(s.contains("hmac-sha2-512-etm@openssh.com"));
+        // Inspect the actual algorithm directive lines (not the comment
+        // block, which can mention "CBC" while saying it's removed).
+        for line in s.lines() {
+            let lower = line.to_lowercase();
+            if lower.starts_with("ciphers ")
+                || lower.starts_with("kexalgorithms ")
+                || lower.starts_with("macs ")
+            {
+                for forbidden in ["cbc", "hmac-sha1", "diffie-hellman-group1-sha1"] {
+                    assert!(
+                        !lower.contains(forbidden),
+                        "{} line includes weak crypto `{}`: {}",
+                        lower.split_whitespace().next().unwrap_or(""),
+                        forbidden,
+                        line
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn drop_in_passes_user_override_through() {
+        let opts = resolve_options(Some("ops"), Some(40022), &HardenConfig::default());
+        let s = build_sshd_drop_in(&opts, "ops");
+        assert!(s.contains("Port 40022"));
+        assert!(s.contains("AllowUsers ops"));
+    }
+
+    #[test]
+    fn normalise_collapses_whitespace_for_idempotency() {
+        let original = "Port 2227\n\n\nPermitRootLogin no\n";
+        let formatted = "  Port 2227\n\nPermitRootLogin no";
+        // Different surrounding whitespace, same semantic content → equal.
+        assert_eq!(normalise(original), normalise(formatted));
+    }
+
+    #[test]
+    fn normalise_treats_different_content_as_different() {
+        let a = "Port 2227";
+        let b = "Port 2228";
+        assert_ne!(normalise(a), normalise(b));
     }
 }

@@ -1,31 +1,39 @@
 # dsc harden
 
-Turn a fresh Ubuntu server reachable via `ssh root@host` into a hardened box ready for `dsc install`. **WIP** — currently ships **stage 1 only**; stages 2 and 3 are in development.
+Turn a fresh Ubuntu server reachable via `ssh root@host` into a hardened box ready for `dsc install`. **WIP** — currently ships **stages 1 and 2**; stage 3 is in development.
 
-## What stage 1 does
+## Usage
 
 ```text
 dsc harden <host> --pubkey-file <path> [--new-user <name>] [--ssh-port <port>] [--ssh-user root]
 ```
 
-Starting from a fresh `ssh root@host` that you can already log in to (typical for a cloud-provisioned VM with your initial SSH key on creation):
+Starting from a fresh `ssh root@host` that you can already log in to (typical for a cloud-provisioned VM with your initial SSH key on creation), `dsc harden` runs stages 1 and 2 end-to-end. After it succeeds, the SSH entry-point on the box has moved to `discourse@host:2227` (or whatever you configured); root login is disabled, password auth is disabled, and only the named user can SSH at all.
+
+## What stage 1 does
 
 1. **Preflight** — confirms the remote is Ubuntu, has ≥ 1 GB RAM (warns < 2 GB), has ≥ 5 GB free on `/var` (warns < 30 GB), and that the SSH user is currently root.
 2. **Creates the new user** with `adduser --disabled-password`. Skipped if the user already exists.
 3. **Grants sudo NOPASSWD** by dropping a single-file snippet into `/etc/sudoers.d/`, validated through `visudo -cf` before being moved into place. Safer than editing the main sudoers, and idempotent.
 4. **Installs the supplied pubkey** into the new user's `authorized_keys` with correct perms. Deduplicated, so re-running doesn't append duplicate lines.
-5. **Verifies new-user SSH actually works** by opening a second SSH session as the new user and running `whoami`. **If this fails, the run errors out before any subsequent stage tightens sshd** — so a bad pubkey can never lock you out of the box. The original `ssh root@host` is still usable for debugging.
+5. **Verifies new-user SSH actually works** by opening a second SSH session as the new user and running `whoami`. **If this fails, the run errors out before stage 2 touches sshd** — so a bad pubkey can never lock you out of the box. The original `ssh root@host` is still usable for debugging.
 
-After stage 1, sshd is **still in its original state** — root SSH and password auth both still permitted. Stages 2+ tighten that down once we know the new-user path works.
+## What stage 2 does
 
-## What stages 2 and 3 will add
+6. **Writes `/etc/ssh/sshd_config.d/90-dsc-harden.conf`** with: `Port <ssh-port>`, `PermitRootLogin no`, `PasswordAuthentication no`, `PubkeyAuthentication yes`, `MaxAuthTries 3`, `LoginGraceTime 30`, `AllowUsers <new-user>`, `X11Forwarding no`, `AllowAgentForwarding no`, `ClientAliveInterval 300`, `ClientAliveCountMax 2`, plus modern cipher/KEX/MAC pins (chacha20-poly1305, curve25519-sha256, hmac-sha2-*-etm) — drops CBC ciphers and SHA-1 MACs.
+7. **Validates the file** with `sshd -t` *before* installing it. A typo can't break the daemon's next restart.
+8. **Patches `ssh.socket`** on Ubuntu's socket-activated systems via `/etc/systemd/system/ssh.socket.d/90-dsc-harden.conf` so the systemd listener actually binds the new port. Without this step the sshd config knows about the new port but systemd is still listening on 22 — a subtle Ubuntu 22.04+ pitfall.
+9. **Verifies the new port** by opening a third SSH session as `<new-user>@<host>:<ssh-port>`. Same self-protection logic as stage 1 — if this fails, you get a clear error pointing at how to roll back from the still-open root session.
 
-Tracked in [`.marcus/harden-install-notes.md`](https://github.com/pacharanero/dsc/tree/main/.marcus) (private). Briefly:
+After a successful run: root@22 stops responding (port 22 isn't listened to anymore), and the only way in is `<new-user>@<host>:<ssh-port>` with the configured pubkey.
 
-- **Stage 2:** an `/etc/ssh/sshd_config.d/90-dsc-harden.conf` drop-in pinning the new SSH port, `PermitRootLogin no`, `PasswordAuthentication no`, `MaxAuthTries 3`, `LoginGraceTime 30`, `AllowUsers <new-user>`, idle session timeouts, and a curated cipher / KEX / MAC algorithm list. `sshd -t` validation before reload, then a third-session verification on the new port.
-- **Stage 3:** UTC timezone, time-sync verified, swap file (2 GB by default), journald log cap, unattended security upgrades, fail2ban, rootless Docker (per the Bawmedical playbook — `setcap cap_net_bind_service=ep` on rootlesskit, `loginctl enable-linger`), and `ufw` opened for Discourse's standard ports.
+### Idempotency caveat
 
-All steps land idempotent — re-running `dsc harden` on an existing box will skip steps that are already configured rather than fight the existing state.
+Stages 1 and 2 are individually idempotent within the fresh-box flow — if you re-run `dsc harden` and stage 1 has already been done, step-by-step skip messages confirm this. **However**, after stage 2 has run successfully the box is no longer reachable as `root@host:22`, so a naive `dsc harden <host>` will fail at step 1 with `Connection refused`. To re-run after a successful harden you either need to update your `~/.ssh/config` for the host so the alias resolves to `<new-user>@<host>:<ssh-port>`, or pass `--ssh-user discourse` explicitly (CLI doesn't yet expose `--initial-port`; tracked as a follow-up).
+
+## What stage 3 will add
+
+Tracked in `.marcus/harden-install-notes.md` (private). Briefly: UTC timezone, time-sync verified, swap file (2 GB by default), journald log cap, unattended security upgrades, fail2ban, rootless Docker (per the Bawmedical playbook — `setcap cap_net_bind_service=ep` on rootlesskit, `loginctl enable-linger`), and `ufw` opened for Discourse's standard ports.
 
 ## Configuration (`[harden]` block)
 
