@@ -46,8 +46,11 @@ changelog_topic_id = 456
 # fail2ban                     = true
 # mosh                         = false      # opt-in; opens UDP 60000-61000
 #
-# # SSH algorithm pins. Defaults drop CBC ciphers and weak KEX/MACs.
-# # Override only if you need to be permissive for older clients.
+# # SSH algorithm policy overlays (OpenSSH list modifiers), not full pinning.
+# # Defaults keep upstream OpenSSH defaults, drop legacy algorithms, and
+# # prefer PQ-hybrid key exchange first.
+# # If you override these, validate with `sshd -t` and inspect `sshd -T`
+# # before reload so mistakes fail loudly.
 # # sshd_ciphers = "..."
 # # sshd_kex     = "..."
 # # sshd_macs    = "..."
