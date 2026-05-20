@@ -17,10 +17,11 @@ dsc update <name|all> [--no-changelog] [--yes] [--parallel] [--max <n>]
 
 1. OS package update over SSH.
 2. Reboot (if applicable).
-3. Discourse rebuild (`./launcher rebuild app`).
-4. Cleanup (`./launcher cleanup`).
-5. Fetch version info from the homepage `<meta name="generator" ...>` tag.
-6. Optionally post a changelog checklist to the configured topic.
+3. Check whether the running Discourse commit matches the latest `stable` branch commit on GitHub. If they match, skip the rebuild.
+4. Discourse rebuild (`./launcher rebuild app`) — only if step 3 found a newer commit available.
+5. Cleanup (`docker container prune -f && docker image prune -f`).
+6. Fetch version info from the homepage `<meta name="generator" ...>` tag.
+7. Optionally post a changelog checklist to the configured topic.
 
 If the OS update command fails, `dsc update` aborts after attempting the rollback command (when configured).
 
@@ -46,6 +47,11 @@ dsc update all --parallel --max 4 --yes
 ```
 
 In sequential mode (without `--parallel`), updates run one-by-one. `all` is a reserved name for `dsc update all`.
+
+## Skipping behaviour
+
+- **No `ssh_host`:** `dsc update all` skips any Discourse instance that has no `ssh_host` configured. These are typically read-only references (e.g. Discourse Meta) or instances not managed via SSH.
+- **Already up to date:** Before running the rebuild, `dsc update` queries the GitHub API for the latest commit on the `discourse/discourse` `stable` branch and compares it with the commit reported by the running instance. If they match, the rebuild is skipped (OS updates still run). If GitHub is unreachable or the running commit is unknown, the rebuild proceeds as normal (fail-open).
 
 ## Environment variables
 

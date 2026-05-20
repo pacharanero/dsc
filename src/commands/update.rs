@@ -4,6 +4,7 @@ use crate::config::{Config, DiscourseConfig, find_discourse};
 use crate::utils::color_discourse_label;
 use anyhow::{Context, Result, anyhow};
 use indicatif::{ProgressBar, ProgressStyle};
+use reqwest::blocking::Client;
 use std::collections::VecDeque;
 use std::io::{self, Write};
 use std::io::{BufRead, BufReader, IsTerminal};
@@ -248,13 +249,22 @@ fn run_update(discourse: &DiscourseConfig) -> Result<UpdateMetadata> {
         }
     }
 
-    stage(&discourse_label, "Running Discourse update");
-    run_ssh_command_with_tail(
-        &target,
-        &discourse_update_cmd,
-        "Discourse update in progress",
-        3,
-    )?;
+    stage(&discourse_label, "Checking if Discourse update is needed");
+    let discourse_up_to_date = is_discourse_up_to_date(before_info.commit.as_deref());
+    if discourse_up_to_date {
+        stage(
+            &discourse_label,
+            "Discourse is already at the latest stable commit — skipping rebuild",
+        );
+    } else {
+        stage(&discourse_label, "Running Discourse update");
+        run_ssh_command_with_tail(
+            &target,
+            &discourse_update_cmd,
+            "Discourse update in progress",
+            3,
+        )?;
+    }
     stage(&discourse_label, "Waiting for Discourse to serve pages");
     let wait_secs = std::env::var("DSC_DISCOURSE_BOOT_WAIT_SECS")
         .ok()
@@ -700,6 +710,50 @@ fn fetch_version_info_with_retry(client: &DiscourseClient, attempts: usize) -> R
         }
     }
     Err(last_err.unwrap_or_else(|| anyhow!("fetch version failed")))
+}
+
+/// Fetch the latest commit SHA on the `stable` branch of discourse/discourse
+/// from the GitHub API. Returns `None` on any failure (network, rate limit,
+/// parse error) — callers treat that as "unknown, proceed with update".
+fn fetch_latest_discourse_commit() -> Option<String> {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .ok()?;
+    let resp = client
+        .get("https://api.github.com/repos/discourse/discourse/commits/stable")
+        .header("Accept", "application/vnd.github.sha")
+        .header("User-Agent", "dsc-cli")
+        .send()
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let sha = resp.text().ok()?.trim().to_string();
+    if sha.len() >= 7 && sha.chars().all(|c| c.is_ascii_hexdigit()) {
+        Some(sha)
+    } else {
+        None
+    }
+}
+
+/// Returns `true` if the running Discourse commit matches the latest available
+/// stable commit — meaning a rebuild would be a no-op.
+fn is_discourse_up_to_date(running_commit: Option<&str>) -> bool {
+    let Some(running) = running_commit else {
+        return false;
+    };
+    let running = running.trim();
+    if running.is_empty() {
+        return false;
+    }
+    let Some(latest) = fetch_latest_discourse_commit() else {
+        return false;
+    };
+    // Compare by the shorter of the two — the running commit from the
+    // HTML meta tag is often truncated to 10 characters.
+    let cmp_len = running.len().min(latest.len());
+    running[..cmp_len].eq_ignore_ascii_case(&latest[..cmp_len])
 }
 
 fn format_commit_link(commit: Option<&str>) -> Option<String> {
