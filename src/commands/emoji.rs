@@ -10,6 +10,106 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
+pub fn pull_emojis(
+    config: &Config,
+    discourse_name: &str,
+    output_dir: &Path,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    let emojis = client.list_custom_emojis()?;
+    if emojis.is_empty() {
+        println!("No custom emoji found on {}", discourse.name);
+        return Ok(());
+    }
+
+    fs::create_dir_all(output_dir)
+        .with_context(|| format!("creating directory {}", output_dir.display()))?;
+
+    let http = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .context("building HTTP client for emoji download")?;
+
+    let bar = ProgressBar::new(emojis.len() as u64);
+    bar.set_style(
+        ProgressStyle::default_bar()
+            .template("[{bar:30}] {pos}/{len} {msg}")
+            .unwrap(),
+    );
+
+    let mut downloaded = 0u64;
+    let mut skipped = 0u64;
+    let mut failed = 0u64;
+
+    for emoji in &emojis {
+        bar.set_message(emoji.name.clone());
+        let ext = emoji
+            .url
+            .rsplit('.')
+            .next()
+            .and_then(|e| {
+                let lower = e.to_lowercase();
+                if matches!(lower.as_str(), "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp") {
+                    Some(lower)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "png".to_string());
+        let dest = output_dir.join(format!("{}.{}", emoji.name, ext));
+
+        if dest.exists() {
+            skipped += 1;
+            bar.inc(1);
+            continue;
+        }
+
+        let url = if emoji.url.starts_with("http") {
+            emoji.url.clone()
+        } else {
+            format!("{}{}", client.baseurl(), emoji.url)
+        };
+
+        match http.get(&url).send() {
+            Ok(resp) if resp.status().is_success() => {
+                match resp.bytes() {
+                    Ok(bytes) => {
+                        if let Err(e) = fs::write(&dest, &bytes) {
+                            eprintln!("Failed to write {}: {}", dest.display(), e);
+                            failed += 1;
+                        } else {
+                            downloaded += 1;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to read response for {}: {}", emoji.name, e);
+                        failed += 1;
+                    }
+                }
+            }
+            Ok(resp) => {
+                eprintln!("HTTP {} downloading {}", resp.status(), emoji.name);
+                failed += 1;
+            }
+            Err(e) => {
+                eprintln!("Failed to download {}: {}", emoji.name, e);
+                failed += 1;
+            }
+        }
+        bar.inc(1);
+    }
+
+    bar.finish_and_clear();
+    println!(
+        "Emoji pull complete: {} downloaded, {} skipped (existing), {} failed",
+        downloaded, skipped, failed
+    );
+    Ok(())
+}
+
 pub fn add_emoji(
     config: &Config,
     discourse_name: &str,

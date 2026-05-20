@@ -308,9 +308,17 @@ pub enum ListCommand {
 
 #[derive(Subcommand)]
 pub enum EmojiCommand {
-    /// Upload one emoji file, or bulk-upload from a directory.
-    #[command(visible_alias = "a")]
-    Add {
+    /// Pull all custom emoji from a Discourse into a local directory.
+    #[command(visible_alias = "pl")]
+    Pull {
+        /// Discourse name.
+        discourse: String,
+        /// Local directory to save emoji images into.
+        output_dir: PathBuf,
+    },
+    /// Push (upload) one emoji file, or bulk-upload from a directory (alias: add).
+    #[command(visible_alias = "ps", alias = "add")]
+    Push {
         /// Discourse name.
         discourse: String,
         /// Local file or directory path.
@@ -530,9 +538,19 @@ pub enum BackupCommand {
         #[arg(long, short = 'v')]
         verbose: bool,
     },
-    /// Restore a backup.
-    #[command(visible_alias = "rs")]
-    Restore {
+    /// Pull (download) a backup to a local file.
+    #[command(visible_alias = "pl")]
+    Pull {
+        /// Discourse name.
+        discourse: String,
+        /// Backup filename on the server (from `dsc backup list`).
+        backup_filename: String,
+        /// Local output path. Defaults to the backup filename in the current directory.
+        local_path: Option<PathBuf>,
+    },
+    /// Push (restore) a backup on the server (alias: restore).
+    #[command(visible_alias = "ps", alias = "restore")]
+    Push {
         /// Discourse name.
         discourse: String,
         /// Backup filename/path on the target system.
@@ -1030,9 +1048,19 @@ pub enum UserGroupsCommand {
 
 #[derive(Subcommand)]
 pub enum PostCommand {
-    /// Edit a post by ID. Reads the new body from file or stdin.
-    #[command(visible_alias = "e")]
-    Edit {
+    /// Pull a post's raw Markdown to a local file.
+    #[command(visible_alias = "pl")]
+    Pull {
+        /// Discourse name.
+        discourse: String,
+        /// Post ID.
+        post_id: u64,
+        /// Output file path. Prints to stdout when omitted.
+        local_path: Option<PathBuf>,
+    },
+    /// Push a local file to update a post (alias: edit).
+    #[command(visible_alias = "ps", alias = "edit")]
+    Push {
         /// Discourse name.
         discourse: String,
         /// Post ID.

@@ -3,8 +3,39 @@ use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
 use anyhow::{Context, Result, anyhow};
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::Path;
+
+pub fn post_pull(
+    config: &Config,
+    discourse_name: &str,
+    post_id: u64,
+    local_path: Option<&Path>,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    let raw = client
+        .fetch_post_raw(post_id)?
+        .ok_or_else(|| anyhow!("post {} has no raw content", post_id))?;
+
+    match local_path {
+        Some(path) => {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)
+                    .with_context(|| format!("creating directory {}", parent.display()))?;
+            }
+            fs::write(path, &raw)
+                .with_context(|| format!("writing {}", path.display()))?;
+            println!("Post {} pulled to {}", post_id, path.display());
+        }
+        None => {
+            io::stdout().write_all(raw.as_bytes())?;
+        }
+    }
+    Ok(())
+}
 
 pub fn post_edit(
     config: &Config,

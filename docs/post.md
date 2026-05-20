@@ -2,17 +2,30 @@
 
 Operations on individual posts (not whole topics). Complements `dsc topic pull/push/sync`, which only work on the OP.
 
-## dsc post edit
+## dsc post pull
 
 ```text
-dsc post edit <discourse> <post-id> [<local-path>]
+dsc post pull <discourse> <post-id> [<local-path>]
 ```
 
-Replaces the body of the specified post with the contents of `<local-path>` (or stdin if omitted, or `-`). Requires either an admin API key or a key whose user is the post author.
+Downloads the raw Markdown body of the specified post. Writes to `<local-path>` if given, otherwise to stdout.
 
 ```bash
-dsc post edit myforum 98765 ./corrected.md
-echo "Edited on the fly." | dsc post edit myforum 98765
+dsc post pull myforum 98765 ./post-98765.md
+dsc post pull myforum 98765 > post.md
+```
+
+## dsc post push
+
+```text
+dsc post push <discourse> <post-id> [<local-path>]
+```
+
+Replaces the body of the specified post with the contents of `<local-path>` (or stdin if omitted, or `-`). Requires either an admin API key or a key whose user is the post author. (Alias: `dsc post edit`.)
+
+```bash
+dsc post push myforum 98765 ./corrected.md
+echo "Edited on the fly." | dsc post push myforum 98765
 ```
 
 ## dsc post delete

@@ -94,7 +94,15 @@ fn main() -> Result<()> {
 
         Commands::Emoji {
             command:
-                EmojiCommand::Add {
+                EmojiCommand::Pull {
+                    discourse,
+                    output_dir,
+                },
+        } => commands::emoji::pull_emojis(&config, &discourse, &output_dir),
+
+        Commands::Emoji {
+            command:
+                EmojiCommand::Push {
                     discourse,
                     emoji_path,
                     emoji_name,
@@ -473,7 +481,13 @@ fn main() -> Result<()> {
                 verbose,
             } => commands::backup::backup_list(&config, &discourse, format, verbose),
 
-            BackupCommand::Restore {
+            BackupCommand::Pull {
+                discourse,
+                backup_filename,
+                local_path,
+            } => commands::backup::backup_pull(&config, &discourse, &backup_filename, local_path.as_deref()),
+
+            BackupCommand::Push {
                 discourse,
                 backup_path,
             } => commands::backup::backup_restore(&config, &discourse, &backup_path, dry_run),
@@ -632,7 +646,12 @@ fn main() -> Result<()> {
         } => commands::upload::upload(&config, &discourse, &file, &upload_type, format),
 
         Commands::Post { command } => match command {
-            PostCommand::Edit {
+            PostCommand::Pull {
+                discourse,
+                post_id,
+                local_path,
+            } => commands::post::post_pull(&config, &discourse, post_id, local_path.as_deref()),
+            PostCommand::Push {
                 discourse,
                 post_id,
                 local_path,

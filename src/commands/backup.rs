@@ -2,8 +2,10 @@ use crate::api::DiscourseClient;
 use crate::cli::OutputFormat;
 use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
+use std::fs;
 use std::io;
+use std::path::Path;
 
 pub fn backup_create(config: &Config, discourse_name: &str) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
@@ -155,6 +157,50 @@ pub fn backup_restore(
     }
     let client = DiscourseClient::new(discourse)?;
     client.restore_backup(backup_path)?;
+    Ok(())
+}
+
+pub fn backup_pull(
+    config: &Config,
+    discourse_name: &str,
+    backup_filename: &str,
+    local_path: Option<&Path>,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    let url = format!("{}/admin/backups/{}", client.baseurl(), backup_filename);
+    let response = client.get(&format!("/admin/backups/{}", backup_filename))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(anyhow!(
+            "failed to download backup {} (HTTP {})",
+            backup_filename,
+            status
+        ));
+    }
+
+    let dest = match local_path {
+        Some(p) => p.to_path_buf(),
+        None => Path::new(backup_filename).to_path_buf(),
+    };
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("creating directory {}", parent.display()))?;
+    }
+
+    let bytes = response
+        .bytes()
+        .with_context(|| format!("reading backup response from {}", url))?;
+    fs::write(&dest, &bytes)
+        .with_context(|| format!("writing {}", dest.display()))?;
+    println!(
+        "Backup {} pulled to {} ({} bytes)",
+        backup_filename,
+        dest.display(),
+        bytes.len()
+    );
     Ok(())
 }
 
