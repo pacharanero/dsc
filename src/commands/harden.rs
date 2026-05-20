@@ -51,13 +51,15 @@ pub(crate) struct Options {
     pub extra_ufw_allow: Vec<String>,
 }
 
-/// Modern SSH algorithm pins, drops CBC ciphers and weak KEX/MACs.
-const DEFAULT_CIPHERS: &str =
-    "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr";
+/// SSH policy overlays (OpenSSH list modifiers), not brittle full pinning.
+/// - Keep upstream defaults as they evolve.
+/// - Remove known-legacy algorithms.
+/// - Prefer PQ-hybrid KEX first.
+const DEFAULT_CIPHERS: &str = "-*-cbc,-3des-cbc";
 const DEFAULT_KEX: &str =
-    "curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512";
+    "^sntrup761x25519-sha512@openssh.com,-diffie-hellman-group1-sha1,-diffie-hellman-group14-sha1,-diffie-hellman-group-exchange-sha1";
 const DEFAULT_MACS: &str =
-    "hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com";
+    "-hmac-sha1,-hmac-sha1-96,-hmac-md5,-hmac-md5-96,-umac-64@openssh.com,-umac-64-etm@openssh.com";
 
 /// Resolve final options. CLI overrides win, then `[harden]` config block,
 /// then the built-in defaults documented in `dsc.example.toml`.
@@ -490,6 +492,9 @@ mod tests {
         assert!(opts.unattended_security_upgrades);
         assert!(!opts.mosh);
         assert_eq!(opts.journald_max_use, "500M");
+        assert!(opts.sshd_kex.contains("sntrup761x25519-sha512@openssh.com"));
+        assert_eq!(opts.sshd_ciphers, "-*-cbc,-3des-cbc");
+        assert!(opts.sshd_macs.contains("-hmac-sha1"));
     }
 
     #[test]

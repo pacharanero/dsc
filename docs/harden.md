@@ -22,7 +22,7 @@ After stage 1, sshd is **still in its original state** — root SSH and password
 
 Tracked in [`.marcus/harden-install-notes.md`](https://github.com/pacharanero/dsc/tree/main/.marcus) (private). Briefly:
 
-- **Stage 2:** an `/etc/ssh/sshd_config.d/90-dsc-harden.conf` drop-in pinning the new SSH port, `PermitRootLogin no`, `PasswordAuthentication no`, `MaxAuthTries 3`, `LoginGraceTime 30`, `AllowUsers <new-user>`, idle session timeouts, and a curated cipher / KEX / MAC algorithm list. `sshd -t` validation before reload, then a third-session verification on the new port.
+- **Stage 2:** an `/etc/ssh/sshd_config.d/90-dsc-harden.conf` drop-in setting the new SSH port, `PermitRootLogin no`, `PasswordAuthentication no`, `MaxAuthTries 3`, `LoginGraceTime 30`, `AllowUsers <new-user>`, idle session timeouts, and SSH algorithm policy overlays (prefer PQ-hybrid KEX, remove legacy algorithms, avoid brittle full pinning). `sshd -t` plus `sshd -T` validation before reload, then a third-session verification on the new port.
 - **Stage 3:** UTC timezone, time-sync verified, swap file (2 GB by default), journald log cap, unattended security upgrades, fail2ban, rootless Docker (per the Bawmedical playbook — `setcap cap_net_bind_service=ep` on rootlesskit, `loginctl enable-linger`), and `ufw` opened for Discourse's standard ports.
 
 All steps land idempotent — re-running `dsc harden` on an existing box will skip steps that are already configured rather than fight the existing state.
@@ -43,7 +43,8 @@ timezone                     = "UTC"
 unattended_security_upgrades = true
 fail2ban                     = true
 mosh                         = false      # opt-in; opens UDP 60000-61000
-# sshd_ciphers, sshd_kex, sshd_macs override dsc's pinned modern lists
+# sshd_ciphers, sshd_kex, sshd_macs override dsc's policy overlays
+# (not brittle full allow-lists)
 # extra_ufw_allow = ["3000/tcp", "192.168.1.0/24"]
 ```
 

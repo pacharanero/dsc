@@ -34,6 +34,9 @@ pub fn update_all(
 ) -> Result<()> {
     if !parallel {
         for discourse in &config.discourse {
+            if discourse.ssh_host.is_none() {
+                continue;
+            }
             let metadata = run_update(discourse)?;
             let payload = print_update_summary(discourse, &metadata);
             if post_changelog {
@@ -43,9 +46,15 @@ pub fn update_all(
         return Ok(());
     }
 
-    let max_threads = parallel_worker_count(max, config.discourse.len());
+    let updatable: Vec<_> = config
+        .discourse
+        .iter()
+        .filter(|d| d.ssh_host.is_some())
+        .cloned()
+        .collect();
+    let max_threads = parallel_worker_count(max, updatable.len());
     let mut handles: Vec<thread::JoinHandle<Result<()>>> = Vec::new();
-    for discourse in config.discourse.clone() {
+    for discourse in updatable {
         if handles.len() >= max_threads {
             if let Some(handle) = handles.pop() {
                 handle.join().expect("thread panicked")?;

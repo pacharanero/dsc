@@ -65,13 +65,16 @@ pub struct HardenConfig {
     /// Whether to install mosh and open UDP 60000-61000. Default: false.
     #[serde(default)]
     pub mosh: Option<bool>,
-    /// Override sshd `Ciphers` line. Defaults to dsc's pinned modern set.
+    /// Override sshd `Ciphers` line. Defaults to dsc's policy overlay
+    /// (drop legacy algorithms while preserving upstream defaults).
     #[serde(default, deserialize_with = "deserialize_opt_string_empty_as_none")]
     pub sshd_ciphers: Option<String>,
-    /// Override sshd `KexAlgorithms` line. Defaults to dsc's pinned modern set.
+    /// Override sshd `KexAlgorithms` line. Defaults to dsc's policy overlay
+    /// (prefer PQ-hybrid first, disable legacy SHA-1 DH groups).
     #[serde(default, deserialize_with = "deserialize_opt_string_empty_as_none")]
     pub sshd_kex: Option<String>,
-    /// Override sshd `MACs` line. Defaults to dsc's pinned modern set.
+    /// Override sshd `MACs` line. Defaults to dsc's policy overlay
+    /// (disable legacy SHA-1/MD5 and short UMAC variants).
     #[serde(default, deserialize_with = "deserialize_opt_string_empty_as_none")]
     pub sshd_macs: Option<String>,
     /// Extra ufw `allow` rules applied after the standard set
