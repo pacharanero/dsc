@@ -8,9 +8,9 @@ edit_uri: edit/main/docs/
 theme:
   variant: modern
   # Light-mode variant by default; CSS in stylesheets/extra.css swaps to
-  # `logo-dark.svg` under `[data-md-color-scheme="slate"]`.
-  logo: assets/dsc-logo-orange-on-white.svg
-  favicon: assets/dsc-logo-orange-on-white.svg
+  # the white-bubble variant under `[data-md-color-scheme="slate"]`.
+  logo: assets/dsc-logo-orange-on-black.svg
+  favicon: assets/dsc-logo-orange-on-black.svg
   features:
     - content.code.copy
     - content.code.annotate
