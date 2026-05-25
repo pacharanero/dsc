@@ -148,7 +148,7 @@ pub enum Commands {
         #[command(subcommand)]
         command: SettingCommand,
     },
-    /// List tags and apply/remove them on topics.
+    /// Manage the tag taxonomy: list/pull/push tags and tag groups.
     #[command(visible_alias = "tg")]
     Tag {
         #[command(subcommand)]
@@ -401,6 +401,24 @@ pub enum TopicCommand {
         title: String,
         /// Input file path. Reads stdin when omitted or `-`.
         local_path: Option<PathBuf>,
+    },
+    /// Add a tag to a topic.
+    Tag {
+        /// Discourse name.
+        discourse: String,
+        /// Topic ID.
+        topic_id: u64,
+        /// Tag to add.
+        tag: String,
+    },
+    /// Remove a tag from a topic.
+    Untag {
+        /// Discourse name.
+        discourse: String,
+        /// Topic ID.
+        topic_id: u64,
+        /// Tag to remove.
+        tag: String,
     },
 }
 
@@ -1100,25 +1118,25 @@ pub enum TagCommand {
         #[arg(long, short = 'f', value_enum, default_value = "text")]
         format: ListFormat,
     },
-    /// Add a tag to a topic.
-    #[command(visible_alias = "a")]
-    Apply {
+    /// Pull the tag taxonomy (tags + tag groups) to a local file.
+    #[command(visible_alias = "pl")]
+    Pull {
         /// Discourse name.
         discourse: String,
-        /// Topic ID.
-        topic_id: u64,
-        /// Tag to add.
-        tag: String,
+        /// Output file (default: tags.yaml). Extension determines format (.yaml/.json).
+        #[arg(default_value = "tags.yaml")]
+        local_path: PathBuf,
     },
-    /// Remove a tag from a topic.
-    #[command(visible_alias = "rm")]
-    Remove {
+    /// Push a local taxonomy file to the server (upsert; optionally prune).
+    #[command(visible_alias = "ps")]
+    Push {
         /// Discourse name.
         discourse: String,
-        /// Topic ID.
-        topic_id: u64,
-        /// Tag to remove.
-        tag: String,
+        /// Input taxonomy file.
+        local_path: PathBuf,
+        /// Delete server tags/groups absent from the file.
+        #[arg(long)]
+        prune: bool,
     },
 }
 

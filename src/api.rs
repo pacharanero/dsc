@@ -23,6 +23,7 @@ mod users;
 pub use api_keys::{ApiKeySummary, CreatedApiKey};
 pub use client::{DiscourseClient, VersionInfo};
 pub use models::*;
+pub use tags::TagGroupInfo;
 pub use groups::AddMembersOutcome;
 pub use invites::InviteResult;
 pub use reports::{AdminReport, ReportPoint};

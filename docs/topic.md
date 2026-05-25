@@ -1,6 +1,6 @@
 # dsc topic
 
-Pull, push, and sync individual topics as local Markdown files.
+Pull, push, and sync individual topics as local Markdown files. Also tag/untag topics.
 
 ## dsc topic pull
 
@@ -58,4 +58,30 @@ Examples:
 ```bash
 dsc topic new myforum 42 --title "Release notes" ./notes.md
 df -h | dsc topic new myforum 42 -t "Disk report $(date -I)"
+```
+
+## dsc topic tag
+
+```text
+dsc topic tag <discourse> <topic-id> <tag>
+```
+
+Adds the given tag to the specified topic, preserving any existing tags. No-op (and prints a message) if the topic already has the tag. Supports `--dry-run` (`-n`).
+
+## dsc topic untag
+
+```text
+dsc topic untag <discourse> <topic-id> <tag>
+```
+
+Removes the given tag from the specified topic, leaving the others intact. No-op if the tag isn't present. Supports `--dry-run`.
+
+```bash
+# Tag every search hit with "triage"
+dsc search myforum "status:open category:bugs" --format json \
+  | jq -r '.[].id' \
+  | xargs -I{} dsc topic tag myforum {} triage
+
+# Preview removal without committing
+dsc -n topic untag myforum 1525 archived
 ```

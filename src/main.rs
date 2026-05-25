@@ -163,6 +163,18 @@ fn main() -> Result<()> {
                 local_path.as_deref(),
                 dry_run,
             ),
+
+            TopicCommand::Tag {
+                discourse,
+                topic_id,
+                tag,
+            } => commands::tag::tag_apply(&config, &discourse, topic_id, &tag, dry_run),
+
+            TopicCommand::Untag {
+                discourse,
+                topic_id,
+                tag,
+            } => commands::tag::tag_remove(&config, &discourse, topic_id, &tag, dry_run),
         },
 
         Commands::Category { command } => match command {
@@ -676,16 +688,15 @@ fn main() -> Result<()> {
             TagCommand::List { discourse, format } => {
                 commands::tag::tag_list(&config, &discourse, format)
             }
-            TagCommand::Apply {
+            TagCommand::Pull {
                 discourse,
-                topic_id,
-                tag,
-            } => commands::tag::tag_apply(&config, &discourse, topic_id, &tag, dry_run),
-            TagCommand::Remove {
+                local_path,
+            } => commands::tag::tag_pull(&config, &discourse, &local_path),
+            TagCommand::Push {
                 discourse,
-                topic_id,
-                tag,
-            } => commands::tag::tag_remove(&config, &discourse, topic_id, &tag, dry_run),
+                local_path,
+                prune,
+            } => commands::tag::tag_push(&config, &discourse, &local_path, prune, dry_run),
         },
 
         Commands::Config {
