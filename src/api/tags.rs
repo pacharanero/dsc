@@ -6,7 +6,7 @@ use serde_json::Value;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TagInfo {
-    pub id: String,
+    pub id: u64,
     #[serde(default)]
     pub text: String,
     #[serde(default)]

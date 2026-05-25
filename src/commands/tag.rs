@@ -18,7 +18,7 @@ pub fn tag_list(
     let client = DiscourseClient::new(discourse)?;
 
     let mut tags = client.list_tags()?;
-    tags.sort_by(|a, b| a.id.cmp(&b.id));
+    tags.sort_by(|a, b| a.text.cmp(&b.text));
 
     match format {
         ListFormat::Text => {
@@ -28,14 +28,14 @@ pub fn tag_list(
             }
             let name_width = tags
                 .iter()
-                .map(|t| t.id.len())
+                .map(|t| t.text.len())
                 .max()
                 .unwrap_or(0)
                 .max(4);
             for tag in &tags {
                 println!(
                     "{:<width$}  {}",
-                    tag.id,
+                    tag.text,
                     tag.count,
                     width = name_width
                 );
@@ -184,9 +184,9 @@ pub fn tag_pull(
     // Collect tag entries with descriptions
     let mut tag_entries: Vec<TagEntry> = Vec::new();
     for t in &server_tags {
-        let description = client.get_tag_description(&t.id).unwrap_or(None);
+        let description = client.get_tag_description(&t.text).unwrap_or(None);
         tag_entries.push(TagEntry {
-            name: t.id.clone(),
+            name: t.text.clone(),
             description,
         });
     }
@@ -311,7 +311,7 @@ pub fn tag_push(
 
     // ── Reconcile tags ────────────────────────────────────────────────────────
     let server_tags = client.list_tags()?;
-    let server_tag_names: BTreeSet<String> = server_tags.iter().map(|t| t.id.clone()).collect();
+    let server_tag_names: BTreeSet<String> = server_tags.iter().map(|t| t.text.clone()).collect();
 
     let tags_to_create: Vec<&String> = desired_tags.difference(&server_tag_names).collect();
     let tags_to_delete: Vec<&String> = if prune {
