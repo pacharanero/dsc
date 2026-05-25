@@ -188,8 +188,15 @@ fn warn_on_discourse_names(config: &Config) {
 ///
 /// If none exist, defaults to `./dsc.toml`.
 pub fn resolve_default_config_path() -> PathBuf {
+    let candidates = config_search_paths();
     let local = PathBuf::from("dsc.toml");
-    let mut candidates = vec![local.clone()];
+    first_existing_config_path(candidates).unwrap_or(local)
+}
+
+/// Returns the ordered list of candidate paths that `dsc` searches for a config file.
+pub fn config_search_paths() -> Vec<PathBuf> {
+    let local = PathBuf::from("dsc.toml");
+    let mut candidates = vec![local];
 
     if let Some(xdg_config_home) = std::env::var_os("XDG_CONFIG_HOME") {
         candidates.push(PathBuf::from(xdg_config_home).join("dsc").join("dsc.toml"));
@@ -216,7 +223,7 @@ pub fn resolve_default_config_path() -> PathBuf {
         candidates.push(PathBuf::from("/usr/local/etc/dsc.toml"));
     }
 
-    first_existing_config_path(candidates).unwrap_or(local)
+    candidates
 }
 
 fn first_existing_config_path<I>(candidates: I) -> Option<PathBuf>

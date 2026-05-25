@@ -267,7 +267,7 @@ pub enum Commands {
     #[command(visible_alias = "cfg")]
     Config {
         #[command(subcommand)]
-        command: ConfigCommand,
+        command: Option<ConfigCommand>,
     },
     /// Generate shell completion scripts.
     #[command(visible_alias = "comp")]

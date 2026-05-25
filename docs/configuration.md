@@ -1,12 +1,17 @@
 # Configuration
 
-If `--config <path>` is not provided, `dsc` searches for a config in this order:
+If `--config <path>` is not provided, `dsc` searches for a config in this order (first match wins):
 
-1. `./dsc.toml`
+1. `./dsc.toml` (current working directory)
 2. `$XDG_CONFIG_HOME/dsc/dsc.toml` (or `~/.config/dsc/dsc.toml` when `XDG_CONFIG_HOME` is unset)
-3. System config locations (`$XDG_CONFIG_DIRS` entries as `<dir>/dsc/dsc.toml`, then `/etc/xdg/dsc/dsc.toml`, `/etc/dsc/dsc.toml`, `/etc/dsc.toml`, `/usr/local/etc/dsc.toml`)
+3. `$XDG_CONFIG_DIRS` entries as `<dir>/dsc/dsc.toml` (or `/etc/xdg/dsc/dsc.toml` when `XDG_CONFIG_DIRS` is unset)
+4. `/etc/dsc/dsc.toml`
+5. `/etc/dsc.toml`
+6. `/usr/local/etc/dsc.toml`
 
 If none are found, it defaults to `./dsc.toml` (created on first write command).
+
+Run `dsc config` to see which paths apply on your system and which one is active.
 
 Each Discourse instance lives under a `[[discourse]]` table. See [dsc.example.toml](../dsc.example.toml) for a fuller template. Minimum useful fields are `name`, `baseurl`, `apikey`, and `api_username`.
 

@@ -13,7 +13,7 @@ fn map_section(s: SectionArg) -> SectionFilter {
         SectionArg::Health => SectionFilter::Health,
     }
 }
-use dsc::config::{load_config, resolve_default_config_path, save_config};
+use dsc::config::{config_search_paths, load_config, resolve_default_config_path, save_config};
 
 fn map_role(role: RoleArg) -> Role {
     match role {
@@ -689,8 +689,27 @@ fn main() -> Result<()> {
         },
 
         Commands::Config {
-            command: ConfigCommand::Check { format, skip_ssh },
+            command: Some(ConfigCommand::Check { format, skip_ssh }),
         } => commands::config::config_check(&config, format, skip_ssh),
+
+        Commands::Config { command: None } => {
+            let candidates = config_search_paths();
+            println!("Active config: {}", config_path.display());
+            println!();
+            println!("Search order:");
+            for (i, path) in candidates.iter().enumerate() {
+                let exists = path.exists();
+                let marker = if path == &config_path { " <-- active" } else { "" };
+                println!(
+                    "  {}. {}{}{}",
+                    i + 1,
+                    path.display(),
+                    if exists && marker.is_empty() { " (exists)" } else { "" },
+                    marker
+                );
+            }
+            Ok(())
+        }
 
         Commands::Completions { shell, dir } => {
             commands::completions::write_completions(shell, dir.as_deref())

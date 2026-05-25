@@ -2,6 +2,21 @@
 
 Inspect and validate your `dsc.toml` configuration.
 
+Running `dsc config` without a subcommand prints the active config file path and the full search order, showing which candidates exist on disk:
+
+```text
+$ dsc config
+Active config: /home/marcus/.config/dsc/dsc.toml
+
+Search order:
+  1. dsc.toml
+  2. /home/marcus/.config/dsc/dsc.toml <-- active
+  3. /etc/xdg/dsc/dsc.toml
+  4. /etc/dsc/dsc.toml
+  5. /etc/dsc.toml
+  6. /usr/local/etc/dsc.toml
+```
+
 ## dsc config check
 
 ```text
