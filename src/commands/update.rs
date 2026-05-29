@@ -184,20 +184,31 @@ fn run_update(discourse: &DiscourseConfig) -> Result<UpdateMetadata> {
         }
     }
 
+    let rootless = discourse.docker_rootless.unwrap_or(false);
+
     let os_update_cmd = std::env::var("DSC_SSH_OS_UPDATE_CMD").unwrap_or_else(|_| {
         "sudo -n DEBIAN_FRONTEND=noninteractive apt update && sudo -n DEBIAN_FRONTEND=noninteractive apt upgrade -y"
             .to_string()
     });
     let reboot_cmd =
         std::env::var("DSC_SSH_REBOOT_CMD").unwrap_or_else(|_| "sudo -n reboot".to_string());
-    let discourse_update_cmd = std::env::var("DSC_SSH_UPDATE_CMD")
-        .unwrap_or_else(|_| "cd /var/discourse && sudo -n ./launcher rebuild app".to_string());
+    let discourse_update_cmd = std::env::var("DSC_SSH_UPDATE_CMD").unwrap_or_else(|_| {
+        if rootless {
+            "cd /var/discourse && ./launcher rebuild app".to_string()
+        } else {
+            "cd /var/discourse && sudo -n ./launcher rebuild app".to_string()
+        }
+    });
     let cleanup_cmd = std::env::var("DSC_SSH_CLEANUP_CMD")
         .unwrap_or_else(|_| {
             // ./launcher cleanup runs docker container prune + docker image prune, both of which
             // prompt for [y/N] confirmation. Without a TTY, they read EOF and default to N,
             // silently doing nothing. Use -f to skip confirmation in non-interactive SSH.
-            "sudo -n docker container prune -f && sudo -n docker image prune -f".to_string()
+            if rootless {
+                "docker container prune -f && docker image prune -f".to_string()
+            } else {
+                "sudo -n docker container prune -f && sudo -n docker image prune -f".to_string()
+            }
         });
 
     let mut server_rebooted = false;

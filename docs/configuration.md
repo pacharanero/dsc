@@ -37,6 +37,7 @@ tags = ["production", "client-a"]
 | `api_username` | for API commands | User to act as (usually `system`). |
 | `fullname` | no | Display name / site title. Auto-populated by `dsc add` and `dsc import` when fetchable. |
 | `ssh_host` | for `update` | SSH config host name for remote updates. |
+| `docker_rootless` | no | Set `true` when the instance uses rootless Docker (e.g. provisioned by `dsc harden`). Drops `sudo` from Docker/launcher commands during `dsc update`. Default: `false`. |
 | `changelog_topic_id` | for changelog | Topic ID for update changelog posts. |
 | `tags` | no | Labels for organising installs; used with `--tags` filtering. |
 | `enabled` | no | Defaults to `true`. Set `false` to skip in bulk operations. |

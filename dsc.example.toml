@@ -11,6 +11,7 @@ baseurl = "https://forum.example.com"              # base URL of the Discourse i
 apikey = "your_api_key_here"                       # admin API key
 api_username = "system"                            # API username the key acts as
 ssh_host = "forum.example.com"                     # host used by `dsc update` over SSH (optional)
+docker_rootless = false                             # true if `dsc harden` installed Docker rootless (optional)
 tags = ["production", "uk"]                        # free-form tags; used by `--tags` filters (optional)
 changelog_topic_id = 123                           # topic id to post rebuild changelogs into (optional)
 

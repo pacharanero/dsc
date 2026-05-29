@@ -100,6 +100,8 @@ pub struct DiscourseConfig {
     pub changelog_topic_id: Option<u64>,
     #[serde(default, deserialize_with = "deserialize_opt_string_empty_as_none")]
     pub ssh_host: Option<String>,
+    #[serde(default)]
+    pub docker_rootless: Option<bool>,
 }
 
 /// Load configuration from a TOML file.

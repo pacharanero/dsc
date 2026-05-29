@@ -48,6 +48,10 @@ dsc update all --parallel --max 4 --yes
 
 In sequential mode (without `--parallel`), updates run one-by-one. `all` is a reserved name for `dsc update all`.
 
+## Rootless Docker
+
+If `docker_rootless = true` is set on a Discourse entry, the update command drops `sudo -n` from Docker and launcher commands. This is required for instances provisioned with `dsc harden` (which defaults to rootless Docker). Without this flag, commands like `sudo ./launcher rebuild app` fail because the root user has no Docker context.
+
 ## Skipping behaviour
 
 - **No `ssh_host`:** `dsc update all` skips any Discourse instance that has no `ssh_host` configured. These are typically read-only references (e.g. Discourse Meta) or instances not managed via SSH.

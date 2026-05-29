@@ -23,6 +23,7 @@ pub fn add_discourses(config: &mut Config, names: &str, interactive: bool) -> Re
             entry.tags = Some(Vec::new());
             entry.changelog_topic_id = Some(0);
             entry.ssh_host = Some("".to_string());
+            entry.docker_rootless = Some(false);
         }
         if interactive {
             entry.baseurl = prompt("Base URL")?;
