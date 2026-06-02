@@ -7,6 +7,11 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
+    cooldown:
+      default-days: 7
+      semver-major-days: 7
+      semver-minor-days: 7
+      semver-patch-days: 7
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -14,3 +19,5 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
+    cooldown:
+      default-days: 7
