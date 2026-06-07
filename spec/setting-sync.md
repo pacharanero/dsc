@@ -33,6 +33,26 @@ The number of settings grows by ~5-10 per Discourse release. Settings are occasi
 
 Key gaps: no file-based workflow, no cross-instance comparison, no metadata preservation, no bulk write.
 
+## Implementation progress
+
+- [ ] **Phase 1** - `dsc setting pull` (read-only snapshot)
+  - [ ] `SiteSettingDetail` struct + `list_site_settings_detailed` API method
+  - [ ] CLI `Pull` subcommand wired through `main.rs`
+  - [ ] `pull_settings` command writes YAML/JSON snapshot
+  - [ ] `--changed-only` and `--category` filters
+  - [ ] Read-only skip-list applied
+- [ ] **Phase 2** - `dsc setting push` (write)
+  - [ ] CLI `Push` subcommand
+  - [ ] Idempotent diff + PUT only on change
+  - [ ] `--dry-run` plan output
+  - [ ] `--reset-unlisted` mode
+  - [ ] Skip unknown / read-only settings gracefully
+- [ ] **Phase 3** - `dsc setting diff`
+  - [ ] Live cross-instance diff (`dsc setting diff <a> <b>`)
+  - [ ] File-based diff (snapshot vs snapshot)
+  - [ ] `--changed-only` and `--category` filters
+- [x] **Phase 4** - Fix `setting set --tags` CLI reachability
+
 ## New subcommands
 
 ### Phase 1: `dsc setting pull` (read-only snapshot)

@@ -585,14 +585,41 @@ fn main() -> Result<()> {
                     value,
                     tags,
                 },
-        } => commands::setting::set_site_setting(
-            &config,
-            Some(discourse.as_str()),
-            &setting,
-            &value,
-            tags.as_deref(),
-            dry_run,
-        ),
+        } => {
+            // When --tags is provided, the user passes only `<setting> <value>`;
+            // clap fills the first two positionals (discourse, setting) and leaves
+            // `value` as None. Shift the arguments so the command layer sees the
+            // correct values.
+            let (discourse_arg, setting_arg, value_arg) = if tags.is_some() {
+                if value.is_some() {
+                    return Err(anyhow::anyhow!(
+                        "cannot pass <discourse> together with --tags; specify either a single discourse or a tag filter"
+                    ));
+                }
+                let shifted_setting = discourse.ok_or_else(|| {
+                    anyhow::anyhow!("missing <setting> argument")
+                })?;
+                let shifted_value = setting.ok_or_else(|| {
+                    anyhow::anyhow!("missing <value> argument")
+                })?;
+                (None, shifted_setting, shifted_value)
+            } else {
+                let d = discourse.ok_or_else(|| {
+                    anyhow::anyhow!("missing <discourse> argument (or pass --tags)")
+                })?;
+                let s = setting.ok_or_else(|| anyhow::anyhow!("missing <setting> argument"))?;
+                let v = value.ok_or_else(|| anyhow::anyhow!("missing <value> argument"))?;
+                (Some(d), s, v)
+            };
+            commands::setting::set_site_setting(
+                &config,
+                discourse_arg.as_deref(),
+                &setting_arg,
+                &value_arg,
+                tags.as_deref(),
+                dry_run,
+            )
+        }
 
         Commands::Setting {
             command: SettingCommand::Get { discourse, setting },

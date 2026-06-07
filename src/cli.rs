@@ -1143,15 +1143,21 @@ pub enum TagCommand {
 #[derive(Subcommand)]
 pub enum SettingCommand {
     /// Set a site setting on a Discourse (or all tagged Discourses).
+    ///
+    /// Usage:
+    ///   dsc setting set <discourse> <setting> <value>
+    ///   dsc setting set --tags <tag1,tag2> <setting> <value>
     #[command(visible_alias = "s")]
     Set {
-        /// Discourse name. Required when targeting a single discourse.
-        discourse: String,
-        /// Setting key.
-        setting: String,
-        /// Setting value.
-        value: String,
-        /// Optional tag filter (comma/semicolon separated, match-any). Ignored when discourse is specified.
+        /// Discourse name. Required unless `--tags` is provided.
+        discourse: Option<String>,
+        /// Setting key. Required.
+        setting: Option<String>,
+        /// Setting value. Required.
+        value: Option<String>,
+        /// Tag filter (comma/semicolon separated, match-any). Apply across all
+        /// Discourses matching any of the tags. When set, omit `<discourse>`
+        /// and pass `<setting> <value>` as the only positionals.
         #[arg(long, value_name = "tag1,tag2")]
         tags: Option<String>,
     },
