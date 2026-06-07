@@ -301,3 +301,236 @@ fn is_json_path(p: &Path) -> bool {
         .map(|e| e.eq_ignore_ascii_case("json"))
         .unwrap_or(false)
 }
+
+// ─── Push (apply) ─────────────────────────────────────────────────────────────
+
+/// Apply a settings snapshot file to a Discourse.
+///
+/// Idempotent: only PUTs values that differ from the server. Settings present
+/// in the file but unknown on the server are skipped with a warning. With
+/// `--reset-unlisted`, settings present on the server but absent from the
+/// file are reset to their `default` value.
+pub fn push_settings(
+    config: &Config,
+    discourse_name: &str,
+    local_path: &Path,
+    reset_unlisted: bool,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    let raw = fs::read_to_string(local_path)
+        .with_context(|| format!("reading {}", local_path.display()))?;
+    let file: SettingsFile = if is_json_path(local_path) {
+        serde_json::from_str(&raw).context("parsing settings file as JSON")?
+    } else {
+        serde_yaml::from_str(&raw).context("parsing settings file as YAML")?
+    };
+
+    if file.version != 1 {
+        return Err(anyhow!(
+            "unsupported settings file schema version {} (expected 1)",
+            file.version
+        ));
+    }
+
+    let server = client.list_site_settings_detailed()?;
+    let server_by_name: std::collections::HashMap<&str, &SiteSettingDetail> = server
+        .iter()
+        .map(|s| (s.setting.as_str(), s))
+        .collect();
+
+    let mut plan: Vec<PushAction> = Vec::new();
+
+    // File → server: change or unchanged.
+    for entry in &file.settings {
+        let Some(srv) = server_by_name.get(entry.name.as_str()) else {
+            plan.push(PushAction::UnknownOnServer(entry.name.clone()));
+            continue;
+        };
+        let desired = value_to_send_string(&entry.value);
+        let current = value_to_send_string(&srv.value);
+        if desired == current {
+            plan.push(PushAction::Unchanged(entry.name.clone()));
+        } else {
+            plan.push(PushAction::Change {
+                name: entry.name.clone(),
+                from: current,
+                to: desired,
+            });
+        }
+    }
+
+    // Server → file: reset_unlisted.
+    if reset_unlisted {
+        let in_file: std::collections::HashSet<&str> =
+            file.settings.iter().map(|e| e.name.as_str()).collect();
+        for srv in &server {
+            if in_file.contains(srv.setting.as_str()) {
+                continue;
+            }
+            if READONLY_SETTINGS.contains(&srv.setting.as_str()) {
+                continue;
+            }
+            let current = value_to_send_string(&srv.value);
+            let default = value_to_send_string(&srv.default);
+            if current == default {
+                continue;
+            }
+            plan.push(PushAction::Reset {
+                name: srv.setting.clone(),
+                from: current,
+                to: default,
+            });
+        }
+    }
+
+    // Stable order for display.
+    plan.sort_by(|a, b| a.name().cmp(b.name()));
+
+    print_plan(&plan, &discourse.name, dry_run);
+
+    if dry_run {
+        return Ok(());
+    }
+
+    // Apply.
+    let mut applied = 0;
+    let mut failed = 0;
+    for action in &plan {
+        match action {
+            PushAction::Change { name, to, .. } | PushAction::Reset { name, to, .. } => {
+                match client.update_site_setting(name, to) {
+                    Ok(()) => {
+                        applied += 1;
+                    }
+                    Err(err) => {
+                        failed += 1;
+                        eprintln!("  ! {}: failed: {}", name, err);
+                    }
+                }
+            }
+            PushAction::Unchanged(_) | PushAction::UnknownOnServer(_) => {}
+        }
+    }
+
+    println!(
+        "{}: applied {} setting{}{}",
+        discourse.name,
+        applied,
+        if applied == 1 { "" } else { "s" },
+        if failed > 0 {
+            format!(", {} failed", failed)
+        } else {
+            String::new()
+        }
+    );
+    if failed > 0 {
+        return Err(anyhow!("{} setting(s) failed to apply", failed));
+    }
+    Ok(())
+}
+
+#[derive(Debug)]
+enum PushAction {
+    Change {
+        name: String,
+        from: String,
+        to: String,
+    },
+    Reset {
+        name: String,
+        from: String,
+        to: String,
+    },
+    Unchanged(String),
+    UnknownOnServer(String),
+}
+
+impl PushAction {
+    fn name(&self) -> &str {
+        match self {
+            PushAction::Change { name, .. }
+            | PushAction::Reset { name, .. }
+            | PushAction::Unchanged(name)
+            | PushAction::UnknownOnServer(name) => name,
+        }
+    }
+}
+
+fn print_plan(plan: &[PushAction], discourse: &str, dry_run: bool) {
+    let prefix = if dry_run { "[dry-run] " } else { "" };
+    let changes = plan
+        .iter()
+        .filter(|a| matches!(a, PushAction::Change { .. } | PushAction::Reset { .. }))
+        .count();
+    let unchanged = plan
+        .iter()
+        .filter(|a| matches!(a, PushAction::Unchanged(_)))
+        .count();
+    let unknown = plan
+        .iter()
+        .filter(|a| matches!(a, PushAction::UnknownOnServer(_)))
+        .count();
+
+    println!(
+        "{}Setting push plan for {}: {} change{}, {} unchanged, {} unknown",
+        prefix,
+        discourse,
+        changes,
+        if changes == 1 { "" } else { "s" },
+        unchanged,
+        unknown,
+    );
+    for action in plan {
+        match action {
+            PushAction::Change { name, from, to } => {
+                println!("  ~ {}: {} → {}", name, quote(from), quote(to));
+            }
+            PushAction::Reset { name, from, to } => {
+                println!(
+                    "  - {}: {} → {} (reset to default)",
+                    name,
+                    quote(from),
+                    quote(to)
+                );
+            }
+            PushAction::Unchanged(name) => {
+                println!("  = {}: (unchanged)", name);
+            }
+            PushAction::UnknownOnServer(name) => {
+                println!("  ? {}: skipped (not found on server)", name);
+            }
+        }
+    }
+}
+
+fn quote(s: &str) -> String {
+    if s.is_empty() {
+        "\"\"".to_string()
+    } else {
+        format!("\"{}\"", s)
+    }
+}
+
+/// Convert a `serde_json::Value` to the string form expected by Discourse's
+/// `PUT /admin/site_settings/{name}.json` endpoint. Discourse accepts strings
+/// and coerces internally.
+fn value_to_send_string(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::Null => String::new(),
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        // Discourse list-type settings are pipe-separated strings on the wire.
+        // If a user wrote a YAML/JSON array, join with "|" for compatibility.
+        serde_json::Value::Array(arr) => arr
+            .iter()
+            .map(value_to_send_string)
+            .collect::<Vec<_>>()
+            .join("|"),
+        serde_json::Value::Object(_) => v.to_string(),
+    }
+}

@@ -650,6 +650,21 @@ fn main() -> Result<()> {
             category.as_deref(),
         ),
 
+        Commands::Setting {
+            command:
+                SettingCommand::Push {
+                    discourse,
+                    local_path,
+                    reset_unlisted,
+                },
+        } => commands::setting::push_settings(
+            &config,
+            &discourse,
+            &local_path,
+            reset_unlisted,
+            dry_run,
+        ),
+
         Commands::Open { discourse } => commands::open::open_discourse(&config, &discourse),
 
         Commands::Harden {

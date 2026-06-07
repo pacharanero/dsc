@@ -1206,6 +1206,23 @@ pub enum SettingCommand {
         #[arg(long)]
         category: Option<String>,
     },
+
+    /// Apply a settings snapshot file to a Discourse (idempotent).
+    ///
+    /// Compares each setting in the file against the server and PUTs only
+    /// values that differ. Combine with `--dry-run` to preview the plan.
+    #[command(visible_alias = "ph")]
+    Push {
+        /// Discourse name.
+        discourse: String,
+        /// Path to the settings snapshot file (YAML or JSON).
+        local_path: PathBuf,
+        /// For settings present on the server but absent from the file,
+        /// reset them to their default value. Off by default (file describes
+        /// only the values you care about).
+        #[arg(long)]
+        reset_unlisted: bool,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy)]

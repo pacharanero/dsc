@@ -41,12 +41,12 @@ Key gaps: no file-based workflow, no cross-instance comparison, no metadata pres
   - [x] `pull_settings` command writes YAML/JSON snapshot
   - [x] `--changed-only` and `--category` filters
   - [x] Read-only skip-list applied
-- [ ] **Phase 2** - `dsc setting push` (write)
-  - [ ] CLI `Push` subcommand
-  - [ ] Idempotent diff + PUT only on change
-  - [ ] `--dry-run` plan output
-  - [ ] `--reset-unlisted` mode
-  - [ ] Skip unknown / read-only settings gracefully
+- [x] **Phase 2** - `dsc setting push` (write)
+  - [x] CLI `Push` subcommand
+  - [x] Idempotent diff + PUT only on change
+  - [x] `--dry-run` plan output
+  - [x] `--reset-unlisted` mode
+  - [x] Skip unknown / read-only settings gracefully
 - [ ] **Phase 3** - `dsc setting diff`
   - [ ] Live cross-instance diff (`dsc setting diff <a> <b>`)
   - [ ] File-based diff (snapshot vs snapshot)

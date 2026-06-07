@@ -42,9 +42,30 @@ Snapshot all site settings to a local YAML (or JSON, by extension) file with ful
 
 See [spec/setting-sync.md](https://github.com/pacharanero/dsc/blob/main/spec/setting-sync.md) for the schema and intended workflow.
 
-## Planned: push and diff
+## dsc setting push
 
-The remaining phases of the bulk-management feature:
+```
+dsc setting push <discourse> <path> [--reset-unlisted] [--dry-run]
+```
 
-- `dsc setting push <discourse> <path>` - idempotent reconciliation. Only sends PUTs for changed values. `--dry-run` shows the plan; `--reset-unlisted` resets server settings absent from the file to their defaults.
+Apply a settings snapshot file to a Discourse. Idempotent: only PUTs values that differ from the current server state.
+
+- Reads YAML or JSON (detected by extension).
+- Settings present in the file but unknown on the server are skipped with a warning (handles version drift).
+- `--reset-unlisted`: for settings present on the server but absent from the file, reset them to their default value. Off by default - the file describes only the values you care about.
+- `--dry-run` (`-n`): print the plan without applying. Output uses `~` for change, `=` for unchanged, `?` for unknown, `-` for reset-to-default.
+
+Example dry-run output:
+
+```text
+[dry-run] Setting push plan for prod: 2 changes, 11 unchanged, 0 unknown
+  = allowed_iframes: (unchanged)
+  ~ title: "Old Title" → "New Title"
+  ~ login_required: "false" → "true"
+```
+
+## Planned: diff
+
+The remaining phase of the bulk-management feature:
+
 - `dsc setting diff <a> <b>` - compare two instances or two snapshot files.
