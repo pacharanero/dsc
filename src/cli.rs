@@ -1223,6 +1223,31 @@ pub enum SettingCommand {
         #[arg(long)]
         reset_unlisted: bool,
     },
+
+    /// Compare site settings between two sources.
+    ///
+    /// Each source can be a Discourse name (live fetch) or a path to a
+    /// snapshot file produced by `dsc setting pull`. Sources are detected
+    /// by whether the argument refers to an existing file on disk; if not,
+    /// it is treated as a Discourse name.
+    #[command(visible_alias = "df")]
+    Diff {
+        /// First source: Discourse name or snapshot file path.
+        source: String,
+        /// Second source: Discourse name or snapshot file path.
+        target: String,
+        /// Filter to settings where at least one source differs from default.
+        /// Reduces noise when most settings on both sides are still default.
+        #[arg(long, short = 'c')]
+        changed_only: bool,
+        /// Limit to settings in this category (e.g. `required`, `email`).
+        /// Only effective when both sources carry category metadata.
+        #[arg(long)]
+        category: Option<String>,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy)]

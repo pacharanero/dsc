@@ -64,8 +64,24 @@ Example dry-run output:
   ~ login_required: "false" → "true"
 ```
 
-## Planned: diff
+## dsc setting diff
 
-The remaining phase of the bulk-management feature:
+```
+dsc setting diff <source> <target> [--changed-only] [--category <cat>] [--format text|json|yaml]
+```
 
-- `dsc setting diff <a> <b>` - compare two instances or two snapshot files.
+Compare site settings between two sources. Each source can be either a Discourse name (live fetch) or a path to a snapshot file produced by `dsc setting pull`. The form is detected automatically: if the argument refers to an existing file or has a `.yaml`/`.yml`/`.json` extension, it is read as a snapshot; otherwise it is treated as a Discourse name.
+
+Three modes:
+
+- live vs live: `dsc setting diff staging production`
+- live vs file: `dsc setting diff production prod-snapshot.yaml`
+- file vs file: `dsc setting diff staging-snapshot.yaml production-snapshot.yaml`
+
+Flags:
+
+- `--changed-only` (`-c`): only show settings where at least one side differs from default. Recommended when one side is a `--changed-only` snapshot - otherwise the diff is dominated by entries the snapshot omitted.
+- `--category <cat>`: limit to settings in one category.
+- `--format` (`-f`): `text` (default), `json`, or `yaml`. JSON/YAML output is pipe-friendly for further tooling.
+
+The text output lists each differing setting with both values quoted, or `(absent)` when one side does not have the setting at all.

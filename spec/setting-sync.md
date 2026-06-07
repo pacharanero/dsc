@@ -47,10 +47,10 @@ Key gaps: no file-based workflow, no cross-instance comparison, no metadata pres
   - [x] `--dry-run` plan output
   - [x] `--reset-unlisted` mode
   - [x] Skip unknown / read-only settings gracefully
-- [ ] **Phase 3** - `dsc setting diff`
-  - [ ] Live cross-instance diff (`dsc setting diff <a> <b>`)
-  - [ ] File-based diff (snapshot vs snapshot)
-  - [ ] `--changed-only` and `--category` filters
+- [x] **Phase 3** - `dsc setting diff`
+  - [x] Live cross-instance diff (`dsc setting diff <a> <b>`)
+  - [x] File-based diff (snapshot vs snapshot)
+  - [x] `--changed-only` and `--category` filters
 - [x] **Phase 4** - Fix `setting set --tags` CLI reachability
 
 ## New subcommands

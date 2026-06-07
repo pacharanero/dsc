@@ -534,3 +534,181 @@ fn value_to_send_string(v: &serde_json::Value) -> String {
         serde_json::Value::Object(_) => v.to_string(),
     }
 }
+
+// ─── Diff (compare two sources) ───────────────────────────────────────────────
+
+/// A canonical, source-agnostic snapshot of settings used by `diff_settings`.
+struct DiffSource {
+    label: String,
+    entries: std::collections::HashMap<String, SettingsEntry>,
+}
+
+/// Compare site settings between two sources. Each source can be a Discourse
+/// name (live fetch) or a path to a snapshot file produced by `pull`.
+pub fn diff_settings(
+    config: &Config,
+    source: &str,
+    target: &str,
+    changed_only: bool,
+    category: Option<&str>,
+    format: ListFormat,
+) -> Result<()> {
+    let a = load_diff_source(config, source)?;
+    let b = load_diff_source(config, target)?;
+
+    // Union of keys.
+    let mut names: std::collections::BTreeSet<String> = a.entries.keys().cloned().collect();
+    names.extend(b.entries.keys().cloned());
+
+    let mut rows: Vec<DiffRow> = Vec::new();
+    for name in names {
+        let ea = a.entries.get(&name);
+        let eb = b.entries.get(&name);
+        let va = ea.map(|e| value_to_send_string(&e.value));
+        let vb = eb.map(|e| value_to_send_string(&e.value));
+        if va == vb {
+            continue;
+        }
+        // Category filter (uses whichever side has metadata).
+        if let Some(cat) = category {
+            let row_cat = ea
+                .and_then(|e| e.category.as_deref())
+                .or_else(|| eb.and_then(|e| e.category.as_deref()))
+                .unwrap_or("");
+            if !row_cat.eq_ignore_ascii_case(cat) {
+                continue;
+            }
+        }
+        // changed-only: filter to rows where at least one side has a value
+        // that differs from its default. Treat an absent setting as "at
+        // default" - this avoids drowning the diff in entries that one side
+        // simply omitted because the snapshot was --changed-only.
+        if changed_only {
+            // Borrow the default from whichever side has metadata.
+            let shared_default = ea
+                .and_then(|e| e.default.as_ref())
+                .or_else(|| eb.and_then(|e| e.default.as_ref()));
+            let a_changed = match ea {
+                Some(e) => shared_default.map(|d| &e.value != d).unwrap_or(true),
+                None => false,
+            };
+            let b_changed = match eb {
+                Some(e) => shared_default.map(|d| &e.value != d).unwrap_or(true),
+                None => false,
+            };
+            if !a_changed && !b_changed {
+                continue;
+            }
+        }
+        rows.push(DiffRow {
+            name,
+            value_a: va,
+            value_b: vb,
+        });
+    }
+
+    print_diff(&rows, &a.label, &b.label, format)
+}
+
+#[derive(Debug, Serialize)]
+struct DiffRow {
+    name: String,
+    #[serde(rename = "a")]
+    value_a: Option<String>,
+    #[serde(rename = "b")]
+    value_b: Option<String>,
+}
+
+/// Resolve a source string to a canonical settings snapshot. Treats the
+/// argument as a file path if it points to an existing file or has a
+/// `.yaml`/`.yml`/`.json` extension; otherwise treats it as a Discourse name.
+fn load_diff_source(config: &Config, src: &str) -> Result<DiffSource> {
+    let path = Path::new(src);
+    let looks_like_file = path.is_file()
+        || matches!(
+            path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase),
+            Some(ref ext) if ext == "yaml" || ext == "yml" || ext == "json"
+        );
+    if looks_like_file {
+        let raw = fs::read_to_string(path)
+            .with_context(|| format!("reading {}", path.display()))?;
+        let file: SettingsFile = if is_json_path(path) {
+            serde_json::from_str(&raw).context("parsing settings file as JSON")?
+        } else {
+            serde_yaml::from_str(&raw).context("parsing settings file as YAML")?
+        };
+        let entries: std::collections::HashMap<String, SettingsEntry> = file
+            .settings
+            .into_iter()
+            .map(|e| (e.name.clone(), e))
+            .collect();
+        return Ok(DiffSource {
+            label: path.display().to_string(),
+            entries,
+        });
+    }
+    // Treat as discourse name.
+    let discourse = select_discourse(config, Some(src))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let server = client.list_site_settings_detailed()?;
+    let entries: std::collections::HashMap<String, SettingsEntry> = server
+        .into_iter()
+        .map(|d| {
+            let entry = detail_to_entry(d);
+            (entry.name.clone(), entry)
+        })
+        .collect();
+    Ok(DiffSource {
+        label: discourse.name.clone(),
+        entries,
+    })
+}
+
+fn print_diff(rows: &[DiffRow], label_a: &str, label_b: &str, format: ListFormat) -> Result<()> {
+    match format {
+        ListFormat::Text => {
+            if rows.is_empty() {
+                println!("{} and {}: no differences.", label_a, label_b);
+                return Ok(());
+            }
+            println!(
+                "{} differing setting{} between {} and {}:",
+                rows.len(),
+                if rows.len() == 1 { "" } else { "s" },
+                label_a,
+                label_b
+            );
+            for row in rows {
+                println!("  {}", row.name);
+                println!("    {}: {}", label_a, fmt_diff_value(&row.value_a));
+                println!("    {}: {}", label_b, fmt_diff_value(&row.value_b));
+            }
+        }
+        ListFormat::Json => {
+            let payload = serde_json::json!({
+                "a": label_a,
+                "b": label_b,
+                "differences": rows,
+            });
+            println!("{}", serde_json::to_string_pretty(&payload)?);
+        }
+        ListFormat::Yaml => {
+            let payload = serde_json::json!({
+                "a": label_a,
+                "b": label_b,
+                "differences": rows,
+            });
+            print!("{}", serde_yaml::to_string(&payload)?);
+        }
+    }
+    Ok(())
+}
+
+fn fmt_diff_value(v: &Option<String>) -> String {
+    match v {
+        Some(s) if s.is_empty() => "\"\"".to_string(),
+        Some(s) => format!("\"{}\"", s),
+        None => "(absent)".to_string(),
+    }
+}

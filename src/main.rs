@@ -665,6 +665,24 @@ fn main() -> Result<()> {
             dry_run,
         ),
 
+        Commands::Setting {
+            command:
+                SettingCommand::Diff {
+                    source,
+                    target,
+                    changed_only,
+                    category,
+                    format,
+                },
+        } => commands::setting::diff_settings(
+            &config,
+            &source,
+            &target,
+            changed_only,
+            category.as_deref(),
+            format,
+        ),
+
         Commands::Open { discourse } => commands::open::open_discourse(&config, &discourse),
 
         Commands::Harden {
