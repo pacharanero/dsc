@@ -8,15 +8,15 @@ Get and set site settings on a Discourse install. Requires an admin API key and 
 dsc setting list <discourse> [--format text|json|yaml]
 ```
 
-Lists all site settings.
+Lists all site settings (name and value only). For a richer snapshot including defaults, descriptions, and types, see the planned `dsc setting pull` (below).
 
 ## dsc setting get
 
 ```
-dsc setting get <discourse> <setting> [--format text|json|yaml]
+dsc setting get <discourse> <setting>
 ```
 
-Gets the value of a site setting.
+Gets the value of a site setting. Output is the raw value on stdout, suitable for piping.
 
 ## dsc setting set
 
@@ -26,8 +26,14 @@ dsc setting set <discourse> <setting> <value>
 
 Updates a site setting.
 
-Add `--dry-run` (or `-n`) to preview the change without sending it. Combine with `--tags` to verify a bulk update before it fans out:
+Add `--dry-run` (or `-n`) to preview the change without sending it.
 
-```bash
-dsc --dry-run setting set --tags production title "My Forum"
-```
+## Planned: bulk pull/push
+
+Snapshot all site settings to a version-controlled file, diff across instances, and push changes through staging→production workflows. See [spec/setting-sync.md](https://github.com/pacharanero/dsc/blob/main/spec/setting-sync.md) for the full design.
+
+Planned subcommands:
+
+- `dsc setting pull <discourse> [path]` - snapshot to YAML/JSON with full metadata (default, description, type, category). `--changed-only` for a manageable diff against defaults.
+- `dsc setting push <discourse> <path>` - idempotent reconciliation. Only sends PUTs for changed values. `--dry-run` shows the plan; `--reset-unlisted` resets server settings absent from the file to their defaults.
+- `dsc setting diff <a> <b>` - compare two instances or two snapshot files.
