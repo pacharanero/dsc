@@ -1,7 +1,26 @@
 use super::client::DiscourseClient;
 use super::error::http_error;
 use anyhow::{anyhow, Context, Result};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+/// A single site setting with its full metadata, as returned by
+/// `GET /admin/site_settings.json`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SiteSettingDetail {
+    pub setting: String,
+    #[serde(default)]
+    pub value: Value,
+    #[serde(default)]
+    pub default: Value,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub category: String,
+    /// API field name is `type`; renamed to avoid the Rust keyword collision.
+    #[serde(rename = "type", default)]
+    pub setting_type: String,
+}
 
 impl DiscourseClient {
     /// Update a site setting by name (admin only).
@@ -42,6 +61,29 @@ impl DiscourseClient {
         let value: Value =
             serde_json::from_str(&text).context("parsing site settings list response")?;
         Ok(value)
+    }
+
+    /// Fetch all site settings with full metadata (admin only).
+    /// Returns one `SiteSettingDetail` per setting, preserving the
+    /// `default`, `description`, `category`, and `type` fields.
+    pub fn list_site_settings_detailed(&self) -> Result<Vec<SiteSettingDetail>> {
+        let raw = self.list_site_settings()?;
+        let arr = raw
+            .get("site_settings")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| anyhow!("site_settings response missing 'site_settings' array"))?;
+        let mut out = Vec::with_capacity(arr.len());
+        for entry in arr {
+            let detail: SiteSettingDetail = serde_json::from_value(entry.clone())
+                .with_context(|| {
+                    format!(
+                        "parsing site setting entry: {}",
+                        entry.get("setting").and_then(|v| v.as_str()).unwrap_or("?")
+                    )
+                })?;
+            out.push(detail);
+        }
+        Ok(out)
     }
 
     /// Fetch a single site setting by name (admin only).

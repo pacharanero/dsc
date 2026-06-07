@@ -35,12 +35,12 @@ Key gaps: no file-based workflow, no cross-instance comparison, no metadata pres
 
 ## Implementation progress
 
-- [ ] **Phase 1** - `dsc setting pull` (read-only snapshot)
-  - [ ] `SiteSettingDetail` struct + `list_site_settings_detailed` API method
-  - [ ] CLI `Pull` subcommand wired through `main.rs`
-  - [ ] `pull_settings` command writes YAML/JSON snapshot
-  - [ ] `--changed-only` and `--category` filters
-  - [ ] Read-only skip-list applied
+- [x] **Phase 1** - `dsc setting pull` (read-only snapshot)
+  - [x] `SiteSettingDetail` struct + `list_site_settings_detailed` API method
+  - [x] CLI `Pull` subcommand wired through `main.rs`
+  - [x] `pull_settings` command writes YAML/JSON snapshot
+  - [x] `--changed-only` and `--category` filters
+  - [x] Read-only skip-list applied
 - [ ] **Phase 2** - `dsc setting push` (write)
   - [ ] CLI `Push` subcommand
   - [ ] Idempotent diff + PUT only on change

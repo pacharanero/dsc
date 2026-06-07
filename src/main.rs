@@ -634,6 +634,22 @@ fn main() -> Result<()> {
                 },
         } => commands::setting::list_site_settings(&config, &discourse, format, verbose),
 
+        Commands::Setting {
+            command:
+                SettingCommand::Pull {
+                    discourse,
+                    local_path,
+                    changed_only,
+                    category,
+                },
+        } => commands::setting::pull_settings(
+            &config,
+            &discourse,
+            &local_path,
+            changed_only,
+            category.as_deref(),
+        ),
+
         Commands::Open { discourse } => commands::open::open_discourse(&config, &discourse),
 
         Commands::Harden {

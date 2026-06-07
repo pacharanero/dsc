@@ -28,12 +28,23 @@ Updates a site setting.
 
 Add `--dry-run` (or `-n`) to preview the change without sending it.
 
-## Planned: bulk pull/push
+## dsc setting pull
 
-Snapshot all site settings to a version-controlled file, diff across instances, and push changes through staging→production workflows. See [spec/setting-sync.md](https://github.com/pacharanero/dsc/blob/main/spec/setting-sync.md) for the full design.
+```
+dsc setting pull <discourse> [path] [--changed-only] [--category <cat>]
+```
 
-Planned subcommands:
+Snapshot all site settings to a local YAML (or JSON, by extension) file with full metadata: `default`, `type`, `category`, `description`. The file is self-documenting and stable-sorted by category then name.
 
-- `dsc setting pull <discourse> [path]` - snapshot to YAML/JSON with full metadata (default, description, type, category). `--changed-only` for a manageable diff against defaults.
+- Default path: `settings.yaml`.
+- `--changed-only` (`-c`): only include settings whose value differs from default. Produces a manageable file (~50-100 entries) suitable for version control.
+- `--category <cat>`: limit to a single category (e.g. `required`, `email`, `security`).
+
+See [spec/setting-sync.md](https://github.com/pacharanero/dsc/blob/main/spec/setting-sync.md) for the schema and intended workflow.
+
+## Planned: push and diff
+
+The remaining phases of the bulk-management feature:
+
 - `dsc setting push <discourse> <path>` - idempotent reconciliation. Only sends PUTs for changed values. `--dry-run` shows the plan; `--reset-unlisted` resets server settings absent from the file to their defaults.
 - `dsc setting diff <a> <b>` - compare two instances or two snapshot files.

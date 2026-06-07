@@ -28,6 +28,7 @@ pub use groups::AddMembersOutcome;
 pub use invites::InviteResult;
 pub use reports::{AdminReport, ReportPoint};
 pub use search::SearchHit;
+pub use settings::SiteSettingDetail;
 pub use tags::TagInfo;
 pub use topics::{PmTopicSummary, PostInfo};
 pub use uploads::UploadInfo;

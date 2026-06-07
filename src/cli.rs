@@ -1183,6 +1183,29 @@ pub enum SettingCommand {
         #[arg(long, short = 'v')]
         verbose: bool,
     },
+
+    /// Snapshot all site settings (with metadata) to a local file.
+    ///
+    /// See spec/setting-sync.md for the full schema and workflow. The
+    /// generated file is a self-documenting YAML (or JSON) including each
+    /// setting's default, type, category, and description.
+    #[command(visible_alias = "pl")]
+    Pull {
+        /// Discourse name.
+        discourse: String,
+        /// Output path. Format detected by extension (.json → JSON,
+        /// otherwise YAML). Defaults to `settings.yaml`.
+        #[arg(default_value = "settings.yaml")]
+        local_path: PathBuf,
+        /// Only include settings whose value differs from default. Produces
+        /// a manageable file (~50-100 entries) suitable for version control.
+        #[arg(long, short = 'c')]
+        changed_only: bool,
+        /// Limit to settings in this category (e.g. `required`, `email`,
+        /// `security`).
+        #[arg(long)]
+        category: Option<String>,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy)]
