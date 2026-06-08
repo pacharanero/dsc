@@ -73,7 +73,7 @@ ssh_host = "forum.example.com"   # only needed for `dsc update`
 
 Full field reference: [Configuration](configuration.md).
 
-## Three things `dsc` does well
+## What `dsc` does well
 
 ### 1. Multi-install operations
 
