@@ -48,6 +48,9 @@ install-updater = false
 tap = "pacharanero/homebrew-tap"
 publish-jobs = ["homebrew"]
 publish-prereleases = false
+# We hand-edit .github/workflows/release.yml to pin actions to commit SHAs
+# (supply-chain hardening); tell dist not to error on the resulting drift.
+allow-dirty = ["ci"]
 
 [dependencies]
 anyhow = "1.0"

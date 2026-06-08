@@ -785,28 +785,68 @@ mod tests {
 
     #[test]
     fn drop_in_uses_modern_algorithm_pins() {
+        // We use OpenSSH list-modifier overlays rather than absolute pinning:
+        //   - `-foo` removes foo from the system default list
+        //   - `^foo` prepends foo to the system default list
+        // This keeps the upstream Ubuntu defaults current while still excising
+        // known-weak primitives and preferring PQ-hybrid KEX.
         let opts = resolve_options(None, None, &HardenConfig::default());
         let s = build_sshd_drop_in(&opts, "discourse");
-        // Spot-check the modern algorithms ARE listed.
-        assert!(s.contains("chacha20-poly1305@openssh.com"));
-        assert!(s.contains("curve25519-sha256"));
-        assert!(s.contains("hmac-sha2-512-etm@openssh.com"));
-        // Inspect the actual algorithm directive lines (not the comment
-        // block, which can mention "CBC" while saying it's removed).
+
+        // PQ-hybrid KEX must be prepended.
+        assert!(
+            s.contains("^sntrup761x25519-sha512@openssh.com"),
+            "expected PQ-hybrid KEX to be prepended, drop-in was:\n{}",
+            s
+        );
+
+        // Walk the actual directive lines and ensure every weak algorithm is
+        // either absent or appears only as a removal (`-foo` token).
+        let weak_by_directive: &[(&str, &[&str])] = &[
+            ("ciphers ", &["*-cbc", "3des-cbc"]),
+            (
+                "kexalgorithms ",
+                &[
+                    "diffie-hellman-group1-sha1",
+                    "diffie-hellman-group14-sha1",
+                    "diffie-hellman-group-exchange-sha1",
+                ],
+            ),
+            (
+                "macs ",
+                &[
+                    "hmac-sha1",
+                    "hmac-sha1-96",
+                    "hmac-md5",
+                    "hmac-md5-96",
+                    "umac-64@openssh.com",
+                    "umac-64-etm@openssh.com",
+                ],
+            ),
+        ];
+
         for line in s.lines() {
             let lower = line.to_lowercase();
-            if lower.starts_with("ciphers ")
-                || lower.starts_with("kexalgorithms ")
-                || lower.starts_with("macs ")
-            {
-                for forbidden in ["cbc", "hmac-sha1", "diffie-hellman-group1-sha1"] {
-                    assert!(
-                        !lower.contains(forbidden),
-                        "{} line includes weak crypto `{}`: {}",
-                        lower.split_whitespace().next().unwrap_or(""),
-                        forbidden,
-                        line
-                    );
+            for (directive, weak_list) in weak_by_directive {
+                if !lower.starts_with(directive) {
+                    continue;
+                }
+                let value = lower[directive.len()..].trim();
+                for token in value.split(',') {
+                    let token = token.trim();
+                    for weak in *weak_list {
+                        // The removal token (`-weak`) and the additive form
+                        // (`weak` or `+weak` or `^weak`) need to be told apart:
+                        // we want NO additive form, only removals.
+                        if token == *weak || token == format!("+{}", weak) || token == format!("^{}", weak) {
+                            panic!(
+                                "{} directive includes weak algorithm `{}` additively: {}",
+                                directive.trim(),
+                                weak,
+                                line
+                            );
+                        }
+                    }
                 }
             }
         }
