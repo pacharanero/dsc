@@ -35,7 +35,7 @@ _(nothing currently in progress)_
 Polish items to land before announcing on [meta.discourse.org](https://meta.discourse.org). Most are small but cumulatively shift perception from "promising 0.x" to "stable, take it seriously."
 
 - [ ] **Bump to 1.0.0** with a written back-compat policy. State: "the CLI surface documented in `dsc --help` is stable; flags will not be removed without a deprecation cycle." The current 0.x signal undersells the project's maturity (125 tests, 5-target prebuilt distribution, 9 months of consistent shipping).
-- [ ] **Generate `CHANGELOG.md`** from `git log` (the conventional-commits style used since v0.9 makes this near-automatic). Mandated by [spec/spec.md](spec.md) but never created. Maintain going forward.
+- [ ] **Generate `CHANGELOG.md`** from `git log` (the conventional-commits style used since v0.9 makes this near-automatic). Mandated by [spec/spec.md](spec.md) but never created. Maintain going forward. Recommended approach: [`git-cliff`](https://github.com/orhun/git-cliff) (Rust-native, conventional-commits aware, additive — sits cleanly alongside the existing `s/version++` + `cargo-dist` flow). Bonus: `cargo-dist` already reads `CHANGELOG.md` to populate the GitHub Release body (see [.github/workflows/release.yml](../.github/workflows/release.yml) header), so adding the file lights up better release notes for free.
 - [ ] **CLI consistency audit** against [spec/spec.md](spec.md). 30-minute pass:
   - Every `* list` command supports `--format text|json|yaml` at minimum.
   - Empty-list output matches the spec (`No <resource> found.` in text mode; empty array/object in structured modes).
