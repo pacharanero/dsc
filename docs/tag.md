@@ -68,9 +68,27 @@ dsc tag push myforum tags.yaml             # apply upserts
 dsc tag push myforum tags.yaml --prune     # full sync (deletes extras)
 ```
 
+## dsc tag rename
+
+Rename a tag, preserving every topic association. Discourse rewrites topic tag lists in-place rather than dropping and re-adding, so this is the safe alternative to editing a tag name in `tags.yaml` and running `dsc tag push` (which sees the old name as removed and the new name as added).
+
+```bash
+dsc tag rename myforum old-name new-name        # rename
+dsc -n tag rename myforum old-name new-name     # dry-run
+```
+
+Aliases: `rn`.
+
+Refuses to run when:
+
+- the old tag does not exist on the server,
+- a tag with the new name already exists (merging is not supported),
+- the new name contains whitespace (Discourse tags are slug-style),
+- old and new names are identical after trimming.
+
 ## Notes
 
-- **Renames**: a name change in the file is indistinguishable from delete + create, which drops topic associations. Use a dedicated API call (or `dsc setting`) for renames that must preserve associations.
+- **Renames**: prefer `dsc tag rename` over editing the name in a pulled file. A name change in the file is indistinguishable from delete + create, which drops topic associations.
 - Tag groups are admin-only; `pull` and `push` degrade gracefully when using a non-admin key.
 - The desired tag set on push = the union of every `tags[].name` and every name listed under any group's `tags:`.
 
@@ -82,4 +100,8 @@ dsc tag pull myforum
 $EDITOR tags.yaml
 dsc -n tag push myforum tags.yaml   # preview
 dsc tag push myforum tags.yaml      # apply
+
+# Rename a tag preserving topic membership
+dsc -n tag rename myforum bug defect    # preview
+dsc tag rename myforum bug defect       # apply
 ```

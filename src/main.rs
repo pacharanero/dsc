@@ -777,6 +777,11 @@ fn main() -> Result<()> {
                 local_path,
                 prune,
             } => commands::tag::tag_push(&config, &discourse, &local_path, prune, dry_run),
+            TagCommand::Rename {
+                discourse,
+                old_name,
+                new_name,
+            } => commands::tag::tag_rename(&config, &discourse, &old_name, &new_name, dry_run),
         },
 
         Commands::Config {

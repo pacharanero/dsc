@@ -130,6 +130,80 @@ pub fn tag_remove(
     Ok(())
 }
 
+/// Rename a tag on the server, preserving every topic association.
+///
+/// Discourse's tag-update endpoint accepts a new `id` (slug) which it then
+/// applies in-place to every topic carrying the old tag. This is the safe
+/// alternative to delete+create, which would unlink every topic.
+pub fn tag_rename(
+    config: &Config,
+    discourse_name: &str,
+    old_name: &str,
+    new_name: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let (old_norm, new_norm) = validate_rename_names(old_name, new_name)?;
+
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    // Look up the old tag and ensure the new name is not already taken.
+    let tags = client.list_tags()?;
+    if !tags.iter().any(|t| t.text == old_norm) {
+        return Err(anyhow::anyhow!(
+            "tag '{}' not found on '{}'",
+            old_norm,
+            discourse_name
+        ));
+    }
+    if tags.iter().any(|t| t.text == new_norm) {
+        return Err(anyhow::anyhow!(
+            "cannot rename to '{}': a tag with that name already exists on '{}' (would merge; not supported)",
+            new_norm,
+            discourse_name
+        ));
+    }
+
+    if dry_run {
+        println!(
+            "[dry-run] would rename tag '{}' -> '{}' on '{}'",
+            old_norm, new_norm, discourse_name
+        );
+        return Ok(());
+    }
+
+    client.rename_tag(&old_norm, &new_norm)?;
+    println!("Renamed tag '{}' -> '{}'", old_norm, new_norm);
+    Ok(())
+}
+
+/// Validate and normalise the rename inputs. Returns `(old, new)` after
+/// trimming. Rejects empty names, identical names, and obvious-typo whitespace.
+fn validate_rename_names(old: &str, new: &str) -> Result<(String, String)> {
+    let old_t = old.trim();
+    let new_t = new.trim();
+    if old_t.is_empty() {
+        return Err(anyhow::anyhow!("old tag name is empty"));
+    }
+    if new_t.is_empty() {
+        return Err(anyhow::anyhow!("new tag name is empty"));
+    }
+    if old_t == new_t {
+        return Err(anyhow::anyhow!(
+            "old and new tag names are identical: '{}'",
+            old_t
+        ));
+    }
+    if new_t.chars().any(|c| c.is_whitespace()) {
+        return Err(anyhow::anyhow!(
+            "new tag name '{}' contains whitespace; Discourse tags must be slug-style",
+            new_t
+        ));
+    }
+    Ok((old_t.to_string(), new_t.to_string()))
+}
+
 // ─── Taxonomy file schema ─────────────────────────────────────────────────────
 
 /// The on-disk taxonomy file (version 1).
@@ -487,7 +561,7 @@ fn build_tag_group_payload(entry: &TagGroupEntry) -> serde_json::Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{next_tags_after_apply, next_tags_after_remove};
+    use super::{next_tags_after_apply, next_tags_after_remove, validate_rename_names};
 
     fn s(items: &[&str]) -> Vec<String> {
         items.iter().map(|x| x.to_string()).collect()
@@ -533,5 +607,43 @@ mod tests {
         // the API returns and accepts whatever is sent. Document the behaviour.
         let got = next_tags_after_apply(&s(&["Foo"]), "foo").unwrap();
         assert_eq!(got, s(&["Foo", "foo"]));
+    }
+
+    #[test]
+    fn rename_trims_inputs() {
+        let (old, new) = validate_rename_names("  foo  ", "  bar  ").unwrap();
+        assert_eq!(old, "foo");
+        assert_eq!(new, "bar");
+    }
+
+    #[test]
+    fn rename_rejects_empty_old() {
+        assert!(validate_rename_names("", "bar").is_err());
+        assert!(validate_rename_names("   ", "bar").is_err());
+    }
+
+    #[test]
+    fn rename_rejects_empty_new() {
+        assert!(validate_rename_names("foo", "").is_err());
+        assert!(validate_rename_names("foo", "   ").is_err());
+    }
+
+    #[test]
+    fn rename_rejects_identical_names() {
+        let err = validate_rename_names("foo", "foo").unwrap_err();
+        assert!(err.to_string().contains("identical"));
+    }
+
+    #[test]
+    fn rename_rejects_whitespace_in_new_name() {
+        let err = validate_rename_names("foo", "bar baz").unwrap_err();
+        assert!(err.to_string().contains("whitespace"));
+    }
+
+    #[test]
+    fn rename_treats_trim_only_difference_as_identical() {
+        // After trimming, "foo " and "foo" are the same.
+        let err = validate_rename_names("foo ", "foo").unwrap_err();
+        assert!(err.to_string().contains("identical"));
     }
 }

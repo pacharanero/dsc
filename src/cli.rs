@@ -1142,6 +1142,19 @@ pub enum TagCommand {
         #[arg(long)]
         prune: bool,
     },
+    /// Rename a tag, preserving topic associations.
+    ///
+    /// Discourse rewrites every topic's tag list in-place, so this avoids
+    /// the delete-and-recreate pattern that loses topic membership.
+    #[command(visible_alias = "rn")]
+    Rename {
+        /// Discourse name.
+        discourse: String,
+        /// Current tag name.
+        old_name: String,
+        /// New tag name.
+        new_name: String,
+    },
 }
 
 #[derive(Subcommand)]

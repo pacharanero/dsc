@@ -157,6 +157,21 @@ impl DiscourseClient {
         Ok(())
     }
 
+    /// Rename a tag, preserving topic associations. Discourse accepts a new
+    /// `id` (slug) on the tag-update endpoint and reassigns every topic
+    /// in-place.
+    pub fn rename_tag(&self, old_name: &str, new_name: &str) -> Result<()> {
+        let path = format!("/tag/{}.json", old_name);
+        let payload = serde_json::json!({ "tag": { "id": new_name } });
+        let response = self.send_retrying(|| Ok(self.put(&path)?.json(&payload)))?;
+        let status = response.status();
+        let text = response.text().context("reading rename tag response")?;
+        if !status.is_success() {
+            return Err(http_error("rename tag", status, &text));
+        }
+        Ok(())
+    }
+
     /// Delete a tag.
     pub fn delete_tag(&self, tag_name: &str) -> Result<()> {
         let path = format!("/tags/{}.json", tag_name);
