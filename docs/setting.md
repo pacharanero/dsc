@@ -8,7 +8,7 @@ Get and set site settings on a Discourse install. Requires an admin API key and 
 dsc setting list <discourse> [--format text|json|yaml]
 ```
 
-Lists all site settings (name and value only). For a richer snapshot including defaults, descriptions, and types, see the planned `dsc setting pull` (below).
+Lists all site settings (name and value only). For a richer snapshot including defaults, descriptions, and types, see `dsc setting pull` below.
 
 ## dsc setting get
 
@@ -22,11 +22,20 @@ Gets the value of a site setting. Output is the raw value on stdout, suitable fo
 
 ```text
 dsc setting set <discourse> <setting> <value>
+dsc setting set --tags <tag1,tag2,...> <setting> <value>
 ```
 
-Updates a site setting.
+Updates a site setting. With `--tags`, applies the change to every configured Discourse whose tag list matches any of the supplied tags (comma- or semicolon-separated). When `--tags` is given, omit `<discourse>` and pass only `<setting> <value>` as positionals.
 
 Add `--dry-run` (or `-n`) to preview the change without sending it.
+
+Examples:
+
+```bash
+dsc setting set myforum title "New Title"
+dsc setting set --tags production,client-a login_required true
+dsc -n setting set --tags staging max_invites_per_day 50   # preview
+```
 
 ## dsc setting pull
 

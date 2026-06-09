@@ -124,10 +124,10 @@ dsc update myforum
   - [pm](docs/pm.md) — send and list private messages
   - [api-key](docs/api-key.md) — manage Discourse API keys
   - [backup](docs/backup.md) — create, list, and restore backups
-  - [setting](docs/setting.md) — get and set site settings
-  - [tag](docs/tag.md) — list tags and apply/remove them on topics
+  - [setting](docs/setting.md) — get, set, pull, push, and diff site settings
+  - [tag](docs/tag.md) — list, pull, push, and rename the tag taxonomy (per-topic tagging lives under `dsc topic tag`/`untag`)
   - [config](docs/config.md) — inspect and validate the dsc config itself
-  - [harden](docs/harden.md) — provision a fresh Ubuntu server (WIP, stage 1)
+  - [harden](docs/harden.md) — provision a fresh Ubuntu server (firewall, SSH hardening, Docker, swap, journald, fail2ban)
 - [Shell completions](docs/completions.md) — bash, zsh, and fish
 - [Development](docs/development.md) — building, testing, releasing, project layout
 

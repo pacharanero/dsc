@@ -21,6 +21,8 @@ Tracks planned, in-progress, and completed work items for `dsc`.
   - [x] Phase 3: `dsc setting diff` - cross-source comparison (live or snapshot)
   - [x] Phase 4: `setting set --tags` reachable from CLI
 - [x] **Config-path resolution** - `$DSC_CONFIG` and `$DSC_CONFIG_HOME` env vars, explicit-selector error semantics, `dsc config` source labelling. Spec: [spec/config-path-resolution.md](config-path-resolution.md)
+- [x] `dsc tag rename <discourse> <old> <new>` - in-place rename preserving every topic association; pre-flight validates existence, name collisions, and slug shape
+- [x] Fix `dsc harden` test - `drop_in_uses_modern_algorithm_pins` rewritten to verify the overlay model (commit `979c3d1`)
 
 ## In progress
 
@@ -30,7 +32,12 @@ _(nothing currently in progress)_
 
 ### Other planned items
 
-- [ ] `dsc tag rename <old> <new>` - rename a tag preserving topic associations (avoids the delete+create problem in pull/push)
-- [ ] Shell completion regeneration - refresh `completions/` for new subcommands (`topic tag/untag`, `tag pull/push`, `setting pull/push`)
-- [ ] Fix `dsc harden` test - `drop_in_uses_modern_algorithm_pins` test failure from policy overlay changes
 - [ ] Doc accuracy pass - verify remaining docs match CLI reality
+- [ ] **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Spec: [spec/theme-management.md](theme-management.md)
+  - [ ] Phase 1: `dsc theme setting` (get/set/list) + `dsc theme enable|disable|attach|detach`
+  - [ ] Phase 2: `dsc theme field pull/push` + `dsc theme asset set/list`
+  - [ ] Phase 3: `dsc theme show` + `dsc theme update` (remote component refresh)
+
+## Out of scope / removed
+
+- ~~Shell completion regeneration~~ - `completions/` is gitignored and `dsc completions <shell> -d ./completions` regenerates on demand. Not a release-tracked item.

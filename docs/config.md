@@ -2,11 +2,14 @@
 
 Inspect and validate your `dsc.toml` configuration.
 
-Running `dsc config` without a subcommand prints the active config file path and the full search order, showing which candidates exist on disk:
+Running `dsc config` without a subcommand prints the env-var overrides (if any), the active config file, the source it came from, and (when discovery selected it) the full search order with markers:
 
 ```text
 $ dsc config
-Active config: /home/marcus/.config/dsc/dsc.toml
+$DSC_CONFIG: (unset)
+$DSC_CONFIG_HOME: (unset)
+
+Active config: /home/marcus/.config/dsc/dsc.toml (from search hierarchy)
 
 Search order:
   1. dsc.toml
@@ -16,6 +19,8 @@ Search order:
   5. /etc/dsc.toml
   6. /usr/local/etc/dsc.toml
 ```
+
+When `--config` or `$DSC_CONFIG` is in effect, the source line shows which selector won (e.g. `(via --config flag)`, `(via $DSC_CONFIG)`) and the search-order list is suppressed (it would be misleading - it was bypassed). See [configuration.md](configuration.md) for the full resolution chain and env-var reference.
 
 ## dsc config check
 
