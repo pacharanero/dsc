@@ -20,6 +20,7 @@ Tracks planned, in-progress, and completed work items for `dsc`.
   - [x] Phase 2: `dsc setting push` - idempotent apply with `--dry-run` and `--reset-unlisted`
   - [x] Phase 3: `dsc setting diff` - cross-source comparison (live or snapshot)
   - [x] Phase 4: `setting set --tags` reachable from CLI
+- [x] **Config-path resolution** - `$DSC_CONFIG` and `$DSC_CONFIG_HOME` env vars, explicit-selector error semantics, `dsc config` source labelling. Spec: [spec/config-path-resolution.md](config-path-resolution.md)
 
 ## In progress
 

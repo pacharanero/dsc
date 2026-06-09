@@ -3,6 +3,14 @@
 # unlocks more functionality (admin commands need apikey/api_username, SSH
 # rebuilds need ssh_host, filtering needs tags, changelog posting needs
 # changelog_topic_id).
+#
+# Where dsc looks for this file (first match wins):
+#   1. --config <path> / -c flag
+#   2. $DSC_CONFIG env var  (full path to a dsc.toml; errors if missing)
+#   3. ./dsc.toml
+#   4. $DSC_CONFIG_HOME/dsc.toml  (defaults to ~/.config/dsc/dsc.toml)
+#   5. system locations ($XDG_CONFIG_DIRS, /etc/dsc/..., /usr/local/etc/...)
+# Run `dsc config` to see which path is active and why.
 
 [[discourse]]
 name = "myforum"                                   # unique short name; used everywhere in the CLI

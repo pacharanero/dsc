@@ -6,7 +6,11 @@ use std::path::PathBuf;
 #[command(name = "dsc")]
 #[command(about = "Discourse CLI", long_about = None)]
 pub struct Cli {
-    /// Path to the config file. If omitted, dsc searches standard locations.
+    /// Path to the config file. If omitted, `dsc` consults `$DSC_CONFIG`,
+    /// then searches `./dsc.toml`, `$DSC_CONFIG_HOME/dsc.toml`
+    /// (default `~/.config/dsc/dsc.toml`), then system locations.
+    /// Errors if the given file does not exist (no silent fallthrough).
+    /// See `dsc config` for the active selection.
     #[arg(long, short = 'c')]
     pub config: Option<PathBuf>,
     /// Describe destructive actions without sending them. Read-only commands

@@ -1,17 +1,32 @@
 # Configuration
 
-If `--config <path>` is not provided, `dsc` searches for a config in this order (first match wins):
+If `--config <path>` is not provided, `dsc` resolves the active config in this order (first match wins):
 
-1. `./dsc.toml` (current working directory)
-2. `$XDG_CONFIG_HOME/dsc/dsc.toml` (or `~/.config/dsc/dsc.toml` when `XDG_CONFIG_HOME` is unset)
-3. `$XDG_CONFIG_DIRS` entries as `<dir>/dsc/dsc.toml` (or `/etc/xdg/dsc/dsc.toml` when `XDG_CONFIG_DIRS` is unset)
-4. `/etc/dsc/dsc.toml`
-5. `/etc/dsc.toml`
-6. `/usr/local/etc/dsc.toml`
+1. `--config <path>` / `-c` flag (explicit)
+2. `$DSC_CONFIG` env var (explicit)
+3. `./dsc.toml` (current working directory)
+4. `$DSC_CONFIG_HOME/dsc.toml` (defaults to `$XDG_CONFIG_HOME/dsc/dsc.toml`, which itself defaults to `~/.config/dsc/dsc.toml`)
+5. `$XDG_CONFIG_DIRS` entries as `<dir>/dsc/dsc.toml` (or `/etc/xdg/dsc/dsc.toml` when `XDG_CONFIG_DIRS` is unset)
+6. `/etc/dsc/dsc.toml`
+7. `/etc/dsc.toml`
+8. `/usr/local/etc/dsc.toml`
 
 If none are found, it defaults to `./dsc.toml` (created on first write command).
 
-Run `dsc config` to see which paths apply on your system and which one is active.
+**Explicit selectors error on missing files.** `-c <path>` and `$DSC_CONFIG` both name a specific file; if that file does not exist, `dsc` errors rather than silently falling through to a lower-precedence config. The discovered hierarchy (steps 3-8) is the only set of paths eligible for skip-if-missing.
+
+If both `-c` and `$DSC_CONFIG` are set, the flag wins.
+
+## Env-var reference
+
+| Variable | Purpose |
+|---|---|
+| `DSC_CONFIG` | Absolute or relative path to a `dsc.toml`. Overrides discovery; errors if missing. |
+| `DSC_CONFIG_HOME` | Directory containing `dsc.toml`. Defaults to `$XDG_CONFIG_HOME/dsc` -> `~/.config/dsc`. |
+| `XDG_CONFIG_HOME` | Standard XDG base; used when `DSC_CONFIG_HOME` is unset. |
+| `XDG_CONFIG_DIRS` | Standard XDG system list; each entry contributes a `<dir>/dsc/dsc.toml` candidate. |
+
+Run `dsc config` to see env-var state, the active config, and (when discovery applies) the full search order with markers.
 
 Each Discourse instance lives under a `[[discourse]]` table. See [dsc.example.toml](../dsc.example.toml) for a fuller template. Minimum useful fields are `name`, `baseurl`, `apikey`, and `api_username`.
 

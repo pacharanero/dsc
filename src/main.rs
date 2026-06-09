@@ -13,7 +13,10 @@ fn map_section(s: SectionArg) -> SectionFilter {
         SectionArg::Health => SectionFilter::Health,
     }
 }
-use dsc::config::{config_search_paths, load_config, resolve_default_config_path, save_config};
+use dsc::config::{
+    config_search_paths, load_config, resolve_config_source, save_config, ConfigSource,
+    ENV_CONFIG, ENV_CONFIG_HOME,
+};
 
 fn map_role(role: RoleArg) -> Role {
     match role {
@@ -34,7 +37,8 @@ fn map_activity_format(f: ActivityFormatArg) -> ActivityFormat {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let config_path = cli.config.unwrap_or_else(resolve_default_config_path);
+    let config_source = resolve_config_source(cli.config)?;
+    let config_path = config_source.path().to_path_buf();
     let mut config = load_config(&config_path)?;
     let dry_run = cli.dry_run;
 
@@ -781,19 +785,46 @@ fn main() -> Result<()> {
 
         Commands::Config { command: None } => {
             let candidates = config_search_paths();
-            println!("Active config: {}", config_path.display());
+            // Show env-var overrides up front so the user can see why a
+            // path outside the standard hierarchy is active.
+            let env_config = std::env::var(ENV_CONFIG).ok();
+            let env_config_home = std::env::var(ENV_CONFIG_HOME).ok();
+            println!(
+                "${}: {}",
+                ENV_CONFIG,
+                env_config.as_deref().unwrap_or("(unset)")
+            );
+            println!(
+                "${}: {}",
+                ENV_CONFIG_HOME,
+                env_config_home.as_deref().unwrap_or("(unset)")
+            );
             println!();
-            println!("Search order:");
-            for (i, path) in candidates.iter().enumerate() {
-                let exists = path.exists();
-                let marker = if path == &config_path { " <-- active" } else { "" };
-                println!(
-                    "  {}. {}{}{}",
-                    i + 1,
-                    path.display(),
-                    if exists && marker.is_empty() { " (exists)" } else { "" },
-                    marker
-                );
+            println!(
+                "Active config: {} ({})",
+                config_path.display(),
+                config_source.label()
+            );
+            // Only show the discovered hierarchy when no explicit
+            // selector overrode it; otherwise the list is misleading.
+            let from_hierarchy = matches!(
+                config_source,
+                ConfigSource::Discovered(_) | ConfigSource::Default(_)
+            );
+            if from_hierarchy {
+                println!();
+                println!("Search order:");
+                for (i, path) in candidates.iter().enumerate() {
+                    let exists = path.exists();
+                    let marker = if path == &config_path { " <-- active" } else { "" };
+                    println!(
+                        "  {}. {}{}{}",
+                        i + 1,
+                        path.display(),
+                        if exists && marker.is_empty() { " (exists)" } else { "" },
+                        marker
+                    );
+                }
             }
             Ok(())
         }
