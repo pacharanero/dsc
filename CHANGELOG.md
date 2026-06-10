@@ -5,6 +5,12 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.13] - 2026-06-10
+
+### Features
+
+- **cli**: Add 'dsc man' for generating Unix man pages ([77d20ed](https://github.com/pacharanero/dsc/commit/77d20eda89c26b3d07699f83adfa62882624094b))
+
 ## [0.10.12] - 2026-06-10
 
 ### Bug fixes
