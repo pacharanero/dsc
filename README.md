@@ -130,6 +130,7 @@ dsc update myforum
   - [harden](docs/harden.md) — provision a fresh Ubuntu server (firewall, SSH hardening, Docker, swap, journald, fail2ban)
 - [Shell completions](docs/completions.md) — bash, zsh, and fish
 - [Development](docs/development.md) — building, testing, releasing, project layout
+- [Contributing](CONTRIBUTING.md) — bug vs spec request, code conventions, support stance
 - [For LLMs and agents](AGENTS.md) — using `dsc` from another AI session, and how to file a useful feature spec
 
 ## License

@@ -55,6 +55,8 @@ This command does **not** honour `--dry-run` — it's read-only.
 
 ## Sections
 
+> **v1 status:** the sections below describe every metric the command is designed around, including some that aren't computed yet. v1 implements the per-report metrics directly; the per-user-walk metrics (new contributors, reactivated users, lost regulars, unique posters, top-10 share, returning poster rate, solo-thread rate) print `— (n/i)` in text and `"not_implemented": true` in JSON. See [What v1 actually computes](#what-v1-actually-computes) for the per-metric matrix, and [spec/analytics.md - Implementation follow-ups](https://github.com/pacharanero/dsc/blob/main/spec/analytics.md#implementation-follow-ups) for the design constraints (mainly per-user-walk latency vs gating behind a future `--full` flag).
+
 ### Growth
 
 Is the community gaining or losing engaged people?
@@ -119,7 +121,7 @@ Some metrics are computed straight from Discourse's `/admin/reports/{id}.json` e
 | Returning poster rate | ⏳ stub — needs cross-window per-user comparison |
 | Solo-thread rate | ⏳ stub — needs per-topic reply-count walk |
 
-The stubbed metrics are tracked in `.marcus/queries.md` (project-private notes) and will land in 0.10.x patches.
+The stubbed metrics are tracked in [spec/analytics.md - Implementation follow-ups](https://github.com/pacharanero/dsc/blob/main/spec/analytics.md#implementation-follow-ups) and will land in patch releases.
 
 ## Examples
 

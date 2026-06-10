@@ -6,7 +6,7 @@ Specs marked ⭐ are **field-driven** - they came from real-world use and are in
 
 ## Completed
 
-- [x] `dsc tag pull/push` - declarative tag taxonomy management ([spec](spec.md) via `dsc-tag-sync-spec.md`)
+- [x] `dsc tag pull/push` - declarative tag taxonomy management. Spec: [spec/tag-sync.md](tag-sync.md)
 - [x] `dsc topic tag/untag` - moved topic-level tagging from `dsc tag apply/remove`
 - [x] `dsc post pull/push` - harmonised with pull/push pattern
 - [x] `dsc backup pull/push` - harmonised with pull/push pattern
@@ -36,18 +36,18 @@ _(nothing currently in progress)_
 Polish items to land before announcing on [meta.discourse.org](https://meta.discourse.org). Most are small but cumulatively shift perception from "promising 0.x" to "stable, take it seriously."
 
 - [ ] **Bump to 1.0.0** with a written back-compat policy. State: "the CLI surface documented in `dsc --help` is stable; flags will not be removed without a deprecation cycle." The current 0.x signal undersells the project's maturity (125 tests, 5-target prebuilt distribution, 9 months of consistent shipping).
-- [ ] **Generate `CHANGELOG.md`** from `git log` (the conventional-commits style used since v0.9 makes this near-automatic). Mandated by [spec/spec.md](spec.md) but never created. Maintain going forward. Recommended approach: [`git-cliff`](https://github.com/orhun/git-cliff) (Rust-native, conventional-commits aware, additive — sits cleanly alongside the existing `s/version++` + `cargo-dist` flow). Bonus: `cargo-dist` already reads `CHANGELOG.md` to populate the GitHub Release body (see [.github/workflows/release.yml](../.github/workflows/release.yml) header), so adding the file lights up better release notes for free.
+- [x] **Generate `CHANGELOG.md`** - [git-cliff](https://github.com/orhun/git-cliff) configured via [cliff.toml](../cliff.toml); full history (back to first conventional commit) backfilled into [CHANGELOG.md](../CHANGELOG.md). `s/version++` now refreshes it automatically on each bump. `cargo-dist` picks it up for the GitHub Release body.
 - [ ] **CLI consistency audit** against [spec/spec.md](spec.md). 30-minute pass:
   - Every `* list` command supports `--format text|json|yaml` at minimum.
   - Empty-list output matches the spec (`No <resource> found.` in text mode; empty array/object in structured modes).
   - Error messages follow the documented `discourse not found: {name}` / `{resource} not found: {identifier}` shapes.
-- [ ] **Move partial-implementation metrics to a "Planned" subsection** in [docs/analytics.md](../docs/analytics.md). `lost_regulars` and `top_10_share` currently print `— (n/i)` and shouldn't sit alongside working metrics in public docs.
-- [ ] **Rename [spec/dsc-tag-sync-spec.md](dsc-tag-sync-spec.md)** to `spec/tag-sync.md` for consistency with the post-`-spec.md` convention. Update any references.
+- [x] **Surface analytics v1 status more prominently** in [docs/analytics.md](../docs/analytics.md). The Sections heading now carries a v1-status callout pointing at the implementation matrix and the spec's "Implementation follow-ups". Stale `.marcus/queries.md` reference fixed.
+- [x] **Rename `spec/dsc-tag-sync-spec.md`** → [spec/tag-sync.md](tag-sync.md) for consistency with the post-`-spec.md` convention. References updated.
 - [ ] **Record an asciinema** (~30s) of the pull → edit → push → diff loop on a real Discourse. Embed in README. Visual proof beats prose.
 - [ ] **"What works / what's coming" matrix in README** so readers can self-sort whether `dsc` covers their use case before installing.
-- [ ] **GitHub issue templates** (`.github/ISSUE_TEMPLATE/bug_report.md`, `feature_request.md`). Inbound from Meta will not all be high-quality; templates filter the noise.
-- [ ] **Decide and write down a support stance.** "Best-effort, no SLA, community-driven, see CONTRIBUTING.md" is fine. Just say it.
-- [ ] **CONTRIBUTING.md** if not present. Reference [spec/implementation.md](implementation.md) and [AGENTS.md](../AGENTS.md).
+- [x] **GitHub issue templates** - [bug_report.md](../.github/ISSUE_TEMPLATE/bug_report.md), [feature_request.md](../.github/ISSUE_TEMPLATE/feature_request.md), [spec_request.md](../.github/ISSUE_TEMPLATE/spec_request.md), plus [config.yml](../.github/ISSUE_TEMPLATE/config.yml) pointing general Discourse questions at Meta.
+- [x] **CONTRIBUTING.md** - lands at [CONTRIBUTING.md](../CONTRIBUTING.md), references AGENTS.md, spec/spec.md, and spec/implementation.md.
+- [x] **Support stance written down** - in CONTRIBUTING.md: "best-effort, community-driven, no SLA; field-driven specs prioritised over speculative ones."
 - [ ] **`s/` script directory naming** - either rename to `scripts/` (conventional) or document its purpose prominently in [docs/development.md](../docs/development.md). Same for `wix/` (MSI build artefacts - obvious from contents but not from name).
 - [ ] **Pre-circulate the Meta post** to one or two Discourse community regulars before posting publicly. Sanity-check framing.
 - [ ] **Man page generation** via [`clap_mangen`](https://docs.rs/clap_mangen) - lights up `man dsc` for distro packagers.

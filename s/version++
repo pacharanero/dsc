@@ -28,4 +28,17 @@ if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   exit 1
 fi
 
+# Refresh CHANGELOG.md if git-cliff is on PATH. Renders the in-progress
+# section under the new version + date by passing --tag.
+# Skip silently when git-cliff isn't installed - it's a release-day tool.
+if command -v git-cliff >/dev/null 2>&1; then
+  git-cliff --tag "$tag" -o CHANGELOG.md
+  git add CHANGELOG.md
+  echo "CHANGELOG.md refreshed for $tag"
+else
+  echo "git-cliff not installed; skipping CHANGELOG.md refresh" >&2
+  echo "Install with: cargo install git-cliff --locked" >&2
+fi
+
 git tag "$tag"
+
