@@ -25,6 +25,7 @@ Specs marked ⭐ are **field-driven** - they came from real-world use and are in
 - [x] ⭐ **Config-path resolution** - `$DSC_CONFIG` and `$DSC_CONFIG_HOME` env vars, explicit-selector error semantics, `dsc config` source labelling. Spec: [spec/config-path-resolution.md](config-path-resolution.md)
 - [x] `dsc tag rename <discourse> <old> <new>` - in-place rename preserving every topic association; pre-flight validates existence, name collisions, and slug shape
 - [x] Fix `dsc harden` test - `drop_in_uses_modern_algorithm_pins` rewritten to verify the overlay model (commit `979c3d1`)
+- [x] ⭐ **`dsc topic pull --full`** - full-thread Markdown snapshot with YAML frontmatter and per-post headings; batch-fetches via `/t/{id}/posts.json?post_ids[]=…`. Spec: [spec/topic-pull-full-thread.md](topic-pull-full-thread.md). Phase 2 (`--since`, `--format json`) still planned.
 
 ## In progress
 
@@ -62,8 +63,6 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 - [ ] **`api-key create --scope <scopes>`** - scoped admin API keys (e.g. `--scope topics:write,users:read`). The existing `dsc api-key create` only mints full-admin keys.
 
 ### New command surfaces
-
-- [ ] ⭐ **`dsc topic pull --full`** - pull all posts in a thread (not just the OP) as a single Markdown file with YAML frontmatter and per-post headings. Requires adding `stream: Vec<u64>` to `PostStream` model and a batch-fetch path via `/t/{id}/posts.json?post_ids[]=…`. No change to default behaviour. Spec: [spec/topic-pull-full-thread.md](topic-pull-full-thread.md)
 
 - [ ] ⭐ **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Spec: [spec/theme-management.md](theme-management.md)
   - [ ] Phase 1: `dsc theme setting` (get/set/list) + `dsc theme enable|disable|attach|detach`

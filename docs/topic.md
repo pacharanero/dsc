@@ -5,12 +5,47 @@ Pull, push, and sync individual topics as local Markdown files. Also tag/untag t
 ## dsc topic pull
 
 ```
-dsc topic pull <discourse> <topic-id> [<local-path>]
+dsc topic pull <discourse> <topic-id> [<local-path>] [--full|-F]
 ```
 
 Pulls the specified topic into a local Markdown file.
 
+By default writes only the topic's first post (the OP), suitable for the `pull → edit → push` round-trip with `dsc topic push`.
+
 If `<local-path>` is omitted, the topic is written to a new file in the current directory (named from the topic title). Directories are created as needed.
+
+### `--full` (read-only thread snapshot)
+
+```bash
+dsc topic pull myforum 364 --full
+dsc topic pull myforum 364 thread.md --full
+```
+
+Pulls every post in the thread (paginating internally as needed) into a single Markdown file with YAML frontmatter and per-post headings:
+
+```markdown
+---
+title: Sitekit, eRedBook and Harris Health Alliance Acquisition
+topic_id: 364
+url: https://forum.example.com/t/sitekit-.../364
+posts_count: 27
+pulled_at: 2026-06-10T11:34:00Z
+---
+
+## Post 1 · alice · 2026-03-24
+
+[raw markdown of post 1]
+
+---
+
+## Post 2 · bob · 2026-03-25
+
+[raw markdown of post 2]
+```
+
+A full-thread file is a read-only snapshot. `dsc topic push` still operates on the OP only and does not consume the full-thread format.
+
+Useful for archiving long discussions, feeding a complete conversation to an LLM, or producing a human-readable export.
 
 ## dsc topic push
 

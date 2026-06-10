@@ -51,6 +51,68 @@ impl DiscourseClient {
         Ok(body)
     }
 
+    /// Fetch every post in a topic, in order.
+    ///
+    /// Discourse paginates `/t/{id}.json` at 20 posts per page. The first
+    /// response also includes `post_stream.stream`, the flat array of every
+    /// post ID in the thread. We page-1 first to learn the stream, then
+    /// batch-fetch any remaining post IDs via
+    /// `/t/{id}/posts.json?post_ids[]=…&include_raw=1`. Returns posts in
+    /// stream order (matches topic display order).
+    pub fn fetch_topic_all_posts(&self, topic_id: u64) -> Result<TopicResponse> {
+        let mut topic = self.fetch_topic(topic_id, true)?;
+
+        // Build the set of IDs we already have from page 1.
+        let have: std::collections::HashSet<u64> =
+            topic.post_stream.posts.iter().map(|p| p.id).collect();
+        let missing: Vec<u64> = topic
+            .post_stream
+            .stream
+            .iter()
+            .copied()
+            .filter(|id| !have.contains(id))
+            .collect();
+
+        // Batch-fetch missing posts in chunks of 20 (Discourse's page size).
+        for chunk in missing.chunks(20) {
+            let query: Vec<String> = chunk
+                .iter()
+                .map(|id| format!("post_ids[]={}", id))
+                .collect();
+            let path = format!(
+                "/t/{}/posts.json?include_raw=1&{}",
+                topic_id,
+                query.join("&")
+            );
+            let response = self.get(&path)?;
+            let status = response.status();
+            let text = response.text().context("reading topic posts response body")?;
+            if !status.is_success() {
+                return Err(http_error("topic posts request", status, &text));
+            }
+            let body: TopicResponse = serde_json::from_str(&text)
+                .context("parsing topic posts response")?;
+            topic.post_stream.posts.extend(body.post_stream.posts);
+        }
+
+        // Reorder posts to match the canonical stream order.
+        if !topic.post_stream.stream.is_empty() {
+            let order: std::collections::HashMap<u64, usize> = topic
+                .post_stream
+                .stream
+                .iter()
+                .enumerate()
+                .map(|(i, id)| (*id, i))
+                .collect();
+            topic
+                .post_stream
+                .posts
+                .sort_by_key(|p| order.get(&p.id).copied().unwrap_or(usize::MAX));
+        }
+
+        Ok(topic)
+    }
+
     /// Fetch a post by ID and return its raw content.
     pub fn fetch_post_raw(&self, post_id: u64) -> Result<Option<String>> {
         Ok(self.fetch_post(post_id)?.raw)

@@ -36,15 +36,25 @@ pub struct TopicResponse {
 }
 
 /// Topic post stream.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct PostStream {
+    #[serde(default)]
     pub posts: Vec<Post>,
+    /// Flat array of every post ID in the topic. Discourse includes this
+    /// on the first-page response only. Used to paginate the rest of the
+    /// thread via the batch-fetch endpoint.
+    #[serde(default)]
+    pub stream: Vec<u64>,
 }
 
 /// Topic post.
 #[derive(Debug, Deserialize)]
 pub struct Post {
     pub id: u64,
+    #[serde(default)]
+    pub post_number: Option<u64>,
+    #[serde(default)]
+    pub username: Option<String>,
     #[serde(default)]
     pub raw: Option<String>,
     #[serde(default)]

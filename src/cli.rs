@@ -359,6 +359,12 @@ pub enum TopicCommand {
         topic_id: u64,
         /// Destination file or directory (auto-derived when omitted).
         local_path: Option<PathBuf>,
+        /// Pull the entire thread (every post) as a single Markdown file
+        /// with YAML frontmatter and per-post headings. Default behaviour
+        /// (no `--full`) writes only the OP, which is what `topic push`
+        /// expects.
+        #[arg(long, short = 'F')]
+        full: bool,
     },
     /// Push a local Markdown file to a topic.
     #[command(visible_alias = "ps")]

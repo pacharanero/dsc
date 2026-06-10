@@ -128,7 +128,14 @@ fn main() -> Result<()> {
                 discourse,
                 topic_id,
                 local_path,
-            } => commands::topic::topic_pull(&config, &discourse, topic_id, local_path.as_deref()),
+                full,
+            } => commands::topic::topic_pull(
+                &config,
+                &discourse,
+                topic_id,
+                local_path.as_deref(),
+                full,
+            ),
 
             TopicCommand::Push {
                 discourse,

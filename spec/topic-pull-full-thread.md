@@ -1,5 +1,12 @@
 # `dsc topic pull` - full thread export
 
+> **Status: Phase 1 implemented in v0.10.11.** `dsc topic pull <discourse>
+> <topic_id> --full` ships and writes a YAML-frontmatter + per-post-headings
+> Markdown file. `PostStream::stream` and `Post::username` added to the
+> model. Batch-fetch via `/t/{id}/posts.json?post_ids[]=…&include_raw=1`.
+> Default (no `--full`) behaviour unchanged. Phase 2 (`--since`,
+> `--format json`) remains planned.
+
 Spec for pulling an entire topic thread (all posts, not just the OP) to a local Markdown file. Goal: make `dsc topic pull` useful for reading, archiving, and summarising a thread - not just for the pull/push OP-editing workflow. Driver: real-world use by an LLM agent reading a forum thread to draft a response.
 
 ## Motivation
@@ -138,12 +145,12 @@ pub struct Post {
 
 ### Phase 1 - blocking
 
-- [ ] Add `stream: Vec<u64>` to `PostStream` model
-- [ ] Add `username: Option<String>` to `Post` model (already in API response, just not modelled)
-- [ ] Add `fetch_topic_all_posts(topic_id)` to `DiscourseClient`: fetch page 1, extract `stream`, chunk remaining IDs, batch-fetch via `/t/{id}/posts.json?post_ids[]=…&include_raw=1`, merge into ordered `Vec<Post>`
-- [ ] Add `--full` flag to `dsc topic pull` CLI
-- [ ] Write full-thread Markdown output (YAML frontmatter + `## Post N · username · date` headings + raw body + `---` separators)
-- [ ] `topic_pull` without `--full`: no behaviour change
+- [x] Add `stream: Vec<u64>` to `PostStream` model
+- [x] Add `username: Option<String>` to `Post` model (already in API response, just not modelled)
+- [x] Add `fetch_topic_all_posts(topic_id)` to `DiscourseClient`: fetch page 1, extract `stream`, chunk remaining IDs, batch-fetch via `/t/{id}/posts.json?post_ids[]=…&include_raw=1`, merge into ordered `Vec<Post>`
+- [x] Add `--full` flag to `dsc topic pull` CLI
+- [x] Write full-thread Markdown output (YAML frontmatter + `## Post N · username · date` headings + raw body + `---` separators)
+- [x] `topic_pull` without `--full`: no behaviour change
 
 ### Phase 2 - iteration ergonomics
 

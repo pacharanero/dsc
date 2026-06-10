@@ -1,4 +1,5 @@
 use crate::api::DiscourseClient;
+use crate::api::TopicResponse;
 use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
 use crate::utils::{read_markdown, resolve_topic_path, write_markdown};
@@ -12,18 +13,45 @@ pub fn topic_pull(
     discourse_name: &str,
     topic_id: u64,
     local_path: Option<&Path>,
+    full: bool,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
+
+    if full {
+        let topic = client.fetch_topic_all_posts(topic_id)?;
+        let title = topic_display_title(&topic, topic_id);
+        let body = render_full_thread(&topic, topic_id, &discourse.baseurl);
+        let target = resolve_topic_path(local_path, &title, &std::env::current_dir()?)?;
+        write_markdown(&target, &body)?;
+        println!(
+            "Topic pulled (full thread, {} posts) to: {}",
+            topic.post_stream.posts.len(),
+            target.display()
+        );
+        return Ok(());
+    }
+
     let topic = client.fetch_topic(topic_id, true)?;
     let raw = topic
         .post_stream
         .posts
-        .get(0)
+        .first()
         .and_then(|p| p.raw.clone())
         .ok_or_else(|| anyhow!("topic has no raw content"))?;
-    let title = topic
+    let title = topic_display_title(&topic, topic_id);
+    let target = resolve_topic_path(local_path, &title, &std::env::current_dir()?)?;
+    write_markdown(&target, &raw)?;
+    println!("Topic pulled to: {}", target.display());
+    Ok(())
+}
+
+/// Pick a stable display string for the topic - title, then slug, then a
+/// `topic-N` fallback. Used for both filename derivation and Markdown
+/// frontmatter.
+fn topic_display_title(topic: &TopicResponse, topic_id: u64) -> String {
+    topic
         .title
         .as_deref()
         .filter(|t| !t.trim().is_empty())
@@ -35,11 +63,121 @@ pub fn topic_pull(
                 .filter(|s| !s.trim().is_empty())
                 .map(|s| s.to_string())
         })
-        .unwrap_or_else(|| format!("topic-{}", topic_id));
-    let target = resolve_topic_path(local_path, &title, &std::env::current_dir()?)?;
-    write_markdown(&target, &raw)?;
-    println!("Topic pulled to: {}", target.display());
-    Ok(())
+        .unwrap_or_else(|| format!("topic-{}", topic_id))
+}
+
+/// Render every post in `topic` as a single Markdown document with YAML
+/// frontmatter (title / topic_id / url / posts_count / pulled_at) and
+/// per-post `## Post N · username · date` headings separated by `---`
+/// horizontal rules.
+fn render_full_thread(topic: &TopicResponse, topic_id: u64, baseurl: &str) -> String {
+    let title = topic_display_title(topic, topic_id);
+    let slug = topic
+        .slug
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("topic");
+    let base_trimmed = baseurl.trim_end_matches('/');
+    let url = format!("{}/t/{}/{}", base_trimmed, slug, topic_id);
+    let posts_count = topic.post_stream.posts.len();
+    let pulled_at = current_utc_iso8601();
+
+    let mut out = String::new();
+    out.push_str("---\n");
+    out.push_str(&format!("title: {}\n", yaml_scalar(&title)));
+    out.push_str(&format!("topic_id: {}\n", topic_id));
+    out.push_str(&format!("url: {}\n", url));
+    out.push_str(&format!("posts_count: {}\n", posts_count));
+    out.push_str(&format!("pulled_at: {}\n", pulled_at));
+    out.push_str("---\n\n");
+
+    for (idx, post) in topic.post_stream.posts.iter().enumerate() {
+        if idx > 0 {
+            out.push_str("\n---\n\n");
+        }
+        let post_number = post.post_number.unwrap_or((idx + 1) as u64);
+        let username = post.username.as_deref().unwrap_or("(unknown)");
+        let date = post
+            .created_at
+            .as_deref()
+            .map(format_date_only)
+            .unwrap_or_else(|| "(no date)".to_string());
+        out.push_str(&format!(
+            "## Post {} · {} · {}\n\n",
+            post_number, username, date
+        ));
+        if let Some(raw) = post.raw.as_deref() {
+            out.push_str(raw.trim_end());
+            out.push('\n');
+        } else {
+            out.push_str("_(raw content unavailable)_\n");
+        }
+    }
+    out
+}
+
+/// Quote a YAML scalar if it contains characters that would confuse the
+/// parser. Keeps simple titles unquoted.
+fn yaml_scalar(value: &str) -> String {
+    let needs_quoting = value.is_empty()
+        || value.contains(':')
+        || value.contains('#')
+        || value.contains('\n')
+        || value.starts_with(['-', '?', '!', '&', '*', '|', '>', '@', '`', '%', '\'', '"', '['])
+        || value.starts_with("  ");
+    if needs_quoting {
+        let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
+        format!("\"{}\"", escaped)
+    } else {
+        value.to_string()
+    }
+}
+
+/// Trim an ISO-8601 timestamp like `2026-03-24T11:07:00.123Z` down to the
+/// date portion. Leaves anything that doesn't parse cleanly as-is.
+fn format_date_only(ts: &str) -> String {
+    match ts.find('T') {
+        Some(idx) => ts[..idx].to_string(),
+        None => ts.to_string(),
+    }
+}
+
+/// Current time in `YYYY-MM-DDTHH:MM:SSZ` form, derived directly from
+/// `SystemTime` to avoid adding a chrono dependency just for this.
+fn current_utc_iso8601() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    // Days-from-epoch arithmetic (proleptic Gregorian via the standard
+    // 1970-01-01 epoch). Good for any year `dsc` will plausibly run in.
+    let days = (secs / 86_400) as i64;
+    let secs_of_day = (secs % 86_400) as u64;
+    let hh = secs_of_day / 3600;
+    let mm = (secs_of_day % 3600) / 60;
+    let ss = secs_of_day % 60;
+    let (y, m, d) = civil_from_days(days);
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        y, m, d, hh, mm, ss
+    )
+}
+
+/// Convert days-from-1970-01-01 to (year, month, day).
+/// Reference: Howard Hinnant, "chrono-Compatible Low-Level Date Algorithms".
+fn civil_from_days(z: i64) -> (i32, u32, u32) {
+    let z = z + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365; // [0, 399]
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
+    let d = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
+    let m = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
+    let y = y + if m <= 2 { 1 } else { 0 };
+    (y as i32, m as u32, d as u32)
 }
 
 pub fn topic_push(
@@ -203,9 +341,38 @@ fn read_reply_input(local_path: Option<&Path>) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::read_reply_input;
+    use super::{
+        civil_from_days, format_date_only, read_reply_input, render_full_thread,
+        topic_display_title, yaml_scalar,
+    };
+    use crate::api::{Post, PostStream, TopicResponse};
     use std::io::Write;
     use tempfile::NamedTempFile;
+
+    fn make_topic(title: Option<&str>, posts: Vec<Post>, stream: Vec<u64>) -> TopicResponse {
+        TopicResponse {
+            title: title.map(|s| s.to_string()),
+            slug: Some("hello-world".to_string()),
+            post_stream: PostStream { posts, stream },
+        }
+    }
+
+    fn make_post(
+        id: u64,
+        post_number: Option<u64>,
+        username: Option<&str>,
+        raw: Option<&str>,
+        created_at: Option<&str>,
+    ) -> Post {
+        Post {
+            id,
+            post_number,
+            username: username.map(|s| s.to_string()),
+            raw: raw.map(|s| s.to_string()),
+            updated_at: None,
+            created_at: created_at.map(|s| s.to_string()),
+        }
+    }
 
     #[test]
     fn read_reply_input_reads_from_file() {
@@ -221,6 +388,96 @@ mod tests {
         let err = read_reply_input(Some(bogus)).unwrap_err();
         let msg = format!("{:#}", err);
         assert!(msg.contains("/definitely/does/not/exist.md"));
+    }
+
+    #[test]
+    fn display_title_prefers_title_then_slug_then_fallback() {
+        let t1 = make_topic(Some("My Title"), vec![], vec![]);
+        assert_eq!(topic_display_title(&t1, 42), "My Title");
+
+        let t2 = TopicResponse {
+            title: Some("  ".to_string()),
+            slug: Some("my-slug".to_string()),
+            post_stream: PostStream::default(),
+        };
+        assert_eq!(topic_display_title(&t2, 42), "my-slug");
+
+        let t3 = TopicResponse {
+            title: None,
+            slug: None,
+            post_stream: PostStream::default(),
+        };
+        assert_eq!(topic_display_title(&t3, 42), "topic-42");
+    }
+
+    #[test]
+    fn format_date_only_trims_at_t() {
+        assert_eq!(format_date_only("2026-03-24T11:07:00Z"), "2026-03-24");
+        assert_eq!(format_date_only("2026-03-24"), "2026-03-24");
+        assert_eq!(format_date_only(""), "");
+    }
+
+    #[test]
+    fn yaml_scalar_quotes_when_ambiguous() {
+        assert_eq!(yaml_scalar("simple title"), "simple title");
+        // Colon triggers quoting.
+        assert_eq!(yaml_scalar("a: b"), "\"a: b\"");
+        // Leading hash would otherwise read as a comment.
+        assert_eq!(yaml_scalar("#hash"), "\"#hash\"");
+        // Leading quote forces quoting + escapes inner quotes.
+        assert_eq!(yaml_scalar("\"q"), "\"\\\"q\"");
+        // Embedded quotes mid-string are fine in plain YAML scalars.
+        assert_eq!(yaml_scalar("she said hi"), "she said hi");
+    }
+
+    #[test]
+    fn render_full_thread_emits_frontmatter_and_per_post_headings() {
+        let posts = vec![
+            make_post(101, Some(1), Some("alice"), Some("hello"), Some("2026-03-24T11:00:00Z")),
+            make_post(102, Some(2), Some("bob"), Some("hi back"), Some("2026-03-25T09:00:00Z")),
+        ];
+        let topic = make_topic(Some("Hello World"), posts, vec![101, 102]);
+        let out = render_full_thread(&topic, 42, "https://forum.example.com/");
+
+        assert!(out.starts_with("---\n"));
+        assert!(out.contains("title: Hello World\n"));
+        assert!(out.contains("topic_id: 42\n"));
+        assert!(out.contains("url: https://forum.example.com/t/hello-world/42\n"));
+        assert!(out.contains("posts_count: 2\n"));
+        assert!(out.contains("## Post 1 · alice · 2026-03-24\n"));
+        assert!(out.contains("## Post 2 · bob · 2026-03-25\n"));
+        assert!(out.contains("hello"));
+        assert!(out.contains("hi back"));
+        assert!(out.contains("\n---\n"), "horizontal rule between posts");
+    }
+
+    #[test]
+    fn render_full_thread_handles_missing_raw_and_user() {
+        let posts = vec![make_post(7, Some(1), None, None, None)];
+        let topic = make_topic(None, posts, vec![7]);
+        let out = render_full_thread(&topic, 7, "https://x.test");
+        assert!(out.contains("(unknown)"));
+        assert!(out.contains("(no date)"));
+        assert!(out.contains("_(raw content unavailable)_"));
+    }
+
+    #[test]
+    fn render_full_thread_falls_back_to_index_when_post_number_missing() {
+        let posts = vec![make_post(7, None, Some("alice"), Some("body"), None)];
+        let topic = make_topic(Some("t"), posts, vec![7]);
+        let out = render_full_thread(&topic, 7, "https://x.test");
+        // Single post with no post_number → numbered 1 from index.
+        assert!(out.contains("## Post 1 · alice"));
+    }
+
+    #[test]
+    fn civil_from_days_matches_known_dates() {
+        // 1970-01-01 is day 0.
+        assert_eq!(civil_from_days(0), (1970, 1, 1));
+        // 2026-06-10 = 20614 days from epoch (well-known via cal / date).
+        assert_eq!(civil_from_days(20614), (2026, 6, 10));
+        // Leap-day check: 2024-02-29.
+        assert_eq!(civil_from_days(19782), (2024, 2, 29));
     }
 }
 
