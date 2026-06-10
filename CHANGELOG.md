@@ -5,6 +5,16 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.12] - 2026-06-10
+
+### Bug fixes
+
+- **cli**: Bring 6 empty-list + 1 error message in line with spec ([bab77a7](https://github.com/pacharanero/dsc/commit/bab77a7536a3a8e2a42a480ede4622c471660aa3))
+
+### Documentation
+
+- Pre-1.0 polish batch (CHANGELOG, CONTRIBUTING, issue templates) ([038d3c7](https://github.com/pacharanero/dsc/commit/038d3c7285061af3a1c7b631842e93bf8d8a491d))
+
 ## [0.10.11] - 2026-06-10
 
 ### Documentation

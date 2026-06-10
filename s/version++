@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Usage: s/version++ [patch|minor|major]
+#
+# Bumps Cargo.toml, refreshes CHANGELOG.md from git-cliff, and tags HEAD.
+#
+# Workflow: commit your feature first (with a conventional-commit message),
+# THEN run this script. git-cliff reads committed history, so any uncommitted
+# changes won't appear in the new CHANGELOG.md section.
+
 # set -v  # Enable verbose mode
 set -e  # Exit on error
 
