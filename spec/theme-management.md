@@ -90,6 +90,72 @@ dsc theme asset list <discourse> <theme-id>
 - **`dsc theme show <discourse> <theme-id>`** - richer than `list`: component flag, enabled state, default flag, parent(s), attached children, settings count, field inventory. `list` today shows only `id - name - enabled/disabled`.
 - **`dsc theme update <discourse> <theme-id>`** - pull an installed *remote* component to its latest upstream commit (distinct from `dsc update`, which is the OS/Discourse rebuild). Maps to the Admin UI "check for updates" on a remote theme.
 
+## Reference: API calls observed in the field
+
+These are the exact Discourse admin API calls used to do this work by hand on kitchen.culinarymedicine.org while `dsc` lacked the commands. Tested against **Discourse 2026.6.0-latest** (the new glimmer header). All requests carry `Api-Key: <redacted>` and `Api-Username: <admin>` headers. They are the ground truth the proposed subcommands should wrap.
+
+**List themes (find default, components, relationships)** - backs `theme show` / a richer `theme list`:
+
+```
+GET /admin/themes.json
+```
+
+Response: `{ "themes": [ { "id", "name", "component": bool, "default": bool, "enabled": bool, "child_themes": [{id,name}], "parent_themes": [{id,name}] }, ... ] }`. Components attach to a parent via the parent's children, not a flag on the child.
+
+**Read one theme: settings schema + fields** - backs `theme setting list/get`, `theme field`:
+
+```
+GET /admin/themes/:id.json
+```
+
+Response `theme.settings[]` entries look like `{ "setting": "links_position", "type": "enum", "default": "right", "value": "right", "choices": [...] }`. Note: JSON-schema list settings (e.g. Dropdown Header's `header_links`) report **`"type": "string"`** here - the `json_schema` lives in the component's `settings.yml`, not the API response. The stored `value` is the JSON array serialised as a string.
+
+**Set a theme/component setting** - backs `theme setting set`:
+
+```
+PUT /admin/themes/:id/setting.json
+Content-Type: application/x-www-form-urlencoded
+name=links_position&value=left
+```
+
+For a JSON-schema string setting, `value` is the JSON text, urlencoded, e.g.:
+
+```
+name=header_links&value=[{"id":1,"title":"Education","icon":"","url":"https://...","newTab":true}]
+```
+
+Returns 200 on success; 422 with a validation message if the value violates the setting's `json_schema`. No response body needed.
+
+**Import a component from a git repo** - backs `theme install` over the API (today's `dsc theme install` is SSH-only):
+
+```
+POST /admin/themes/import.json
+Content-Type: application/x-www-form-urlencoded
+remote=https://github.com/paviliondev/discourse-dropdown-header&branch=main
+```
+
+Response: `{ "theme": { "id": 14, "name": "Dropdown Header", "component": true, ... } }`. `branch` is required-ish; try the repo default (`main`, then `master`).
+
+**Attach a component to a parent theme** - backs `theme attach/detach`:
+
+```
+PUT /admin/themes/:parent-id.json
+Content-Type: application/json
+{ "theme": { "child_theme_ids": [8,3,1,5,13,10,4,11,6,14] } }
+```
+
+The list **replaces** the parent's children, so read the current `child_themes` from `GET /admin/themes/:parent-id.json` first and send the full set plus the new id. Disabled components stay in the list (disabled != detached).
+
+**Enable / disable a theme or component** - backs `theme enable/disable`:
+
+```
+PUT /admin/themes/:id.json
+Content-Type: application/json
+{ "theme": { "enabled": false } }
+```
+
+(Confirmed via the Admin UI toggle; the `enabled` boolean round-trips in `GET /admin/themes/:id.json`.)
+
 ## Out of scope
 
 - Authoring component source (SCSS/JS) beyond editing existing fields - that belongs in the component's own repo, not `dsc`.

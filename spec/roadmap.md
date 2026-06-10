@@ -49,17 +49,65 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 - [ ] **CONTRIBUTING.md** if not present. Reference [spec/implementation.md](implementation.md) and [AGENTS.md](../AGENTS.md).
 - [ ] **`s/` script directory naming** - either rename to `scripts/` (conventional) or document its purpose prominently in [docs/development.md](../docs/development.md). Same for `wix/` (MSI build artefacts - obvious from contents but not from name).
 - [ ] **Pre-circulate the Meta post** to one or two Discourse community regulars before posting publicly. Sanity-check framing.
+- [ ] **Man page generation** via [`clap_mangen`](https://docs.rs/clap_mangen) - lights up `man dsc` for distro packagers.
+- [ ] **Evaluate `dsc open` and `dsc import`** - keep, deprecate, or document why they earn their keep before locking the CLI surface.
 
 ## Planned
 
-### Other planned items
+### CLI papercuts and finishing touches
 
-- [ ] Doc accuracy pass - verify remaining docs match CLI reality
+- [ ] **Universal JSON output** - the few mutating commands that still produce only single-value text (`setting get`, `theme duplicate`, `topic reply/new`) should accept `--format json|yaml`. Already easy to pipe; revisit when a user reports the papercut.
+- [ ] **`palette` → `theme palette`** with a deprecation alias. Lower priority; treat as a focused patch.
+- [ ] **Emoji filename preservation** - bulk uploads via `dsc emoji push <dir>` currently rename `google-drive.svg` to `google_drive` (Discourse normalises). Predictable behaviour would preserve the stem-minus-extension as the emoji name where Discourse permits.
+- [ ] **`api-key create --scope <scopes>`** - scoped admin API keys (e.g. `--scope topics:write,users:read`). The existing `dsc api-key create` only mints full-admin keys.
+
+### New command surfaces
+
+- [ ] ⭐ **`dsc topic pull --full`** - pull all posts in a thread (not just the OP) as a single Markdown file with YAML frontmatter and per-post headings. Requires adding `stream: Vec<u64>` to `PostStream` model and a batch-fetch path via `/t/{id}/posts.json?post_ids[]=…`. No change to default behaviour. Spec: [spec/topic-pull-full-thread.md](topic-pull-full-thread.md)
+
 - [ ] ⭐ **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Spec: [spec/theme-management.md](theme-management.md)
   - [ ] Phase 1: `dsc theme setting` (get/set/list) + `dsc theme enable|disable|attach|detach`
   - [ ] Phase 2: `dsc theme field pull/push` + `dsc theme asset set/list`
   - [ ] Phase 3: `dsc theme show` + `dsc theme update` (remote component refresh)
+- [ ] **`dsc chat`** - Discourse Chat is core now and the API is there. Subcommands: `chat channels`, `chat send <discourse> <channel> [<file>]`, `chat fetch <channel> [--since …]`. Mirrors the existing `dsc topic`/`pm` split.
+- [ ] **`dsc install <name> --host <host>`** - declarative Discourse provisioning on a `dsc harden`-prepared box. Spec: [spec/install.md](install.md). Includes: templated `app.yml`, `launcher bootstrap + start`, polls `/about.json` until ready, appends the new install to `dsc.toml`. Companion to `dsc harden` (the substrate) and `dsc update` (the steady-state).
+- [ ] **`dsc harden` stage 3 finishing items** - timezone/swap/journald/unattended-upgrades/fail2ban/rootless-Docker/ufw. Config keys are already wired in [src/commands/harden.rs](../src/commands/harden.rs); remaining work is the SSH-side execution and tests. See [spec/install.md](install.md) for gotchas (rootlesskit `cap_net_bind_service`, `loginctl enable-linger`, cloud firewall caveat).
+- [ ] **Config schema additions for `dsc install`** - add `ssh_user: Option<String>` and `ssh_port: Option<u16>` to `DiscourseConfig`, written by `dsc install` on success. Today only `HardenConfig` carries `ssh_port`; the per-Discourse field is missing.
+
+### Admin depth (release driven by demand)
+
+- [ ] **`dsc log staff <discourse> [--since 7d] [--format json]`** - the staff action log.
+- [ ] **`dsc report <discourse> <report-name> [--period 30d]`** - dashboard reports (signups, DAU, posts, likes). Scriptable admin dashboard. Distinct from `dsc analytics` (curated multi-metric snapshot).
+- [ ] **`dsc webhook list|create|delete|ping`** - manage the plumbing automation depends on.
+- [ ] **`dsc notification list|read <discourse>`** - your own notifications as the API user.
+
+### Cross-forum specialties (the multi-install headline)
+
+- [ ] **`dsc search all <query>`** - fan out search across every configured forum, merged results.
+- [ ] **`dsc report all <name>`** - aggregate a given report across forums (e.g. total signups last 30 days across N installs).
+- [ ] **`dsc setting audit <key>`** - show the current value of a given setting across every forum, diff-friendly. Distinct from `dsc setting diff` (two specific sources, all keys).
+- [ ] **`dsc user find <email>`** - locate a user across every configured forum (GDPR / "which of my forums has this person" workflows).
+- [ ] **`dsc backup create --all`** - reuse the parallel-ops pattern established by `dsc update all`.
+
+### Doc accuracy
+
+- [ ] Doc accuracy pass - verify remaining docs match CLI reality.
+
+## Stretch / exploratory
+
+Speculative ideas. Build only if real demand surfaces; none are required for 1.0.
+
+- [ ] **MCP server mode** - `dsc mcp serve` exposing every command as an MCP tool, letting LLM agents drive Discourse via this CLI. Overlaps with the existing `discourse-bawmedical-mcp` - worth a think about consolidation vs coexistence.
+- [ ] **TUI** - `dsc tui` for interactive browsing of forums/topics/users. Big scope.
+- [ ] **Config file federation** - support multiple config files and include-directives, for teams.
+- [ ] **Discourse User API** - alternative auth path for non-admins and scoped bots:
+  - `dsc login <discourse> [--scopes read,write,…]` runs the full key-exchange (RSA keypair, browser to `/user-api-key/new?…`, transient-localhost callback or manual paste, decrypt, write `user_api_key` into `dsc.toml`).
+  - Client emits `User-Api-Key` header when configured, preferring it over `Api-Key`/`Api-Username`.
+  - Likely to require renaming the existing `dsc api-key` to `dsc admin-key` (with deprecation alias) so `dsc user-key` or similar can sit alongside.
+  - **Tradeoff:** widens the *audience* (non-admins, scoped bots) but not the *capability* - most current `dsc` value (suspend, group admin, settings, backups) requires admin scope regardless.
 
 ## Out of scope / removed
 
 - ~~Shell completion regeneration~~ - `completions/` is gitignored and `dsc completions <shell> -d ./completions` regenerates on demand. Not a release-tracked item.
+- ~~`dsc user password change`~~ - dropped. Discourse's API doesn't expose an admin "set this password directly" endpoint on purpose (admins shouldn't know user passwords). `dsc user password-reset` covers the operational need.
+- ~~`dsc user anonymize`~~ - dropped. Rare enough that the Admin UI is fine; not worth the destructive-confirmation UX.

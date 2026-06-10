@@ -214,3 +214,31 @@ This command must comply with the standards in `spec/spec.md`:
 - A `dsc analytics watch` long-running mode that posts a weekly roll-up to a configured topic on a schedule.
 - A `--baseline <path>` flag that loads a previously emitted JSON snapshot and computes deltas against it, decoupling "compare" from a fixed prior window.
 - Surfacing of "topics that are spiking" (a leaderboard of topics whose post rate in the last 24h exceeded their 7-day baseline by N×). Useful but not headline-health.
+
+## Implementation follow-ups
+
+v1 ships ~half the metrics directly from `/admin/reports/{id}.json`; the per-user-walk metrics print `— (n/i)` and remain unimplemented. These notes capture the open design decisions for filling them in.
+
+### Stubbed metrics and the per-user-walk cost concern
+
+`new_contributors`, `reactivated_users`, `lost_regulars`, `top_10_share`, and `returning_poster_rate` all require per-user post-history walks beyond what `/admin/reports/{id}.json` exposes directly. On a busy forum a naive implementation is N HTTP calls per `dsc analytics` run (where N = unique posters in the window), which can be 200+ requests and 5-10 seconds of latency.
+
+**Recommended path:** gate the expensive metrics behind a `--full` flag. Default invocation runs in <1s with the Discourse-report-derivable metrics; `--full` opts into the per-user walk with a documented latency cost. Alternatively cap the walk at the top N posters by post count and report "reactivated among heavy posters" as a proxy.
+
+### Cheap wins still to land
+
+These don't need the user-walk and could ship as an early follow-up patch:
+
+- **`solo_thread_rate`** - `% of topics in the window where only the OP posted`. One call per category via `/c/{category}/l/latest.json` filtered by `created_at`. Cheap.
+- **Window clamping for new installs** - if `--since` exceeds install age, clamp and print a `(window clamped — install is N days old)` note. One `GET /about.json` call.
+- **ANSI colour on arrows** - autodetect TTY, respect `NO_COLOR`. Mirror whatever convention `dsc list` uses today so behaviour is consistent across the CLI.
+
+### Open report-id verification
+
+The `flag_response_time` report ID returns 500 on at least one tested forum. May have been renamed (`time_to_resolution`?) or removed. Currently rendered as `—`. Reconfirm against a current Discourse before wiring in.
+
+`time_to_first_response.average` is exposed by Discourse; the spec calls for **median**. The daily `data` array could be re-aggregated to a real median, but this requires raw post timestamps rather than the report's pre-aggregated daily averages. v1 uses Discourse's `average` and documents the caveat in [docs/analytics.md](../docs/analytics.md). Promote to a real median if a forum operator complains.
+
+### Schema versioning is a public contract
+
+The JSON / YAML output emits `"schema": 1`. Once shipped, breaking a key warrants `"schema": 2`. Treat this as a stability commitment; downstream consumers (cron-driven trend tracking, third-party dashboards) will pin against it.

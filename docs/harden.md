@@ -33,7 +33,7 @@ Stages 1 and 2 are individually idempotent within the fresh-box flow — if you 
 
 ## What stage 3 will add
 
-Tracked in `.marcus/harden-install-notes.md` (private). Briefly: UTC timezone, time-sync verified, swap file (2 GB by default), journald log cap, unattended security upgrades, fail2ban, rootless Docker (per the Bawmedical playbook — `setcap cap_net_bind_service=ep` on rootlesskit, `loginctl enable-linger`), and `ufw` opened for Discourse's standard ports.
+Tracked in [spec/install.md](https://github.com/pacharanero/dsc/blob/main/spec/install.md). Briefly: UTC timezone, time-sync verified, swap file (2 GB by default), journald log cap, unattended security upgrades, fail2ban, rootless Docker (per the Bawmedical playbook — `setcap cap_net_bind_service=ep` on rootlesskit, `loginctl enable-linger`), and `ufw` opened for Discourse's standard ports.
 
 ## Configuration (`[harden]` block)
 
