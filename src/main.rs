@@ -845,6 +845,8 @@ fn main() -> Result<()> {
             commands::completions::write_completions(shell, dir.as_deref())
         }
 
+        Commands::Man { dir } => commands::manpages::write_manpages(&dir),
+
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
             Ok(())

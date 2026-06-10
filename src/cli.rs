@@ -283,6 +283,18 @@ pub enum Commands {
         #[arg(long, short = 'd')]
         dir: Option<PathBuf>,
     },
+    /// Generate man pages for `dsc` and every subcommand.
+    ///
+    /// Writes one ROFF-formatted file per (sub)command (e.g. `dsc.1`,
+    /// `dsc-tag-pull.1`) into the given directory. Distro packagers
+    /// install these into section 1 of the man path. Run `gzip -9` on
+    /// the output if your packaging convention expects compressed pages.
+    #[command(visible_alias = "manpages")]
+    Man {
+        /// Output directory. Required - this command always writes to disk.
+        #[arg(long, short = 'd')]
+        dir: PathBuf,
+    },
     /// Print the dsc version.
     #[command(visible_alias = "ver")]
     Version,

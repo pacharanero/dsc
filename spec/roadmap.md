@@ -50,7 +50,7 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 - [x] **Support stance written down** - in CONTRIBUTING.md: "best-effort, community-driven, no SLA; field-driven specs prioritised over speculative ones."
 - [ ] **`s/` script directory naming** - either rename to `scripts/` (conventional) or document its purpose prominently in [docs/development.md](../docs/development.md). Same for `wix/` (MSI build artefacts - obvious from contents but not from name).
 - [ ] **Pre-circulate the Meta post** to one or two Discourse community regulars before posting publicly. Sanity-check framing.
-- [ ] **Man page generation** via [`clap_mangen`](https://docs.rs/clap_mangen) - lights up `man dsc` for distro packagers.
+- [x] **Man page generation** via [`clap_mangen`](https://docs.rs/clap_mangen) - new `dsc man --dir <path>` subcommand emits 103 ROFF pages (root + every nested subcommand), `git`/`cargo`-style hyphen-joined filenames. Recommended workflow for distro packagers documented at [docs/manpages.md](../docs/manpages.md).
 - [ ] **Evaluate `dsc open` and `dsc import`** - keep, deprecate, or document why they earn their keep before locking the CLI surface.
 
 ## Planned
