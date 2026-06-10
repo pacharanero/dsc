@@ -21,7 +21,7 @@ pub fn pull_emojis(
 
     let emojis = client.list_custom_emojis()?;
     if emojis.is_empty() {
-        println!("No custom emoji found on {}", discourse.name);
+        println!("No custom emoji found on {}.", discourse.name);
         return Ok(());
     }
 

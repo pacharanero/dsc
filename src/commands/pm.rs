@@ -67,7 +67,7 @@ pub fn pm_list(
     match format {
         ListFormat::Text => {
             if topics.is_empty() {
-                println!("No PMs in {}.", direction);
+                println!("No PMs found in {}.", direction);
                 return Ok(());
             }
             let id_width = topics

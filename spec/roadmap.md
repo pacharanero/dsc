@@ -37,10 +37,10 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 
 - [ ] **Bump to 1.0.0** with a written back-compat policy. State: "the CLI surface documented in `dsc --help` is stable; flags will not be removed without a deprecation cycle." The current 0.x signal undersells the project's maturity (125 tests, 5-target prebuilt distribution, 9 months of consistent shipping).
 - [x] **Generate `CHANGELOG.md`** - [git-cliff](https://github.com/orhun/git-cliff) configured via [cliff.toml](../cliff.toml); full history (back to first conventional commit) backfilled into [CHANGELOG.md](../CHANGELOG.md). `s/version++` now refreshes it automatically on each bump. `cargo-dist` picks it up for the GitHub Release body.
-- [ ] **CLI consistency audit** against [spec/spec.md](spec.md). 30-minute pass:
-  - Every `* list` command supports `--format text|json|yaml` at minimum.
-  - Empty-list output matches the spec (`No <resource> found.` in text mode; empty array/object in structured modes).
-  - Error messages follow the documented `discourse not found: {name}` / `{resource} not found: {identifier}` shapes.
+- [x] **CLI consistency audit** against [spec/spec.md](spec.md):
+  - Format baseline: all 20 list commands accept `--format text|json|yaml` (fully compliant).
+  - Empty-list text mode: 5 commands fixed to the `No <resource> found.` shape (`api-key list`, `emoji pull`, `pm list`, `search`, `tag list`). Context preserved where useful (e.g. `No PMs found in {direction}.`).
+  - Error messages: `dsc tag rename` switched from `"tag 'foo' not found on 'bar'"` to the shared `not_found("tag", &old_norm)` helper, matching the `{resource} not found: {identifier}` shape used elsewhere.
 - [x] **Surface analytics v1 status more prominently** in [docs/analytics.md](../docs/analytics.md). The Sections heading now carries a v1-status callout pointing at the implementation matrix and the spec's "Implementation follow-ups". Stale `.marcus/queries.md` reference fixed.
 - [x] **Rename `spec/dsc-tag-sync-spec.md`** → [spec/tag-sync.md](tag-sync.md) for consistency with the post-`-spec.md` convention. References updated.
 - [ ] **Record an asciinema** (~30s) of the pull → edit → push → diff loop on a real Discourse. Embed in README. Visual proof beats prose.

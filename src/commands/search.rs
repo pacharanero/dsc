@@ -19,7 +19,7 @@ pub fn search(
     match format {
         ListFormat::Text => {
             if hits.is_empty() {
-                println!("No matches.");
+                println!("No search results found.");
                 return Ok(());
             }
             let id_width = hits

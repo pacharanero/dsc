@@ -1,6 +1,6 @@
 use crate::api::{DiscourseClient, TagGroupInfo};
 use crate::cli::ListFormat;
-use crate::commands::common::{ensure_api_credentials, select_discourse};
+use crate::commands::common::{ensure_api_credentials, not_found, select_discourse};
 use crate::config::Config;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ pub fn tag_list(
     match format {
         ListFormat::Text => {
             if tags.is_empty() {
-                println!("No tags.");
+                println!("No tags found.");
                 return Ok(());
             }
             let name_width = tags
@@ -151,11 +151,7 @@ pub fn tag_rename(
     // Look up the old tag and ensure the new name is not already taken.
     let tags = client.list_tags()?;
     if !tags.iter().any(|t| t.text == old_norm) {
-        return Err(anyhow::anyhow!(
-            "tag '{}' not found on '{}'",
-            old_norm,
-            discourse_name
-        ));
+        return Err(not_found("tag", &old_norm));
     }
     if tags.iter().any(|t| t.text == new_norm) {
         return Err(anyhow::anyhow!(

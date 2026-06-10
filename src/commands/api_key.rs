@@ -17,7 +17,7 @@ pub fn api_key_list(
     match format {
         ListFormat::Text => {
             if keys.is_empty() {
-                println!("No API keys.");
+                println!("No API keys found.");
                 return Ok(());
             }
             let desc_width = keys
