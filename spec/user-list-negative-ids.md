@@ -107,3 +107,30 @@ Changing `id` from `u64` to `i64` is source-compatible for all current internal 
 - Filtering system accounts out of the listing by default (they are legitimately part of `active`; callers can filter on `id < 0` or username if they want).
 - Any change to which listing types are exposed or to pagination.
 - Validation/guards on moderating system accounts (optional nicety noted above, not required for the fix).
+
+## Audit of downstream code (post-implementation, 2026-06-17)
+
+After widening to `i64`, the full set of code paths that touch a Discourse user ID was audited. **No other code requires changes**:
+
+| Code path | Verdict |
+|---|---|
+| `UserSummary.id` / `UserDetail.id` printing | Safe - just `{}` formatting; `-1` renders fine in text/JSON/YAML |
+| `suspend_user`, `unsuspend_user`, `silence_user`, `unsilence_user`, `grant_admin`, `revoke_admin`, `grant_moderation`, `revoke_moderation` | Safe - all widened to `i64`, all pass through to URL building. Acting on a system account hits `PUT /admin/users/-1/suspend.json` and Discourse responds 4xx; the existing `http_error` path surfaces it as a normal command error (raw HTTP message, not a `dsc`-specific friendly one - see below) |
+| `create_user` return | Safe - Discourse only ever assigns positive IDs to newly-created accounts |
+| `dsc user info <username>` | Safe - resolves by username; printed id can now be `-1`/`-2` for system rows |
+| `dsc user activity <username>` | Safe - operates on the `username` string, not a user id |
+| `dsc user groups list/add/remove` | Safe - operates on usernames |
+| `dsc invite send/bulk` | Safe - no user IDs involved |
+| `UserAction` struct (used by `dsc user activity`) | Safe - carries `topic_id`/`post_id`/`post_number` only, never a user id |
+| Integration tests in `tests/` | Safe - none touch the user-list path |
+
+### Friendly-error UX (still deliberately out of scope, just documented)
+
+`dsc user suspend system` resolves the username, then calls the API with `id: -1`. The result is the standard Discourse 4xx surfaced via the existing `http_error` path - not a `dsc`-specific message like "cannot moderate the built-in system account". This matches the original spec intent (no extra guard required) but is worth noting so the behaviour isn't a surprise.
+
+### Forward-looking notes for unrelated work
+
+These are flagged because they will touch this area in future, not because they need doing now:
+
+- **Analytics per-user-walk metrics.** The stubbed metrics in [spec/analytics.md](analytics.md) (`new_contributors`, `reactivated_users`, `lost_regulars`, `unique_posters`, `top_10_share`, `returning_poster_rate`) will eventually walk `admin_list_users` and compute things like "users who posted ≥ N times". When that work lands, those derivations **must filter out system accounts** (e.g. `.filter(|u| u.id > 0)` at the right point), otherwise `system` and `discobot` would be counted as "lost regulars" simply because they don't post. Easy one-liner; just don't forget.
+- **Future "pull/push for users" surfaces** (not currently planned). If any future snapshot/restore workflow round-trips user data, it would need to skip system rows on push (Discourse won't let you re-create them).

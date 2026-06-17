@@ -225,6 +225,8 @@ v1 ships ~half the metrics directly from `/admin/reports/{id}.json`; the per-use
 
 **Recommended path:** gate the expensive metrics behind a `--full` flag. Default invocation runs in <1s with the Discourse-report-derivable metrics; `--full` opts into the per-user walk with a documented latency cost. Alternatively cap the walk at the top N posters by post count and report "reactivated among heavy posters" as a proxy.
 
+> **When implementing the per-user-walk metrics, filter out Discourse system accounts.** `admin_list_users` returns `system` (id `-1`) and `discobot` (id `-2`) in the `active` listing. Without an `.filter(|u| u.id > 0)` at the right point, they will be counted as "lost regulars" (because they don't post) and inflate the unique-poster denominators. Cheap one-liner; just don't forget. See [spec/user-list-negative-ids.md](user-list-negative-ids.md) for the underlying typing fix that enabled correct parsing.
+
 ### Cheap wins still to land
 
 These don't need the user-walk and could ship as an early follow-up patch:
