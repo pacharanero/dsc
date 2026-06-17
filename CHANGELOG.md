@@ -5,6 +5,12 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.14] - 2026-06-17
+
+### Bug fixes
+
+- **user**: Tolerate negative IDs for Discourse system accounts ([d3c6d55](https://github.com/pacharanero/dsc/commit/d3c6d5516ac912ebabdbcda5607e07a5c05b1988))
+
 ## [0.10.13] - 2026-06-10
 
 ### Features
