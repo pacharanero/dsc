@@ -5,9 +5,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// One row from /admin/users/list/<type>.json.
+///
+/// `id` is signed: Discourse's built-in system accounts use negative IDs
+/// (`system` is `-1`, `discobot` is `-2`), and these appear in the
+/// `active` listing. See `spec/user-list-negative-ids.md`.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UserSummary {
-    pub id: u64,
+    pub id: i64,
     pub username: String,
     #[serde(default)]
     pub name: Option<String>,
@@ -30,9 +34,11 @@ pub struct UserSummary {
 }
 
 /// Distilled /users/<username>.json payload.
+///
+/// `id` is signed for the same reason as `UserSummary::id`.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UserDetail {
-    pub id: u64,
+    pub id: i64,
     pub username: String,
     #[serde(default)]
     pub name: Option<String>,
@@ -101,19 +107,19 @@ impl DiscourseClient {
     /// Suspend a user by ID. `until` is an ISO-8601 timestamp (or any string
     /// Discourse accepts, like "forever"); `reason` is mandatory from the UI
     /// but Discourse accepts empty via the API.
-    pub fn suspend_user(&self, user_id: u64, until: &str, reason: &str) -> Result<()> {
+    pub fn suspend_user(&self, user_id: i64, until: &str, reason: &str) -> Result<()> {
         let payload = [("suspend_until", until), ("reason", reason)];
         self.put_admin_user_action(user_id, "suspend", &payload, "suspend user request")
     }
 
     /// Unsuspend a user by ID.
-    pub fn unsuspend_user(&self, user_id: u64) -> Result<()> {
+    pub fn unsuspend_user(&self, user_id: i64) -> Result<()> {
         self.put_admin_user_action(user_id, "unsuspend", &[], "unsuspend user request")
     }
 
     /// Silence a user by ID. Optional `silenced_till` (Discourse-accepted
     /// timestamp string) and `reason`; both default to empty.
-    pub fn silence_user(&self, user_id: u64, until: &str, reason: &str) -> Result<()> {
+    pub fn silence_user(&self, user_id: i64, until: &str, reason: &str) -> Result<()> {
         let mut payload: Vec<(&str, &str)> = Vec::new();
         if !until.is_empty() {
             payload.push(("silenced_till", until));
@@ -125,22 +131,22 @@ impl DiscourseClient {
     }
 
     /// Unsilence a user by ID.
-    pub fn unsilence_user(&self, user_id: u64) -> Result<()> {
+    pub fn unsilence_user(&self, user_id: i64) -> Result<()> {
         self.put_admin_user_action(user_id, "unsilence", &[], "unsilence user request")
     }
 
     /// Grant admin to a user.
-    pub fn grant_admin(&self, user_id: u64) -> Result<()> {
+    pub fn grant_admin(&self, user_id: i64) -> Result<()> {
         self.put_admin_user_action(user_id, "grant_admin", &[], "grant admin request")
     }
 
     /// Revoke admin from a user.
-    pub fn revoke_admin(&self, user_id: u64) -> Result<()> {
+    pub fn revoke_admin(&self, user_id: i64) -> Result<()> {
         self.put_admin_user_action(user_id, "revoke_admin", &[], "revoke admin request")
     }
 
     /// Grant moderator to a user.
-    pub fn grant_moderation(&self, user_id: u64) -> Result<()> {
+    pub fn grant_moderation(&self, user_id: i64) -> Result<()> {
         self.put_admin_user_action(
             user_id,
             "grant_moderation",
@@ -150,7 +156,7 @@ impl DiscourseClient {
     }
 
     /// Revoke moderator from a user.
-    pub fn revoke_moderation(&self, user_id: u64) -> Result<()> {
+    pub fn revoke_moderation(&self, user_id: i64) -> Result<()> {
         self.put_admin_user_action(
             user_id,
             "revoke_moderation",
@@ -170,7 +176,7 @@ impl DiscourseClient {
         password: Option<&str>,
         name: Option<&str>,
         approve: bool,
-    ) -> Result<u64> {
+    ) -> Result<i64> {
         let mut payload: Vec<(&str, &str)> = vec![
             ("email", email),
             ("username", username),
@@ -199,12 +205,12 @@ impl DiscourseClient {
         // the top level first, then fall back to `user.id`.
         let id = value
             .get("user_id")
-            .and_then(|v| v.as_u64())
+            .and_then(|v| v.as_i64())
             .or_else(|| {
                 value
                     .get("user")
                     .and_then(|u| u.get("id"))
-                    .and_then(|v| v.as_u64())
+                    .and_then(|v| v.as_i64())
             })
             .ok_or_else(|| anyhow!("user create response missing user id: {}", text))?;
         Ok(id)
@@ -244,7 +250,7 @@ impl DiscourseClient {
 
     fn put_admin_user_action(
         &self,
-        user_id: u64,
+        user_id: i64,
         action: &str,
         payload: &[(&str, &str)],
         action_label: &str,
@@ -266,5 +272,42 @@ impl DiscourseClient {
             return Err(http_error(action_label, status, &text));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{UserDetail, UserSummary};
+
+    /// Regression test for the bug captured in
+    /// `spec/user-list-negative-ids.md`: Discourse uses negative IDs for
+    /// its built-in `system` (-1) and `discobot` (-2) accounts, which
+    /// appear in the `active` listing. Parsing a page that contains them
+    /// must succeed, not fail with `invalid value: integer -2`.
+    #[test]
+    fn user_summary_accepts_negative_system_ids() {
+        let json = r#"[
+            {"id": -1, "username": "system", "name": "system",
+             "email": "no_email"},
+            {"id": -2, "username": "discobot", "name": "discobot",
+             "email": "no_email"},
+            {"id": 42, "username": "alice", "name": "Alice",
+             "email": "alice@example.com"}
+        ]"#;
+        let users: Vec<UserSummary> =
+            serde_json::from_str(json).expect("negative ids must parse");
+        assert_eq!(users.len(), 3);
+        assert_eq!(users[0].id, -1);
+        assert_eq!(users[1].id, -2);
+        assert_eq!(users[2].id, 42);
+        assert_eq!(users[0].username, "system");
+    }
+
+    #[test]
+    fn user_detail_accepts_negative_system_ids() {
+        let json = r#"{"id": -1, "username": "system"}"#;
+        let detail: UserDetail = serde_json::from_str(json).expect("must parse");
+        assert_eq!(detail.id, -1);
+        assert_eq!(detail.username, "system");
     }
 }

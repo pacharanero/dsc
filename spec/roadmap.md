@@ -26,10 +26,15 @@ Specs marked ⭐ are **field-driven** - they came from real-world use and are in
 - [x] `dsc tag rename <discourse> <old> <new>` - in-place rename preserving every topic association; pre-flight validates existence, name collisions, and slug shape
 - [x] Fix `dsc harden` test - `drop_in_uses_modern_algorithm_pins` rewritten to verify the overlay model (commit `979c3d1`)
 - [x] ⭐ **`dsc topic pull --full`** - full-thread Markdown snapshot with YAML frontmatter and per-post headings; batch-fetches via `/t/{id}/posts.json?post_ids[]=…`. Spec: [spec/topic-pull-full-thread.md](topic-pull-full-thread.md). Phase 2 (`--since`, `--format json`) still planned.
+- [x] ⭐ **Fix `dsc user list` parse failure on negative IDs** - Discourse's built-in `system`/`discobot` accounts use IDs `-1`/`-2`, which broke deserialisation on any listing page that contained them. Widened `UserSummary.id`, `UserDetail.id`, and every user-action helper signature from `u64` to `i64`. Spec: [spec/user-list-negative-ids.md](user-list-negative-ids.md). Regression-tested.
 
 ## In progress
 
 _(nothing currently in progress)_
+
+## Planned
+
+- [ ] **`dsc user list` negative IDs (bug)** - `user list` fails to parse any page containing Discourse system accounts (`system` id `-1`, `discobot` id `-2`) because `id` is typed `u64`. Field-reported against `rjc-vcop`. Spec: [spec/user-list-negative-ids.md](user-list-negative-ids.md)
 
 ## Pre-1.0 launch checklist
 
