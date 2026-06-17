@@ -9,28 +9,19 @@ pub fn normalize_baseurl(baseurl: &str) -> String {
 }
 
 /// Create a URL-safe slug from arbitrary input.
+///
+/// Wraps the [`slug`] crate, which transliterates Unicode (so `"Café"`
+/// becomes `"cafe"`, Cyrillic and CJK get sensible romanisations) and
+/// emits the standard kebab-case shape used across most slug-generating
+/// tooling. Returns `"untitled"` when the slug would otherwise be empty
+/// (the `slug` crate itself returns an empty string for input that has
+/// no transliterable characters).
 pub fn slugify(input: &str) -> String {
-    let mut out = String::new();
-    let mut last_dash = false;
-    for ch in input.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-            last_dash = false;
-        } else if !last_dash {
-            out.push('-');
-            last_dash = true;
-        }
-    }
-    while out.starts_with('-') {
-        out.remove(0);
-    }
-    while out.ends_with('-') {
-        out.pop();
-    }
-    if out.is_empty() {
+    let s = slug::slugify(input);
+    if s.is_empty() {
         "untitled".to_string()
     } else {
-        out
+        s
     }
 }
 
@@ -219,6 +210,25 @@ mod tests {
     #[test]
     fn slugify_lowercases() {
         assert_eq!(slugify("ABCxyz"), "abcxyz");
+    }
+
+    #[test]
+    fn slugify_transliterates_unicode() {
+        // The whole reason for adopting the `slug` crate: pre-existing
+        // ASCII behaviour preserved, plus accented Latin, Cyrillic, and
+        // CJK now produce meaningful slugs instead of "untitled".
+        assert_eq!(slugify("Café Tonight"), "cafe-tonight");
+        assert_eq!(slugify("Привет мир"), "privet-mir");
+        assert_eq!(slugify("日本語"), "ri-ben-yu");
+    }
+
+    #[test]
+    fn slugify_trims_both_ends_of_dashes() {
+        // Regression guard: catches a latent bug from a contributor PR
+        // that only trimmed trailing dashes. The `slug` crate handles
+        // both ends correctly.
+        assert_eq!(slugify("-foo-"), "foo");
+        assert_eq!(slugify("---foo---bar---"), "foo-bar");
     }
 
     #[test]
