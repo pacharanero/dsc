@@ -5,6 +5,16 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.15] - 2026-06-17
+
+### Documentation
+
+- **spec**: Audit downstream code for negative user-id impact ([bb18cd6](https://github.com/pacharanero/dsc/commit/bb18cd6aa8d04b08f9e0b2ca0b16f1d22d73e823))
+
+### Refactor
+
+- **utils**: Use slug crate for slugify, handles Unicode ([690b321](https://github.com/pacharanero/dsc/commit/690b3210ad8b523172b5e706e87130027d5c988e))
+
 ## [0.10.14] - 2026-06-17
 
 ### Bug fixes
