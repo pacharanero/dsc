@@ -35,6 +35,28 @@ fn map_activity_format(f: ActivityFormatArg) -> ActivityFormat {
     }
 }
 
+/// Dispatch a palette subcommand. Shared by the top-level `dsc palette`
+/// (deprecated) and the canonical `dsc theme palette`.
+fn run_palette(config: &dsc::config::Config, command: PaletteCommand) -> Result<()> {
+    match command {
+        PaletteCommand::List {
+            discourse,
+            format,
+            verbose,
+        } => commands::palette::palette_list(config, &discourse, format, verbose),
+        PaletteCommand::Pull {
+            discourse,
+            palette_id,
+            local_path,
+        } => commands::palette::palette_pull(config, &discourse, palette_id, local_path.as_deref()),
+        PaletteCommand::Push {
+            discourse,
+            local_path,
+            palette_id,
+        } => commands::palette::palette_push(config, &discourse, &local_path, palette_id),
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let config_source = resolve_config_source(cli.config)?;
@@ -546,30 +568,13 @@ fn main() -> Result<()> {
             } => commands::backup::backup_restore(&config, &discourse, &backup_path, dry_run),
         },
 
-        Commands::Palette { command } => match command {
-            PaletteCommand::List {
-                discourse,
-                format,
-                verbose,
-            } => commands::palette::palette_list(&config, &discourse, format, verbose),
-
-            PaletteCommand::Pull {
-                discourse,
-                palette_id,
-                local_path,
-            } => commands::palette::palette_pull(
-                &config,
-                &discourse,
-                palette_id,
-                local_path.as_deref(),
-            ),
-
-            PaletteCommand::Push {
-                discourse,
-                local_path,
-                palette_id,
-            } => commands::palette::palette_push(&config, &discourse, &local_path, palette_id),
-        },
+        Commands::Palette { command } => {
+            eprintln!(
+                "note: `dsc palette` is deprecated and will move under `dsc theme palette`; \
+                 please use `dsc theme palette` instead."
+            );
+            run_palette(&config, command)
+        }
 
         Commands::Plugin { command } => match command {
             PluginCommand::List {
@@ -675,6 +680,7 @@ fn main() -> Result<()> {
                 false,
                 dry_run,
             ),
+            ThemeCommand::Palette { command } => run_palette(&config, command),
         },
 
         Commands::Setting {

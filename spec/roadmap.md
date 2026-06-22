@@ -67,9 +67,9 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 ### CLI papercuts and finishing touches
 
 - [x] **Universal JSON output** - `setting get`, `theme setting get`, `theme duplicate`, `topic reply`, and `topic new` now accept `--format text|json|yaml` via a shared `emit_result()` helper in `commands/common.rs`. Single-value commands emit a small structured object (e.g. `{"topic_id":…,"post_id":…}`) for scripting.
-- [ ] **`palette` → `theme palette`** with a deprecation alias. Lower priority; treat as a focused patch.
+- [x] **`palette` → `theme palette`** - palettes now live under `dsc theme palette` (shared `run_palette()` dispatch). The top-level `dsc palette …` still works as a deprecated alias and prints a one-line migration notice to stderr.
 - [x] **Emoji filename preservation** - `dsc emoji push <dir>` now derives the emoji name as `slugify(stem)` (hyphens preserved), so `google-drive.svg` uploads as `google-drive` instead of the previous `google_drive`. Discourse's custom-emoji charset accepts hyphens.
-- [ ] **`api-key create --scope <scopes>`** - scoped admin API keys (e.g. `--scope topics:write,users:read`). The existing `dsc api-key create` only mints full-admin keys.
+- [ ] **`api-key create --scope <scopes>`** - scoped admin API keys (e.g. `--scope topics:write,users:read`). The existing `dsc api-key create` only mints full-admin keys. **Blocked on API shape:** Discourse's scoped-key creation uses a nested `key[scopes][][resource_name]` / `key[scopes][][action]` form structure that isn't captured anywhere; confirm the exact `POST /admin/api/keys.json` body for a scoped key against a live forum (ideally captured by the field session) before implementing, to avoid minting broken keys.
 
 ### New command surfaces
 

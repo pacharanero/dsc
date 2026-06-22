@@ -802,6 +802,12 @@ pub enum ThemeCommand {
         /// Component (child theme) ID to detach.
         component_id: u64,
     },
+    /// Manage colour palettes (colour schemes). The canonical home for what
+    /// was `dsc palette`.
+    Palette {
+        #[command(subcommand)]
+        command: PaletteCommand,
+    },
 }
 
 #[derive(Subcommand)]
