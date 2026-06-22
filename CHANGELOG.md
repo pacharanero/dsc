@@ -5,6 +5,14 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.17] - 2026-06-22
+
+### Features
+
+- **theme**: Add `dsc theme show` for a richer single-theme view (theme mgmt Phase 3) ([c4b1dac](https://github.com/pacharanero/dsc/commit/c4b1dac1b09eb803dcfc2a9d5c4432d8618383d1))
+
+- **theme**: Component settings, enable/disable, attach/detach (theme mgmt Phase 1) ([8983c04](https://github.com/pacharanero/dsc/commit/8983c04fa34e848f8cadd6ce4cfeda922174ef75))
+
 ## [0.10.16] - 2026-06-22
 
 ### Features
