@@ -1,5 +1,11 @@
 # `dsc topic` - title and tag editing
 
+> **Status: Implemented (unreleased).** `dsc topic title` and `dsc topic tags`
+> ship, both honouring `--dry-run`; the reserved-slug `403` is surfaced with a
+> clear message. The "Future" front-matter-title enhancement is already
+> satisfied - `dsc category push` prefers the `title` field in a file's YAML
+> front matter when creating a topic.
+
 Spec for two missing `dsc topic` subcommands: `title` (rename a topic) and
 `tags` (set/replace a topic's tag list). Goal: allow the full topic
 metadata surface to be managed from the CLI without needing raw `curl`.

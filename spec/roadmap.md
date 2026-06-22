@@ -28,6 +28,8 @@ Specs marked ⭐ are **field-driven** - they came from real-world use and are in
 - [x] ⭐ **`dsc topic pull --full`** - full-thread Markdown snapshot with YAML frontmatter and per-post headings; batch-fetches via `/t/{id}/posts.json?post_ids[]=…`. Spec: [spec/topic-pull-full-thread.md](topic-pull-full-thread.md). Phase 2 (`--since`, `--format json`) still planned.
 - [x] ⭐ **Fix `dsc user list` parse failure on negative IDs** - Discourse's built-in `system`/`discobot` accounts use IDs `-1`/`-2`, which broke deserialisation on any listing page that contained them. Widened `UserSummary.id`, `UserDetail.id`, and every user-action helper signature from `u64` to `i64`. Spec: [spec/user-list-negative-ids.md](user-list-negative-ids.md). Regression-tested.
 
+- [x] ⭐ **`dsc topic title` + `dsc topic tags`** - rename a topic and set its full tag list atomically (both `PUT /t/{id}.json`). Field-driven by the `forum.rcpch.tech/c/playbook` migration, where 15 bulk-created topics had slug-derived titles. Reserved-slug `403` surfaced clearly; both honour `--dry-run`. Spec: [spec/topic-title-and-tags.md](topic-title-and-tags.md). (Note: the spec's "title from front matter on `category push` create" is already satisfied - `category push` prefers the front-matter `title` when creating.)
+
 ## In progress
 
 _(nothing currently in progress)_

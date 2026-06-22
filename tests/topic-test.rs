@@ -126,3 +126,97 @@ fn topic_sync() {
     });
     assert!(found, "marker not found after sync");
 }
+
+#[test]
+fn topic_title_roundtrip() {
+    let Some(test) = test_discourse() else {
+        return;
+    };
+    let Some(topic_id) = test.test_topic_id else {
+        return;
+    };
+    vprintln("e2e_topic_title_roundtrip: rename topic, verify, restore");
+    let config = to_config(&test);
+    let client = DiscourseClient::new(&config).expect("client");
+    let original = client
+        .fetch_topic(topic_id, false)
+        .expect("fetch topic")
+        .title
+        .expect("topic has a title");
+
+    let dir = TempDir::new().expect("tempdir");
+    let config_path = write_temp_config(
+        &dir,
+        &format!(
+            "[[discourse]]\nname = \"{}\"\nbaseurl = \"{}\"\napikey = \"{}\"\napi_username = \"{}\"\n",
+            test.name, test.baseurl, test.apikey, test.api_username
+        ),
+    );
+    let marker = format!("DSC E2E Title {}", Uuid::new_v4());
+    let output = run_dsc(
+        &["topic", "title", &test.name, &topic_id.to_string(), &marker],
+        &config_path,
+    );
+    assert!(
+        output.status.success(),
+        "topic title failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let now = client
+        .fetch_topic(topic_id, false)
+        .expect("re-fetch topic")
+        .title
+        .unwrap_or_default();
+    assert_eq!(now, marker, "title was not applied");
+
+    // Restore the original title so the test leaves no trace.
+    let restore = run_dsc(
+        &["topic", "title", &test.name, &topic_id.to_string(), &original],
+        &config_path,
+    );
+    assert!(
+        restore.status.success(),
+        "restoring original title failed: {}",
+        String::from_utf8_lossy(&restore.stderr)
+    );
+}
+
+#[test]
+fn topic_tags_dry_run() {
+    let Some(test) = test_discourse() else {
+        return;
+    };
+    let Some(topic_id) = test.test_topic_id else {
+        return;
+    };
+    vprintln("e2e_topic_tags_dry_run: dry-run set tags must not write");
+    let dir = TempDir::new().expect("tempdir");
+    let config_path = write_temp_config(
+        &dir,
+        &format!(
+            "[[discourse]]\nname = \"{}\"\nbaseurl = \"{}\"\napikey = \"{}\"\napi_username = \"{}\"\n",
+            test.name, test.baseurl, test.apikey, test.api_username
+        ),
+    );
+    let output = run_dsc(
+        &[
+            "-n",
+            "topic",
+            "tags",
+            &test.name,
+            &topic_id.to_string(),
+            "dsc-e2e-probe",
+        ],
+        &config_path,
+    );
+    assert!(
+        output.status.success(),
+        "topic tags --dry-run failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("[dry-run]") && stdout.contains("would set tags"),
+        "expected dry-run tags notice, got: {stdout}"
+    );
+}

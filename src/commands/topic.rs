@@ -6,8 +6,8 @@ use crate::commands::common::{emit_result, ensure_api_credentials, select_discou
 use crate::config::Config;
 use serde_json::json;
 use crate::utils::{
-    current_utc_iso8601, read_markdown, resolve_topic_path, strip_frontmatter, write_markdown,
-    yaml_scalar,
+    current_utc_iso8601, read_markdown, resolve_topic_path, slugify, strip_frontmatter,
+    write_markdown, yaml_scalar,
 };
 use anyhow::{Context, Result, anyhow};
 use std::fs;
@@ -287,6 +287,93 @@ pub fn topic_new(
         &json!({ "topic_id": topic_id, "category_id": category_id }),
         &format!("Created topic {} in category {}", topic_id, category_id),
     )
+}
+
+/// Rename a topic's title (`PUT /t/{id}.json` with `title=`). Renaming
+/// changes the slug, so the topic URL changes too - the user is warned.
+pub fn topic_title(
+    config: &Config,
+    discourse_name: &str,
+    topic_id: u64,
+    title: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    if title.trim().is_empty() {
+        return Err(anyhow!("new title is empty"));
+    }
+    let topic = client.fetch_topic(topic_id, false)?;
+    let old_title = topic.title.as_deref().unwrap_or("(unknown)");
+    let old_slug = topic.slug.as_deref().unwrap_or("topic");
+    let new_slug = slugify(title);
+    let url_note = if old_slug != new_slug {
+        format!(
+            "note: topic URL {} change from /t/{}/{} to /t/{}/{}",
+            if dry_run { "would" } else { "changed" },
+            old_slug,
+            topic_id,
+            new_slug,
+            topic_id
+        )
+    } else {
+        String::new()
+    };
+
+    if dry_run {
+        println!(
+            "[dry-run] {}: would rename topic {}: \"{}\" → \"{}\"",
+            discourse.name, topic_id, old_title, title
+        );
+        if !url_note.is_empty() {
+            println!("{}", url_note);
+        }
+        return Ok(());
+    }
+
+    client.set_topic_title(topic_id, title)?;
+    println!("renamed topic {}: \"{}\" → \"{}\"", topic_id, old_title, title);
+    if !url_note.is_empty() {
+        println!("{}", url_note);
+    }
+    Ok(())
+}
+
+/// Replace a topic's full tag list (`PUT /t/{id}.json` with `tags[]=`).
+/// Passing zero tags clears all tags. Unlike `topic tag`/`untag` (which add
+/// or remove one tag), this sets the list atomically.
+pub fn topic_tags(
+    config: &Config,
+    discourse_name: &str,
+    topic_id: u64,
+    tags: &[String],
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let current = client.fetch_topic_tags(topic_id)?;
+
+    if dry_run {
+        println!(
+            "[dry-run] {}: would set tags on topic {}: [{}] → [{}]",
+            discourse.name,
+            topic_id,
+            current.join(", "),
+            tags.join(", ")
+        );
+        return Ok(());
+    }
+
+    let after = client.set_topic_tags(topic_id, tags)?;
+    println!(
+        "tags set on topic {}: [{}] → [{}]",
+        topic_id,
+        current.join(", "),
+        after.join(", ")
+    );
+    Ok(())
 }
 
 fn read_reply_input(local_path: Option<&Path>) -> Result<String> {

@@ -126,3 +126,37 @@ dsc search myforum "status:open category:bugs" --format json \
 # Preview removal without committing
 dsc -n topic untag myforum 1525 archived
 ```
+
+## dsc topic title
+
+```text
+dsc topic title <discourse> <topic-id> <title>
+```
+
+Renames a topic's title in place (`PUT /t/{id}.json`). Prints the old and new title, and - because the title drives the URL slug - a note when the topic URL changes. Supports `--dry-run`.
+
+Useful after a `dsc category push` that created topics with slug-derived titles (e.g. `git-overview`):
+
+```bash
+dsc topic title myforum 723 "Get Git: an overview of our workflow"
+# renamed topic 723: "git-overview" → "Get Git: an overview of our workflow"
+# note: topic URL changed from /t/git-overview/723 to /t/get-git-an-overview-of-our-workflow/723
+```
+
+Discourse reserves some slugs (`contact`, `about`, …) as system routes; renaming a topic with a reserved slug returns a clear error instead of failing silently.
+
+## dsc topic tags
+
+```text
+dsc topic tags <discourse> <topic-id> [<tag>...]
+```
+
+Sets a topic's **full** tag list atomically, replacing any existing tags (`PUT /t/{id}.json`). Pass no tags to clear all tags. This differs from `topic tag`/`topic untag`, which add or remove a single tag. Supports `--dry-run`.
+
+```bash
+# Initialise tags on a freshly-created topic
+dsc topic tags myforum 723 git developer-guide
+
+# Clear all tags
+dsc topic tags myforum 723
+```

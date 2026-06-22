@@ -194,6 +194,28 @@ impl DiscourseClient {
         Ok(url)
     }
 
+    /// Rename a topic via `PUT /t/{id}.json` with `title=`. Surfaces
+    /// Discourse's reserved-slug `403` (e.g. a topic whose slug is `contact`,
+    /// a system route) with a clear message rather than the generic forbidden
+    /// error.
+    pub fn set_topic_title(&self, topic_id: u64, title: &str) -> Result<()> {
+        let path = format!("/t/{}.json", topic_id);
+        let payload = [("title", title)];
+        let response = self.send_retrying(|| Ok(self.put(&path)?.form(&payload)))?;
+        let status = response.status();
+        let text = response.text().context("reading set-title response body")?;
+        if status == reqwest::StatusCode::FORBIDDEN {
+            return Err(anyhow!(
+                "topic {} title cannot be changed (reserved slug or insufficient permission)",
+                topic_id
+            ));
+        }
+        if !status.is_success() {
+            return Err(http_error("set title request", status, &text));
+        }
+        Ok(())
+    }
+
     /// Update a post by ID. `opts` controls Discourse's edit side effects
     /// (topic bump, revision history); [`PostEditOptions::default`] applies a
     /// normal edit.

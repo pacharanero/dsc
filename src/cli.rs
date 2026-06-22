@@ -457,6 +457,25 @@ pub enum TopicCommand {
         /// Tag to remove.
         tag: String,
     },
+    /// Rename a topic's title (changes its URL slug). Honours `--dry-run`.
+    Title {
+        /// Discourse name.
+        discourse: String,
+        /// Topic ID.
+        topic_id: u64,
+        /// New title.
+        title: String,
+    },
+    /// Set a topic's full tag list, replacing existing tags. Pass no tags to
+    /// clear all tags. Honours `--dry-run`.
+    Tags {
+        /// Discourse name.
+        discourse: String,
+        /// Topic ID.
+        topic_id: u64,
+        /// Tags to set (space-separated; omit to clear all tags).
+        tags: Vec<String>,
+    },
 }
 
 #[derive(Subcommand)]

@@ -224,6 +224,18 @@ fn main() -> Result<()> {
                 topic_id,
                 tag,
             } => commands::tag::tag_remove(&config, &discourse, topic_id, &tag, dry_run),
+
+            TopicCommand::Title {
+                discourse,
+                topic_id,
+                title,
+            } => commands::topic::topic_title(&config, &discourse, topic_id, &title, dry_run),
+
+            TopicCommand::Tags {
+                discourse,
+                topic_id,
+                tags,
+            } => commands::topic::topic_tags(&config, &discourse, topic_id, &tags, dry_run),
         },
 
         Commands::Category { command } => match command {
