@@ -74,10 +74,10 @@ Timestamps of both copies are shown before proceeding. Pass `--yes` (or `-y`) to
 ## dsc topic reply
 
 ```text
-dsc topic reply <discourse> <topic-id> [<local-path>]
+dsc topic reply <discourse> <topic-id> [<local-path>] [--format text|json|yaml]
 ```
 
-Posts a new reply at the end of the topic. Reads from `<local-path>` if given, otherwise from stdin (equivalent to passing `-`).
+Posts a new reply at the end of the topic. Reads from `<local-path>` if given, otherwise from stdin (equivalent to passing `-`). `--format json` emits `{"topic_id": ..., "post_id": ...}` for scripting.
 
 Examples:
 
@@ -89,10 +89,10 @@ git log --since=yesterday --oneline | dsc topic reply myforum 1525
 ## dsc topic new
 
 ```text
-dsc topic new <discourse> <category-id> --title <title> [<local-path>]
+dsc topic new <discourse> <category-id> --title <title> [<local-path>] [--format text|json|yaml]
 ```
 
-Creates a new topic in the given category with the specified title. Reads the body from `<local-path>` if given, otherwise from stdin.
+Creates a new topic in the given category with the specified title. Reads the body from `<local-path>` if given, otherwise from stdin. `--format json` emits `{"topic_id": ..., "category_id": ...}` for scripting.
 
 Examples:
 

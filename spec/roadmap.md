@@ -66,7 +66,7 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 
 ### CLI papercuts and finishing touches
 
-- [ ] **Universal JSON output** - the few mutating commands that still produce only single-value text (`setting get`, `theme duplicate`, `topic reply/new`) should accept `--format json|yaml`. Already easy to pipe; revisit when a user reports the papercut.
+- [x] **Universal JSON output** - `setting get`, `theme setting get`, `theme duplicate`, `topic reply`, and `topic new` now accept `--format text|json|yaml` via a shared `emit_result()` helper in `commands/common.rs`. Single-value commands emit a small structured object (e.g. `{"topic_id":…,"post_id":…}`) for scripting.
 - [ ] **`palette` → `theme palette`** with a deprecation alias. Lower priority; treat as a focused patch.
 - [ ] **Emoji filename preservation** - bulk uploads via `dsc emoji push <dir>` currently rename `google-drive.svg` to `google_drive` (Discourse normalises). Predictable behaviour would preserve the stem-minus-extension as the emoji name where Discourse permits.
 - [ ] **`api-key create --scope <scopes>`** - scoped admin API keys (e.g. `--scope topics:write,users:read`). The existing `dsc api-key create` only mints full-admin keys.

@@ -13,10 +13,10 @@ Lists all site settings (name and value only). For a richer snapshot including d
 ## dsc setting get
 
 ```
-dsc setting get <discourse> <setting>
+dsc setting get <discourse> <setting> [--format text|json|yaml]
 ```
 
-Gets the value of a site setting. Output is the raw value on stdout, suitable for piping.
+Gets the value of a site setting. Text output (default) is the raw value on stdout, suitable for piping. `--format json` (or `yaml`) emits a structured `{"setting": ..., "value": ...}` object.
 
 ## dsc setting set
 

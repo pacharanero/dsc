@@ -166,11 +166,13 @@ fn main() -> Result<()> {
                 discourse,
                 topic_id,
                 local_path,
+                format,
             } => commands::topic::topic_reply(
                 &config,
                 &discourse,
                 topic_id,
                 local_path.as_deref(),
+                format,
             ),
 
             TopicCommand::New {
@@ -178,6 +180,7 @@ fn main() -> Result<()> {
                 category_id,
                 title,
                 local_path,
+                format,
             } => commands::topic::topic_new(
                 &config,
                 &discourse,
@@ -185,6 +188,7 @@ fn main() -> Result<()> {
                 &title,
                 local_path.as_deref(),
                 dry_run,
+                format,
             ),
 
             TopicCommand::Tag {
@@ -611,7 +615,8 @@ fn main() -> Result<()> {
             ThemeCommand::Duplicate {
                 discourse,
                 theme_id,
-            } => commands::theme::theme_duplicate(&config, &discourse, theme_id),
+                format,
+            } => commands::theme::theme_duplicate(&config, &discourse, theme_id, format),
             ThemeCommand::Show {
                 discourse,
                 theme_id,
@@ -627,7 +632,8 @@ fn main() -> Result<()> {
                     discourse,
                     theme_id,
                     key,
-                } => commands::theme::theme_setting_get(&config, &discourse, theme_id, &key),
+                    format,
+                } => commands::theme::theme_setting_get(&config, &discourse, theme_id, &key, format),
                 ThemeSettingCommand::Set {
                     discourse,
                     theme_id,
@@ -716,8 +722,13 @@ fn main() -> Result<()> {
         }
 
         Commands::Setting {
-            command: SettingCommand::Get { discourse, setting },
-        } => commands::setting::get_site_setting(&config, &discourse, &setting),
+            command:
+                SettingCommand::Get {
+                    discourse,
+                    setting,
+                    format,
+                },
+        } => commands::setting::get_site_setting(&config, &discourse, &setting, format),
 
         Commands::Setting {
             command:

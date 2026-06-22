@@ -419,6 +419,9 @@ pub enum TopicCommand {
         topic_id: u64,
         /// Input file path. Reads stdin when omitted or `-`.
         local_path: Option<PathBuf>,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
     },
     /// Create a new topic in a category, body from a file or stdin.
     #[command(visible_alias = "n")]
@@ -432,6 +435,9 @@ pub enum TopicCommand {
         title: String,
         /// Input file path. Reads stdin when omitted or `-`.
         local_path: Option<PathBuf>,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
     },
     /// Add a tag to a topic.
     Tag {
@@ -745,6 +751,9 @@ pub enum ThemeCommand {
         discourse: String,
         /// Theme ID to duplicate (from `dsc theme list`).
         theme_id: u64,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
     },
     /// Show a richer view of one theme/component than `list`.
     Show {
@@ -816,6 +825,9 @@ pub enum ThemeSettingCommand {
         theme_id: u64,
         /// Setting key (the `setting` name from `theme setting list`).
         key: String,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
     },
     /// Set a single setting. Value is sent verbatim (pass JSON text for
     /// json-schema list settings). Honours global `--dry-run`.
@@ -1309,6 +1321,9 @@ pub enum SettingCommand {
         discourse: String,
         /// Setting key.
         setting: String,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
     },
 
     /// List all site settings.

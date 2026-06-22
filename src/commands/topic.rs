@@ -1,8 +1,10 @@
 use crate::api::DiscourseClient;
 use crate::api::PostEditOptions;
 use crate::api::TopicResponse;
-use crate::commands::common::{ensure_api_credentials, select_discourse};
+use crate::cli::ListFormat;
+use crate::commands::common::{emit_result, ensure_api_credentials, select_discourse};
 use crate::config::Config;
+use serde_json::json;
 use crate::utils::{
     current_utc_iso8601, read_markdown, resolve_topic_path, strip_frontmatter, write_markdown,
     yaml_scalar,
@@ -225,6 +227,7 @@ pub fn topic_reply(
     discourse_name: &str,
     topic_id: u64,
     local_path: Option<&Path>,
+    format: ListFormat,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
@@ -236,8 +239,11 @@ pub fn topic_reply(
     }
 
     let post_id = client.create_post(topic_id, &raw)?;
-    println!("Replied to topic {} (post id {})", topic_id, post_id);
-    Ok(())
+    emit_result(
+        format,
+        &json!({ "topic_id": topic_id, "post_id": post_id }),
+        &format!("Replied to topic {} (post id {})", topic_id, post_id),
+    )
 }
 
 pub fn topic_new(
@@ -247,6 +253,7 @@ pub fn topic_new(
     title: &str,
     local_path: Option<&Path>,
     dry_run: bool,
+    format: ListFormat,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
@@ -261,19 +268,25 @@ pub fn topic_new(
     }
 
     if dry_run {
-        println!(
-            "[dry-run] {}: would create topic in category {} titled \"{}\" ({} bytes of body)",
-            discourse.name,
-            category_id,
-            title,
-            raw.len()
+        return emit_result(
+            format,
+            &json!({ "dry_run": true, "category_id": category_id, "title": title }),
+            &format!(
+                "[dry-run] {}: would create topic in category {} titled \"{}\" ({} bytes of body)",
+                discourse.name,
+                category_id,
+                title,
+                raw.len()
+            ),
         );
-        return Ok(());
     }
 
     let topic_id = client.create_topic(category_id, title, &raw)?;
-    println!("Created topic {} in category {}", topic_id, category_id);
-    Ok(())
+    emit_result(
+        format,
+        &json!({ "topic_id": topic_id, "category_id": category_id }),
+        &format!("Created topic {} in category {}", topic_id, category_id),
+    )
 }
 
 fn read_reply_input(local_path: Option<&Path>) -> Result<String> {

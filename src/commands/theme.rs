@@ -1,6 +1,6 @@
 use crate::api::DiscourseClient;
 use crate::cli::ListFormat;
-use crate::commands::common::{ensure_api_credentials, not_found, select_discourse};
+use crate::commands::common::{emit_result, ensure_api_credentials, not_found, select_discourse};
 use crate::commands::update::run_ssh_command;
 use crate::config::{Config, DiscourseConfig};
 use crate::utils::slugify;
@@ -228,6 +228,7 @@ pub fn theme_duplicate(
     config: &Config,
     discourse_name: &str,
     theme_id: u64,
+    format: ListFormat,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
@@ -248,8 +249,7 @@ pub fn theme_duplicate(
     push_data["default"] = Value::Bool(false);
 
     let new_id = client.create_theme(&push_data)?;
-    println!("{}", new_id);
-    Ok(())
+    emit_result(format, &json!({ "id": new_id }), &new_id.to_string())
 }
 
 /// Build a payload suitable for creating or updating a theme.
@@ -377,6 +377,7 @@ pub fn theme_setting_get(
     discourse_name: &str,
     theme_id: u64,
     key: &str,
+    format: ListFormat,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
@@ -392,8 +393,11 @@ pub fn theme_setting_get(
         })
         .ok_or_else(|| not_found("theme setting", key))?;
     let value = setting.get("value").cloned().unwrap_or(Value::Null);
-    println!("{}", value_display(&value));
-    Ok(())
+    emit_result(
+        format,
+        &json!({ "setting": key, "value": value }),
+        &value_display(&value),
+    )
 }
 
 /// Set a single theme/component setting. The value is sent verbatim, so a

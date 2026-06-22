@@ -81,6 +81,34 @@ fn setting_get() {
 }
 
 #[test]
+fn setting_get_json() {
+    let Some(test) = test_discourse() else {
+        return;
+    };
+    vprintln("e2e_setting_get_json: --format json emits a structured object");
+    let dir = TempDir::new().expect("tempdir");
+    let config_path = make_config(&dir, &test);
+    let output = run_dsc(
+        &["setting", "get", &test.name, "title", "--format", "json"],
+        &config_path,
+    );
+    assert!(
+        output.status.success(),
+        "setting get --format json failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // The object shape must be present regardless of the live value.
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("setting get --format json should emit JSON");
+    assert_eq!(
+        parsed.get("setting").and_then(|v| v.as_str()),
+        Some("title")
+    );
+    assert!(parsed.get("value").is_some(), "expected a value key");
+}
+
+#[test]
 fn setting_get_missing() {
     let Some(test) = test_discourse() else {
         return;

@@ -51,10 +51,10 @@ Pushes a local JSON theme file to a Discourse instance.
 ## dsc theme duplicate
 
 ```
-dsc theme duplicate <discourse> <theme-id>
+dsc theme duplicate <discourse> <theme-id> [--format text|json|yaml]
 ```
 
-Duplicates the specified theme and prints the new theme ID. The copy is named `Copy of <original name>` and is not set as the default theme.
+Duplicates the specified theme and prints the new theme ID. The copy is named `Copy of <original name>` and is not set as the default theme. `--format json` emits `{"id": ...}`.
 
 ## dsc theme show
 
@@ -75,7 +75,7 @@ Read and write a single theme or component's **settings** - the typed key/value 
 
 ```
 dsc theme setting list <discourse> <theme-id> [--format text|json|yaml]
-dsc theme setting get  <discourse> <theme-id> <key>
+dsc theme setting get  <discourse> <theme-id> <key> [--format text|json|yaml]
 dsc theme setting set  <discourse> <theme-id> <key> <value>   [--dry-run]
 ```
 

@@ -1,8 +1,24 @@
 use crate::api::DiscourseClient;
+use crate::cli::ListFormat;
 use crate::config::{Config, DiscourseConfig, find_discourse};
 use anyhow::{Context, Result, anyhow};
+use serde::Serialize;
 use std::fmt::Display;
 use std::process::Command;
+
+/// Emit a single command result honouring `--format`. Text mode prints the
+/// human-readable `text`; json/yaml serialise `value`. Lets the otherwise
+/// single-value commands (`setting get`, `theme duplicate`, `topic reply`/
+/// `new`, …) participate in scripting pipelines without bespoke per-command
+/// formatting code.
+pub fn emit_result<T: Serialize>(format: ListFormat, value: &T, text: &str) -> Result<()> {
+    match format {
+        ListFormat::Text => println!("{}", text),
+        ListFormat::Json => println!("{}", serde_json::to_string_pretty(value)?),
+        ListFormat::Yaml => println!("{}", serde_yaml::to_string(value)?),
+    }
+    Ok(())
+}
 
 pub fn select_discourse<'a>(
     config: &'a Config,

@@ -1,6 +1,6 @@
 use crate::api::{DiscourseClient, SiteSettingDetail};
 use crate::cli::ListFormat;
-use crate::commands::common::{ensure_api_credentials, parse_tags, select_discourse};
+use crate::commands::common::{emit_result, ensure_api_credentials, parse_tags, select_discourse};
 use crate::config::{Config, DiscourseConfig};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -77,13 +77,21 @@ pub fn set_site_setting(
 }
 
 /// Get the current value of a single site setting.
-pub fn get_site_setting(config: &Config, discourse_name: &str, setting: &str) -> Result<()> {
+pub fn get_site_setting(
+    config: &Config,
+    discourse_name: &str,
+    setting: &str,
+    format: ListFormat,
+) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
     let value = client.fetch_site_setting(setting)?;
-    println!("{}", value);
-    Ok(())
+    emit_result(
+        format,
+        &serde_json::json!({ "setting": setting, "value": value }),
+        &value,
+    )
 }
 
 #[derive(Debug, Serialize)]
