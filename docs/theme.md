@@ -56,6 +56,19 @@ dsc theme duplicate <discourse> <theme-id>
 
 Duplicates the specified theme and prints the new theme ID. The copy is named `Copy of <original name>` and is not set as the default theme.
 
+## dsc theme show
+
+```
+dsc theme show <discourse> <theme-id> [--format text|json|yaml]
+```
+
+Shows a richer view of one theme/component than `list`: whether it's a theme or component, its enabled/default/user-selectable flags, colour scheme, parent themes, attached child components, settings count, and the editable field inventory (e.g. `common/scss`). Read-only.
+
+```bash
+dsc theme show accm 11
+dsc theme show accm 11 --format json
+```
+
 ## dsc theme setting
 
 Read and write a single theme or component's **settings** - the typed key/value pairs a component declares (e.g. a nav component's menu items). Distinct from `dsc setting`, which manages site-wide settings.

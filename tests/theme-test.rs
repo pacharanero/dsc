@@ -144,6 +144,51 @@ fn theme_pull_push() {
 }
 
 #[test]
+fn theme_show() {
+    let Some(test) = test_discourse() else {
+        return;
+    };
+    let Some(theme_id) = test.test_theme_id else {
+        return;
+    };
+    vprintln("e2e_theme_show: show a theme's detail (json)");
+    let dir = TempDir::new().expect("tempdir");
+    let config_path = write_temp_config(
+        &dir,
+        &format!(
+            "[[discourse]]\nname = \"{}\"\nbaseurl = \"{}\"\napikey = \"{}\"\napi_username = \"{}\"\n",
+            test.name, test.baseurl, test.apikey, test.api_username
+        ),
+    );
+    let output = run_dsc(
+        &[
+            "theme",
+            "show",
+            &test.name,
+            &theme_id.to_string(),
+            "--format",
+            "json",
+        ],
+        &config_path,
+    );
+    assert!(
+        output.status.success(),
+        "theme show failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("theme show should emit JSON");
+    assert_eq!(
+        parsed.get("id").and_then(|v| v.as_u64()),
+        Some(theme_id),
+        "theme show id should match requested theme"
+    );
+    assert!(parsed.get("settings_count").is_some(), "missing settings_count");
+    assert!(parsed.get("fields").is_some(), "missing fields inventory");
+}
+
+#[test]
 fn theme_setting_list() {
     let Some(test) = test_discourse() else {
         return;

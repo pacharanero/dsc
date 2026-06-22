@@ -506,6 +506,150 @@ pub fn theme_set_child(
     Ok(())
 }
 
+#[derive(Debug, Serialize)]
+struct ThemeRelation {
+    id: u64,
+    name: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ThemeShow {
+    id: u64,
+    name: String,
+    component: bool,
+    enabled: bool,
+    default: bool,
+    user_selectable: bool,
+    color_scheme_id: Option<u64>,
+    parent_themes: Vec<ThemeRelation>,
+    child_themes: Vec<ThemeRelation>,
+    settings_count: usize,
+    fields: Vec<String>,
+}
+
+/// Parse an array of `{id, name}` theme relations (child/parent themes),
+/// skipping entries missing an id.
+fn theme_relations(theme: &Value, key: &str) -> Vec<ThemeRelation> {
+    theme
+        .get(key)
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|r| {
+                    let id = r.get("id").and_then(|v| v.as_u64())?;
+                    let name = r
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    Some(ThemeRelation { id, name })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Inventory of editable `theme_fields` as `target/name` strings (e.g.
+/// `common/scss`). Parsed defensively so an unexpected entry shape just
+/// contributes nothing rather than erroring.
+fn theme_field_inventory(theme: &Value) -> Vec<String> {
+    theme
+        .get("theme_fields")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|f| {
+                    let name = f.get("name").and_then(|v| v.as_str())?;
+                    let target = f.get("target").and_then(|v| v.as_str()).unwrap_or("");
+                    if target.is_empty() {
+                        Some(name.to_string())
+                    } else {
+                        Some(format!("{}/{}", target, name))
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn build_theme_show(theme: &Value, theme_id: u64) -> ThemeShow {
+    ThemeShow {
+        id: theme.get("id").and_then(|v| v.as_u64()).unwrap_or(theme_id),
+        name: theme
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string(),
+        component: theme.get("component").and_then(|v| v.as_bool()).unwrap_or(false),
+        enabled: theme.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false),
+        default: theme.get("default").and_then(|v| v.as_bool()).unwrap_or(false),
+        user_selectable: theme
+            .get("user_selectable")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        color_scheme_id: theme.get("color_scheme_id").and_then(|v| v.as_u64()),
+        parent_themes: theme_relations(theme, "parent_themes"),
+        child_themes: theme_relations(theme, "child_themes"),
+        settings_count: theme_setting_entries(theme).len(),
+        fields: theme_field_inventory(theme),
+    }
+}
+
+fn format_relations(rels: &[ThemeRelation]) -> String {
+    if rels.is_empty() {
+        "(none)".to_string()
+    } else {
+        rels.iter()
+            .map(|r| format!("{} - {}", r.id, r.name))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+/// Show a richer view of one theme/component than `theme list`: type, enabled
+/// and default flags, parents, attached children, settings count, and the
+/// editable field inventory.
+pub fn theme_show(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    format: ListFormat,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let show = build_theme_show(theme, theme_id);
+    match format {
+        ListFormat::Json => println!("{}", serde_json::to_string_pretty(&show)?),
+        ListFormat::Yaml => println!("{}", serde_yaml::to_string(&show)?),
+        ListFormat::Text => {
+            println!("{} - {}", show.id, show.name);
+            println!(
+                "  type:            {}",
+                if show.component { "component" } else { "theme" }
+            );
+            println!("  enabled:         {}", show.enabled);
+            println!("  default:         {}", show.default);
+            println!("  user-selectable: {}", show.user_selectable);
+            if let Some(cs) = show.color_scheme_id {
+                println!("  color scheme:    {}", cs);
+            }
+            println!("  parents:         {}", format_relations(&show.parent_themes));
+            println!("  children:        {}", format_relations(&show.child_themes));
+            println!("  settings:        {}", show.settings_count);
+            let fields = if show.fields.is_empty() {
+                "(none)".to_string()
+            } else {
+                show.fields.join(", ")
+            };
+            println!("  fields:          {}", fields);
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -549,5 +693,57 @@ mod tests {
     #[test]
     fn theme_setting_entries_empty_when_absent() {
         assert!(theme_setting_entries(&json!({ "name": "no settings" })).is_empty());
+    }
+
+    #[test]
+    fn theme_relations_parses_id_name_pairs() {
+        let theme = json!({
+            "child_themes": [
+                { "id": 8, "name": "Header Submenus" },
+                { "id": 14, "name": "Dropdown Header" },
+                { "name": "no id, skipped" }
+            ]
+        });
+        let rels = theme_relations(&theme, "child_themes");
+        assert_eq!(rels.len(), 2);
+        assert_eq!(rels[0].id, 8);
+        assert_eq!(rels[1].name, "Dropdown Header");
+        assert!(theme_relations(&theme, "parent_themes").is_empty());
+    }
+
+    #[test]
+    fn theme_field_inventory_joins_target_and_name() {
+        let theme = json!({
+            "theme_fields": [
+                { "target": "common", "name": "scss", "value": "body{}" },
+                { "target": "desktop", "name": "scss", "value": "" },
+                { "target": "", "name": "extra_js", "value": "" },
+                { "value": "no name, skipped" }
+            ]
+        });
+        let fields = theme_field_inventory(&theme);
+        assert_eq!(fields, vec!["common/scss", "desktop/scss", "extra_js"]);
+    }
+
+    #[test]
+    fn build_theme_show_summarises_core_fields() {
+        let theme = json!({
+            "id": 11,
+            "name": "kitchen-customisations",
+            "component": false,
+            "enabled": true,
+            "default": false,
+            "user_selectable": true,
+            "child_themes": [{ "id": 14, "name": "Dropdown Header" }],
+            "settings": [{ "setting": "links_position", "value": "left" }],
+            "theme_fields": [{ "target": "common", "name": "scss", "value": "x" }]
+        });
+        let show = build_theme_show(&theme, 11);
+        assert_eq!(show.id, 11);
+        assert!(!show.component);
+        assert!(show.enabled);
+        assert_eq!(show.child_themes.len(), 1);
+        assert_eq!(show.settings_count, 1);
+        assert_eq!(show.fields, vec!["common/scss"]);
     }
 }

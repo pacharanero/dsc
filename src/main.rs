@@ -612,6 +612,11 @@ fn main() -> Result<()> {
                 discourse,
                 theme_id,
             } => commands::theme::theme_duplicate(&config, &discourse, theme_id),
+            ThemeCommand::Show {
+                discourse,
+                theme_id,
+                format,
+            } => commands::theme::theme_show(&config, &discourse, theme_id, format),
             ThemeCommand::Setting { command } => match command {
                 ThemeSettingCommand::List {
                     discourse,

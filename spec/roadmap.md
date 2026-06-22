@@ -76,7 +76,7 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 - [ ] ⭐ **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Phase 1 implemented (unreleased). Spec: [spec/theme-management.md](theme-management.md)
   - [x] Phase 1: `dsc theme setting` (get/set/list) + `dsc theme enable|disable|attach|detach`
   - [ ] Phase 2: `dsc theme field pull/push` + `dsc theme asset set/list`
-  - [ ] Phase 3: `dsc theme show` + `dsc theme update` (remote component refresh)
+  - [ ] Phase 3: `dsc theme show` ✅ + `dsc theme update` (remote component refresh) — `theme show` done, `theme update` planned
 - [ ] **`dsc chat`** - Discourse Chat is core now and the API is there. Subcommands: `chat channels`, `chat send <discourse> <channel> [<file>]`, `chat fetch <channel> [--since …]`. Mirrors the existing `dsc topic`/`pm` split.
 - [ ] **`dsc install <name> --host <host>`** - declarative Discourse provisioning on a `dsc harden`-prepared box. Spec: [spec/install.md](install.md). Includes: templated `app.yml`, `launcher bootstrap + start`, polls `/about.json` until ready, appends the new install to `dsc.toml`. Companion to `dsc harden` (the substrate) and `dsc update` (the steady-state).
 - [ ] **`dsc harden` stage 3 finishing items** - timezone/swap/journald/unattended-upgrades/fail2ban/rootless-Docker/ufw. Config keys are already wired in [src/commands/harden.rs](../src/commands/harden.rs); remaining work is the SSH-side execution and tests. See [spec/install.md](install.md) for gotchas (rootlesskit `cap_net_bind_service`, `loginctl enable-linger`, cloud firewall caveat).

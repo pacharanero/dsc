@@ -746,6 +746,16 @@ pub enum ThemeCommand {
         /// Theme ID to duplicate (from `dsc theme list`).
         theme_id: u64,
     },
+    /// Show a richer view of one theme/component than `list`.
+    Show {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID (from `dsc theme list`).
+        theme_id: u64,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
     /// Read and write a theme/component's settings (not site settings).
     Setting {
         #[command(subcommand)]
