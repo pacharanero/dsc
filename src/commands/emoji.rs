@@ -377,8 +377,11 @@ fn emoji_name_from_path(path: &Path) -> Result<String> {
         .file_stem()
         .and_then(|s| s.to_str())
         .ok_or_else(|| anyhow!("emoji path missing filename: {}", path.display()))?;
-    let slug = slugify(stem);
-    let name = slug.replace('-', "_");
+    // Preserve the file stem as the emoji name as closely as Discourse allows.
+    // `slugify` already lowercases and yields the `[a-z0-9-]` shape Discourse
+    // accepts for custom emoji (hyphens included), so `google-drive.svg`
+    // becomes `google-drive` rather than the previous `google_drive`.
+    let name = slugify(stem);
     if name.is_empty() {
         return Err(anyhow!("emoji name is empty for {}", path.display()));
     }
@@ -416,8 +419,30 @@ fn is_duplicate_emoji_error(err: &anyhow::Error) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_duplicate_emoji_error;
+    use super::{emoji_name_from_path, is_duplicate_emoji_error};
     use anyhow::anyhow;
+    use std::path::Path;
+
+    #[test]
+    fn emoji_name_preserves_hyphens_from_stem() {
+        // Regression: previously hyphens were forced to underscores.
+        assert_eq!(
+            emoji_name_from_path(Path::new("/x/google-drive.svg")).unwrap(),
+            "google-drive"
+        );
+        assert_eq!(
+            emoji_name_from_path(Path::new("partytime.gif")).unwrap(),
+            "partytime"
+        );
+    }
+
+    #[test]
+    fn emoji_name_slugifies_spaces_and_case() {
+        assert_eq!(
+            emoji_name_from_path(Path::new("My Cool Emoji.png")).unwrap(),
+            "my-cool-emoji"
+        );
+    }
 
     #[test]
     fn duplicate_error_is_detected() {

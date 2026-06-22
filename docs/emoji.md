@@ -18,7 +18,7 @@ Downloads all custom emoji from the instance into `output-dir`. Images are saved
 dsc emoji push <discourse> <emoji-path> [emoji-name]
 ```
 
-Adds a new emoji from a local image file (alias: `dsc emoji add`). If `emoji-name` is omitted, the filename stem is used (slugified; dashes converted to underscores).
+Adds a new emoji from a local image file (alias: `dsc emoji add`). If `emoji-name` is omitted, the filename stem is used, slugified to Discourse's accepted shape (lowercased, hyphens preserved) - so `google-drive.svg` becomes `google-drive`.
 
 If `emoji-path` is a directory, uploads all `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg` files using the filename stem as the emoji name.
 
