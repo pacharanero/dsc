@@ -56,13 +56,13 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 
 ## Planned
 
-- [ ] ⭐ **`category pull/push` workflow gaps + silent push** — five gaps; phases 1–4 implemented (unreleased). Spec: [spec/category-workflow.md](category-workflow.md)
+- [ ] ⭐ **`category pull/push` workflow gaps + silent push** — five gaps; phases 1–4 + 6 implemented (unreleased). Only Phase 5 (MkDocs↔Discourse content conversion) remains. Spec: [spec/category-workflow.md](category-workflow.md)
   - [x] Phase 1: `category pull` writes YAML front matter (`title`, `topic_id`, `url`, `pulled_at`) + `strip_frontmatter()` in `utils.rs`
-  - [x] Phase 2: `category push` routes by front-matter `topic_id`; strips front matter before sending body
+  - [x] Phase 2: `category push` routes by front-matter `topic_id`; strips front matter before sending body (also `topic push`)
   - [x] Phase 3: working `--dry-run` for `category push` with `~`/`+`/`=` output
   - [x] Phase 4: `--updates-only` flag errors instead of silently creating on mismatch
   - [ ] Phase 5: `--convert-admonitions` and `--rewrite-links` flags on push/pull (MkDocs↔Discourse portability)
-  - [ ] Phase 6: `--no-bump` (suppress activity-feed bump on edit) and `--skip-revision` on `topic push` / `category push`
+  - [x] Phase 6: `--no-bump` (suppress activity-feed bump on edit) and `--skip-revision` on `topic push` / `category push`; `PostEditOptions` threaded through `update_post()`
 
 ### CLI papercuts and finishing touches
 

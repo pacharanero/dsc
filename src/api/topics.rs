@@ -15,6 +15,18 @@ pub struct PostInfo {
     pub raw: Option<String>,
 }
 
+/// Side-effect controls for a post edit (`PUT /posts/{id}.json`). The default
+/// is an ordinary edit that bumps the topic and records a revision.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PostEditOptions {
+    /// Send `post[no_bump]=true` so the edit does not bump the topic to the
+    /// top of the category activity feed. For quiet maintenance edits.
+    pub no_bump: bool,
+    /// Send `post[skip_revision]=true` so the edit does not create a revision
+    /// (edit-history) entry. Suppresses the online audit trail; use sparingly.
+    pub skip_revision: bool,
+}
+
 /// Distilled row from /topics/private-messages-*.json.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PmTopicSummary {
@@ -182,10 +194,12 @@ impl DiscourseClient {
         Ok(url)
     }
 
-    /// Update a post by ID.
-    pub fn update_post(&self, post_id: u64, raw: &str) -> Result<()> {
+    /// Update a post by ID. `opts` controls Discourse's edit side effects
+    /// (topic bump, revision history); [`PostEditOptions::default`] applies a
+    /// normal edit.
+    pub fn update_post(&self, post_id: u64, raw: &str, opts: PostEditOptions) -> Result<()> {
         let path = format!("/posts/{}.json", post_id);
-        let payload = [("post[raw]", raw)];
+        let payload = post_edit_payload(raw, opts);
         let response = self.send_retrying(|| Ok(self.put(&path)?.form(&payload)))?;
         let status = response.status();
         if !status.is_success() {
@@ -288,5 +302,80 @@ impl DiscourseClient {
         let body: CreatePostResponse =
             serde_json::from_str(&text).context("parsing create post response")?;
         Ok(body.id)
+    }
+}
+
+/// Build the urlencoded form payload for a `PUT /posts/{id}.json` edit.
+/// Always sends `post[raw]`; `post[no_bump]` / `post[skip_revision]` are added
+/// only when requested, so a default edit is byte-for-byte what `dsc` sent
+/// before these options existed.
+fn post_edit_payload(raw: &str, opts: PostEditOptions) -> Vec<(&'static str, &str)> {
+    let mut payload: Vec<(&'static str, &str)> = vec![("post[raw]", raw)];
+    if opts.no_bump {
+        payload.push(("post[no_bump]", "true"));
+    }
+    if opts.skip_revision {
+        payload.push(("post[skip_revision]", "true"));
+    }
+    payload
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_edit_sends_only_raw() {
+        let payload = post_edit_payload("hello", PostEditOptions::default());
+        assert_eq!(payload, vec![("post[raw]", "hello")]);
+    }
+
+    #[test]
+    fn no_bump_adds_form_field() {
+        let payload = post_edit_payload(
+            "hi",
+            PostEditOptions {
+                no_bump: true,
+                skip_revision: false,
+            },
+        );
+        assert_eq!(
+            payload,
+            vec![("post[raw]", "hi"), ("post[no_bump]", "true")]
+        );
+    }
+
+    #[test]
+    fn skip_revision_adds_form_field() {
+        let payload = post_edit_payload(
+            "hi",
+            PostEditOptions {
+                no_bump: false,
+                skip_revision: true,
+            },
+        );
+        assert_eq!(
+            payload,
+            vec![("post[raw]", "hi"), ("post[skip_revision]", "true")]
+        );
+    }
+
+    #[test]
+    fn both_flags_add_both_fields() {
+        let payload = post_edit_payload(
+            "x",
+            PostEditOptions {
+                no_bump: true,
+                skip_revision: true,
+            },
+        );
+        assert_eq!(
+            payload,
+            vec![
+                ("post[raw]", "x"),
+                ("post[no_bump]", "true"),
+                ("post[skip_revision]", "true"),
+            ]
+        );
     }
 }

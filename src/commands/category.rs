@@ -1,4 +1,4 @@
-use crate::api::{CategoryInfo, DiscourseClient, TopicSummary};
+use crate::api::{CategoryInfo, DiscourseClient, PostEditOptions, TopicSummary};
 use crate::cli::ListFormat;
 use crate::commands::common::{ensure_api_credentials, not_found, select_discourse};
 use crate::config::Config;
@@ -195,6 +195,7 @@ pub fn category_push(
     local_path: &Path,
     dry_run: bool,
     updates_only: bool,
+    edit_opts: PostEditOptions,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
@@ -266,7 +267,7 @@ pub fn category_push(
         for action in &plan {
             match action {
                 PushAction::Update { post_id, body, .. } => {
-                    client.update_post(*post_id, body)?;
+                    client.update_post(*post_id, body, edit_opts)?;
                 }
                 PushAction::Create { title, body, .. } => {
                     client.create_topic(category_id, title, body)?;

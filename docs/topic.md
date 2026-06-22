@@ -50,10 +50,16 @@ Useful for archiving long discussions, feeding a complete conversation to an LLM
 ## dsc topic push
 
 ```text
-dsc topic push <discourse> <topic-id> <local-path>
+dsc topic push [OPTIONS] <discourse> <topic-id> <local-path>
 ```
 
-Pushes the local Markdown file up to the specified topic, updating it with the file contents.
+Pushes the local Markdown file up to the specified topic, updating its first post with the file contents. Any leading YAML front matter is stripped before sending, so a file annotated with a `---` block (or one carried over from `category pull`) pushes a clean body.
+
+Flags:
+
+- `-n`, `--dry-run` — describe the edit without sending it.
+- `--no-bump` — update the post without bumping the topic to the top of the activity feed (sends `post[no_bump]=true`). Use for silent maintenance edits.
+- `--skip-revision` — update without recording an edit-history revision (sends `post[skip_revision]=true`). Suppresses the online audit trail; use sparingly.
 
 ## dsc topic sync
 

@@ -1,4 +1,4 @@
-use crate::api::DiscourseClient;
+use crate::api::{DiscourseClient, PostEditOptions};
 use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
 use anyhow::{Context, Result, anyhow};
@@ -63,7 +63,7 @@ pub fn post_edit(
         return Ok(());
     }
 
-    client.update_post(post_id, &raw)?;
+    client.update_post(post_id, &raw, PostEditOptions::default())?;
     println!("Post {} updated", post_id);
     Ok(())
 }

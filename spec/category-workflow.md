@@ -1,6 +1,6 @@
 # `dsc category` pull/push workflow — gaps + admonition/URL conversion + silent push
 
-> **Status: Gaps 1–3 implemented (unreleased). Gap 4 and Gap 5 planned.**
+> **Status: Gaps 1–3 and 5 implemented (unreleased). Gap 4 planned.**
 > Surfaced from a real-world offline playbook sync workflow against
 > `forum.rcpch.tech`. Gaps 1–3 affect the `category pull` / `category push`
 > command pair. Gap 4 is content transformation for a single-source workflow.
@@ -12,7 +12,7 @@ Spec for five features in `dsc category pull` and `dsc category push`:
 2. **`category push` ignores `--dry-run`** ✅ implemented
 3. **`category push` silently creates new topics on slug mismatch** ✅ implemented
 4. **No admonition/URL conversion on pull/push** — planned
-5. **No `--no-bump` / `--skip-revision` for silent bulk edits** — planned
+5. **No `--no-bump` / `--skip-revision` for silent bulk edits** ✅ implemented
 
 ## Context: the real-world driver
 
@@ -505,10 +505,10 @@ From the Discourse source and Meta documentation:
 
 ### Phase 6 — `--no-bump` and `--skip-revision` flags (Gap 5)
 
-- [ ] Add `no_bump: bool` and `skip_revision: bool` parameters to `update_post()` in `src/api/topics.rs`.
-- [ ] Wire `--no-bump` flag through `topic push`, `category push` CLI → `category_push()` → `update_post()`.
-- [ ] Wire `--skip-revision` flag the same way (optional companion; document that it suppresses Discourse revision history).
-- [ ] Document in `dsc topic push --help`: "use `--no-bump` for silent maintenance edits to avoid churning the activity feed." — `strip_frontmatter()`
+- [x] Add a `PostEditOptions { no_bump, skip_revision }` parameter to `update_post()` in `src/api/topics.rs` (payload built by the unit-tested `post_edit_payload()`).
+- [x] Wire `--no-bump` flag through `topic push`, `category push` CLI → `topic_push()`/`category_push()` → `update_post()`.
+- [x] Wire `--skip-revision` flag the same way (optional companion; help text notes it suppresses Discourse revision history).
+- [x] Document in `dsc topic push --help`: "use `--no-bump` for silent maintenance edits to avoid churning the activity feed." — `strip_frontmatter()`
   returns an empty map and the full file content, and `find_topic_match()` is
   used as before. This covers files edited before this feature shipped and
   files added manually without a pull.

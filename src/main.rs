@@ -141,7 +141,19 @@ fn main() -> Result<()> {
                 discourse,
                 local_path,
                 topic_id,
-            } => commands::topic::topic_push(&config, &discourse, topic_id, &local_path, dry_run),
+                no_bump,
+                skip_revision,
+            } => commands::topic::topic_push(
+                &config,
+                &discourse,
+                topic_id,
+                &local_path,
+                dry_run,
+                dsc::api::PostEditOptions {
+                    no_bump,
+                    skip_revision,
+                },
+            ),
 
             TopicCommand::Sync {
                 discourse,
@@ -224,6 +236,8 @@ fn main() -> Result<()> {
                 local_path,
                 category,
                 updates_only,
+                no_bump,
+                skip_revision,
             } => commands::category::category_push(
                 &config,
                 &discourse,
@@ -231,6 +245,10 @@ fn main() -> Result<()> {
                 &local_path,
                 dry_run,
                 updates_only,
+                dsc::api::PostEditOptions {
+                    no_bump,
+                    skip_revision,
+                },
             ),
         },
 

@@ -1,9 +1,11 @@
 use crate::api::DiscourseClient;
+use crate::api::PostEditOptions;
 use crate::api::TopicResponse;
 use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
 use crate::utils::{
-    current_utc_iso8601, read_markdown, resolve_topic_path, write_markdown, yaml_scalar,
+    current_utc_iso8601, read_markdown, resolve_topic_path, strip_frontmatter, write_markdown,
+    yaml_scalar,
 };
 use anyhow::{Context, Result, anyhow};
 use std::fs;
@@ -133,6 +135,7 @@ pub fn topic_push(
     topic_id: u64,
     local_path: &Path,
     dry_run: bool,
+    edit_opts: PostEditOptions,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
@@ -141,21 +144,25 @@ pub fn topic_push(
     let post = topic
         .post_stream
         .posts
-        .get(0)
+        .first()
         .ok_or_else(|| anyhow!("topic has no posts"))?;
     let raw = read_markdown(local_path)?;
+    // Strip any YAML front matter so a manually-annotated file (or one carried
+    // over from a `category pull`) pushes a clean body — the `---` block is
+    // local-only metadata and must never reach the published post.
+    let (_front, body) = strip_frontmatter(&raw);
     if dry_run {
         println!(
             "[dry-run] {}: would replace OP of topic {} (post id {}) with {} bytes from {}",
             discourse.name,
             topic_id,
             post.id,
-            raw.len(),
+            body.len(),
             local_path.display()
         );
         return Ok(());
     }
-    client.update_post(post.id, &raw)?;
+    client.update_post(post.id, &body, edit_opts)?;
     Ok(())
 }
 
@@ -207,7 +214,7 @@ pub fn topic_sync(
         write_markdown(local_path, &raw)?;
     } else {
         let raw = read_markdown(local_path)?;
-        client.update_post(post.id, &raw)?;
+        client.update_post(post.id, &raw, PostEditOptions::default())?;
     }
 
     Ok(())

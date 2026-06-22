@@ -387,6 +387,15 @@ pub enum TopicCommand {
         topic_id: u64,
         /// Local Markdown file path.
         local_path: PathBuf,
+        /// Update the post without bumping the topic in the activity feed.
+        /// Use for silent maintenance edits (sends post[no_bump]=true).
+        #[arg(long)]
+        no_bump: bool,
+        /// Update the post without recording an edit-history revision
+        /// (sends post[skip_revision]=true). Suppresses the online audit
+        /// trail - use sparingly.
+        #[arg(long)]
+        skip_revision: bool,
     },
     /// Sync a topic and local Markdown file using newest timestamp.
     #[command(visible_alias = "sy")]
@@ -495,6 +504,15 @@ pub enum CategoryCommand {
         /// when a local file has no remote match.
         #[arg(long)]
         updates_only: bool,
+        /// Update posts without bumping their topics in the activity feed.
+        /// Use for silent bulk maintenance edits (sends post[no_bump]=true).
+        #[arg(long)]
+        no_bump: bool,
+        /// Update posts without recording edit-history revisions
+        /// (sends post[skip_revision]=true). Suppresses the online audit
+        /// trail - use sparingly.
+        #[arg(long)]
+        skip_revision: bool,
     },
 }
 
