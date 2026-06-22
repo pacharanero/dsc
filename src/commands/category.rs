@@ -2,7 +2,10 @@ use crate::api::{CategoryInfo, DiscourseClient, TopicSummary};
 use crate::cli::ListFormat;
 use crate::commands::common::{ensure_api_credentials, not_found, select_discourse};
 use crate::config::Config;
-use crate::utils::{ensure_dir, normalize_baseurl, read_markdown, slugify, write_markdown};
+use crate::utils::{
+    current_utc_iso8601, ensure_dir, normalize_baseurl, read_markdown, slugify, write_markdown,
+    yaml_scalar,
+};
 use anyhow::{Context, Result, anyhow};
 use std::fs;
 use std::path::Path;
@@ -131,14 +134,36 @@ pub fn category_pull(
         let raw = topic_detail
             .post_stream
             .posts
-            .get(0)
+            .first()
             .and_then(|p| p.raw.clone())
             .unwrap_or_default();
         let filename = format!("{}.md", slugify(&topic.title));
-        write_markdown(&dir.join(filename), &raw)?;
+        let contents = render_category_topic(&topic, &discourse.baseurl, &raw);
+        write_markdown(&dir.join(filename), &contents)?;
     }
     println!("{}", dir.display());
     Ok(())
+}
+
+/// Render one pulled topic as a Markdown document with YAML front matter
+/// (`title` / `topic_id` / `url` / `pulled_at`) followed by the OP's raw body.
+///
+/// The `topic_id` is the durable binding `category push` routes on, so edits
+/// to the title or filename no longer risk creating a duplicate topic. Mirrors
+/// the front matter written by `topic pull --full`.
+fn render_category_topic(topic: &TopicSummary, baseurl: &str, raw: &str) -> String {
+    let base = normalize_baseurl(baseurl);
+    let url = format!("{}/t/{}/{}", base, topic.slug, topic.id);
+    let mut out = String::new();
+    out.push_str("---\n");
+    out.push_str(&format!("title: {}\n", yaml_scalar(&topic.title)));
+    out.push_str(&format!("topic_id: {}\n", topic.id));
+    out.push_str(&format!("url: {}\n", url));
+    out.push_str(&format!("pulled_at: {}\n", current_utc_iso8601()));
+    out.push_str("---\n\n");
+    out.push_str(raw.trim_end());
+    out.push('\n');
+    out
 }
 
 pub fn category_push(
@@ -326,4 +351,45 @@ fn find_topic_match<'a>(
                 .map(|s| s.to_string_lossy().eq_ignore_ascii_case(&topic.slug))
                 .unwrap_or(false)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::strip_frontmatter;
+
+    fn summary(id: u64, title: &str, slug: &str) -> TopicSummary {
+        TopicSummary {
+            id,
+            title: title.to_string(),
+            slug: slug.to_string(),
+        }
+    }
+
+    #[test]
+    fn render_category_topic_emits_front_matter() {
+        let topic = summary(412, "Dependency management", "dependency-management");
+        let out = render_category_topic(&topic, "https://forum.rcpch.tech/", "Body here.\n");
+        assert!(out.starts_with("---\n"));
+        assert!(out.contains("title: Dependency management\n"));
+        assert!(out.contains("topic_id: 412\n"));
+        assert!(out.contains("url: https://forum.rcpch.tech/t/dependency-management/412\n"));
+        assert!(out.contains("pulled_at: "));
+        assert!(out.contains("\n---\n\nBody here.\n"));
+    }
+
+    #[test]
+    fn render_then_strip_round_trips_the_body() {
+        let topic = summary(7, "Intro: getting started", "intro-getting-started");
+        let body = "First paragraph.\n\n---\n\nSecond, after a rule.\n";
+        let rendered = render_category_topic(&topic, "https://x.test", body);
+        let (front, recovered) = strip_frontmatter(&rendered);
+        assert_eq!(front.get("topic_id").map(String::as_str), Some("7"));
+        // Title carrying a colon is round-tripped through YAML quoting.
+        assert_eq!(
+            front.get("title").map(String::as_str),
+            Some("Intro: getting started")
+        );
+        assert_eq!(recovered, body);
+    }
 }

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::fs;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -59,6 +60,149 @@ pub fn write_markdown(path: &Path, content: &str) -> Result<()> {
     }
     fs::write(path, content).with_context(|| format!("writing {}", path.display()))?;
     Ok(())
+}
+
+/// Quote a YAML scalar if it contains characters that would confuse the
+/// parser. Keeps simple values unquoted. Shared by every command that
+/// writes YAML front matter (`topic pull --full`, `category pull`).
+pub fn yaml_scalar(value: &str) -> String {
+    let needs_quoting = value.is_empty()
+        || value.contains(':')
+        || value.contains('#')
+        || value.contains('\n')
+        || value.starts_with(['-', '?', '!', '&', '*', '|', '>', '@', '`', '%', '\'', '"', '['])
+        || value.starts_with("  ");
+    if needs_quoting {
+        let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
+        format!("\"{}\"", escaped)
+    } else {
+        value.to_string()
+    }
+}
+
+/// Split a Markdown document into its leading YAML front matter (if any) and
+/// the body that follows.
+///
+/// Front matter is recognised only when the file's very first line is exactly
+/// `---` (an optional leading BOM is tolerated), terminated by a later line
+/// that is exactly `---`. The fenced block is parsed shallowly into a flat
+/// `key → value` map (one `key: value` pair per line; lines without a colon
+/// are ignored) — `dsc` front matter is intentionally shallow (`title`,
+/// `topic_id`, `url`, `pulled_at`), so a full YAML parse is unnecessary and a
+/// flat scan keeps the body intact.
+///
+/// Returns `(map, body)`. When there is no recognisable front matter the map
+/// is empty and the body is the original content unchanged, so callers can
+/// treat "no front matter" and "empty front matter" identically. One blank
+/// line separating the closing fence from the body is consumed (it mirrors
+/// what the `pull` side writes), giving a stable pull → push round-trip.
+///
+/// Note the inherent ambiguity shared with Jekyll/Hugo: a file with no front
+/// matter whose body genuinely opens with a `---` thematic break followed by
+/// another `---` will be misread as front matter. This is accepted; real
+/// snapshots written by `dsc` always carry proper front matter.
+pub fn strip_frontmatter(raw: &str) -> (HashMap<String, String>, String) {
+    let mut map = HashMap::new();
+    let text = raw.strip_prefix('\u{feff}').unwrap_or(raw);
+
+    let mut lines = text.lines();
+    if lines.next().map(str::trim_end) != Some("---") {
+        return (map, raw.to_string());
+    }
+
+    let mut body_lines: Vec<&str> = Vec::new();
+    let mut closed = false;
+    for line in &mut lines {
+        if line.trim_end() == "---" {
+            closed = true;
+            break;
+        }
+        if let Some((key, value)) = line.split_once(':') {
+            map.insert(key.trim().to_string(), unquote_yaml_scalar(value.trim()));
+        }
+    }
+
+    if !closed {
+        // Opening fence with no matching close: not front matter after all.
+        return (HashMap::new(), raw.to_string());
+    }
+
+    body_lines.extend(lines);
+    // Consume a single conventional blank line between fence and body.
+    if body_lines.first() == Some(&"") {
+        body_lines.remove(0);
+    }
+    let mut body = body_lines.join("\n");
+    if raw.ends_with('\n') && !body.is_empty() {
+        body.push('\n');
+    }
+    (map, body)
+}
+
+/// Inverse of [`yaml_scalar`]'s quoting: if `value` is wrapped in double
+/// quotes, strip them and unescape `\"` and `\\`. Bare values pass through
+/// unchanged, so a value Discourse never sees as quoted (an integer, a URL)
+/// is untouched.
+fn unquote_yaml_scalar(value: &str) -> String {
+    let bytes = value.as_bytes();
+    if bytes.len() < 2 || bytes[0] != b'"' || bytes[bytes.len() - 1] != b'"' {
+        return value.to_string();
+    }
+    let inner = &value[1..value.len() - 1];
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('"') => out.push('"'),
+                Some('\\') => out.push('\\'),
+                Some(other) => {
+                    out.push('\\');
+                    out.push(other);
+                }
+                None => out.push('\\'),
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// Current time in `YYYY-MM-DDTHH:MM:SSZ` form, derived directly from
+/// `SystemTime` to avoid a chrono dependency where one is not otherwise
+/// needed. Used for the `pulled_at` front-matter stamp.
+pub fn current_utc_iso8601() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    // Days-from-epoch arithmetic (proleptic Gregorian via the standard
+    // 1970-01-01 epoch). Good for any year `dsc` will plausibly run in.
+    let days = (secs / 86_400) as i64;
+    let secs_of_day = secs % 86_400;
+    let hh = secs_of_day / 3600;
+    let mm = (secs_of_day % 3600) / 60;
+    let ss = secs_of_day % 60;
+    let (y, m, d) = civil_from_days(days);
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, hh, mm, ss)
+}
+
+/// Convert days-from-1970-01-01 to (year, month, day).
+/// Reference: Howard Hinnant, "chrono-Compatible Low-Level Date Algorithms".
+fn civil_from_days(z: i64) -> (i32, u32, u32) {
+    let z = z + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365; // [0, 399]
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
+    let d = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
+    let m = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
+    let y = y + if m <= 2 { 1 } else { 0 };
+    (y as i32, m as u32, d as u32)
 }
 
 fn color_mode() -> &'static str {
@@ -359,6 +503,115 @@ mod tests {
     fn parse_since_cutoff_rejects_garbage() {
         assert!(parse_since_cutoff("not a date").is_err());
         assert!(parse_since_cutoff("").is_err());
+    }
+
+    #[test]
+    fn yaml_scalar_leaves_simple_values_bare() {
+        assert_eq!(yaml_scalar("Dependency management"), "Dependency management");
+        assert_eq!(yaml_scalar("Topic 42"), "Topic 42");
+    }
+
+    #[test]
+    fn yaml_scalar_quotes_when_needed() {
+        assert_eq!(yaml_scalar("a: b"), "\"a: b\"");
+        assert_eq!(yaml_scalar("# hash"), "\"# hash\"");
+        assert_eq!(yaml_scalar("- leading dash"), "\"- leading dash\"");
+        // Interior quotes alone do not trigger quoting; a quote that coincides
+        // with another trigger (here the colon) is escaped inside the wrap.
+        assert_eq!(yaml_scalar("she said \"hi\""), "she said \"hi\"");
+        assert_eq!(yaml_scalar("a: \"b\""), "\"a: \\\"b\\\"\"");
+    }
+
+    #[test]
+    fn strip_frontmatter_parses_block_and_body() {
+        let raw = "---\ntitle: Dependency management\ntopic_id: 412\nurl: https://forum.rcpch.tech/t/dependency-management/412\npulled_at: 2026-06-22T09:19:00Z\n---\n\nBody line one.\nBody line two.\n";
+        let (front, body) = strip_frontmatter(raw);
+        assert_eq!(front.get("topic_id").map(String::as_str), Some("412"));
+        assert_eq!(
+            front.get("title").map(String::as_str),
+            Some("Dependency management")
+        );
+        assert_eq!(
+            front.get("url").map(String::as_str),
+            Some("https://forum.rcpch.tech/t/dependency-management/412")
+        );
+        assert_eq!(body, "Body line one.\nBody line two.\n");
+    }
+
+    #[test]
+    fn strip_frontmatter_absent_returns_empty_map_and_full_body() {
+        let raw = "# Heading\n\nNo front matter here.\n";
+        let (front, body) = strip_frontmatter(raw);
+        assert!(front.is_empty());
+        assert_eq!(body, raw);
+    }
+
+    #[test]
+    fn strip_frontmatter_unclosed_fence_is_not_front_matter() {
+        // Opening `---` but never closed: treat the whole thing as body.
+        let raw = "---\ntitle: oops\nstill body, no closing fence\n";
+        let (front, body) = strip_frontmatter(raw);
+        assert!(front.is_empty());
+        assert_eq!(body, raw);
+    }
+
+    #[test]
+    fn strip_frontmatter_preserves_horizontal_rules_in_body() {
+        // A `---` inside the body (after the real close) must survive intact.
+        let raw = "---\ntopic_id: 7\n---\n\nIntro.\n\n---\n\nAfter the rule.\n";
+        let (front, body) = strip_frontmatter(raw);
+        assert_eq!(front.get("topic_id").map(String::as_str), Some("7"));
+        assert_eq!(body, "Intro.\n\n---\n\nAfter the rule.\n");
+    }
+
+    #[test]
+    fn strip_frontmatter_unquotes_yaml_scalar_values() {
+        // yaml_scalar quotes a title containing a colon; strip must invert it.
+        let title = "Intro: getting started";
+        let raw = format!("---\ntitle: {}\ntopic_id: 3\n---\n\nbody\n", yaml_scalar(title));
+        let (front, body) = strip_frontmatter(&raw);
+        assert_eq!(front.get("title").map(String::as_str), Some(title));
+        assert_eq!(front.get("topic_id").map(String::as_str), Some("3"));
+        assert_eq!(body, "body\n");
+    }
+
+    #[test]
+    fn strip_frontmatter_leaves_url_with_colons_intact() {
+        // URLs are written bare (not via yaml_scalar) and only the first colon
+        // separates key from value, so the scheme colon must survive.
+        let raw = "---\nurl: https://forum.rcpch.tech/t/x/9\n---\n\nbody\n";
+        let (front, _) = strip_frontmatter(raw);
+        assert_eq!(
+            front.get("url").map(String::as_str),
+            Some("https://forum.rcpch.tech/t/x/9")
+        );
+    }
+
+    #[test]
+    fn strip_frontmatter_tolerates_leading_bom() {
+        let raw = "\u{feff}---\ntopic_id: 99\n---\n\nbody\n";
+        let (front, body) = strip_frontmatter(raw);
+        assert_eq!(front.get("topic_id").map(String::as_str), Some("99"));
+        assert_eq!(body, "body\n");
+    }
+
+    #[test]
+    fn current_utc_iso8601_has_expected_shape() {
+        let s = current_utc_iso8601();
+        assert_eq!(s.len(), 20, "got {s:?}");
+        assert!(s.ends_with('Z'));
+        assert_eq!(&s[4..5], "-");
+        assert_eq!(&s[10..11], "T");
+    }
+
+    #[test]
+    fn civil_from_days_matches_known_dates() {
+        // 1970-01-01 is day 0.
+        assert_eq!(civil_from_days(0), (1970, 1, 1));
+        // 2026-06-10 = 20614 days from epoch (well-known via cal / date).
+        assert_eq!(civil_from_days(20614), (2026, 6, 10));
+        // Leap-day check: 2024-02-29.
+        assert_eq!(civil_from_days(19782), (2024, 2, 29));
     }
 }
 

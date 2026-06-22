@@ -2,7 +2,9 @@ use crate::api::DiscourseClient;
 use crate::api::TopicResponse;
 use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
-use crate::utils::{read_markdown, resolve_topic_path, write_markdown};
+use crate::utils::{
+    current_utc_iso8601, read_markdown, resolve_topic_path, write_markdown, yaml_scalar,
+};
 use anyhow::{Context, Result, anyhow};
 use std::fs;
 use std::io::{self, Read, Write};
@@ -116,23 +118,6 @@ fn render_full_thread(topic: &TopicResponse, topic_id: u64, baseurl: &str) -> St
     out
 }
 
-/// Quote a YAML scalar if it contains characters that would confuse the
-/// parser. Keeps simple titles unquoted.
-fn yaml_scalar(value: &str) -> String {
-    let needs_quoting = value.is_empty()
-        || value.contains(':')
-        || value.contains('#')
-        || value.contains('\n')
-        || value.starts_with(['-', '?', '!', '&', '*', '|', '>', '@', '`', '%', '\'', '"', '['])
-        || value.starts_with("  ");
-    if needs_quoting {
-        let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
-        format!("\"{}\"", escaped)
-    } else {
-        value.to_string()
-    }
-}
-
 /// Trim an ISO-8601 timestamp like `2026-03-24T11:07:00.123Z` down to the
 /// date portion. Leaves anything that doesn't parse cleanly as-is.
 fn format_date_only(ts: &str) -> String {
@@ -140,44 +125,6 @@ fn format_date_only(ts: &str) -> String {
         Some(idx) => ts[..idx].to_string(),
         None => ts.to_string(),
     }
-}
-
-/// Current time in `YYYY-MM-DDTHH:MM:SSZ` form, derived directly from
-/// `SystemTime` to avoid adding a chrono dependency just for this.
-fn current_utc_iso8601() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    // Days-from-epoch arithmetic (proleptic Gregorian via the standard
-    // 1970-01-01 epoch). Good for any year `dsc` will plausibly run in.
-    let days = (secs / 86_400) as i64;
-    let secs_of_day = (secs % 86_400) as u64;
-    let hh = secs_of_day / 3600;
-    let mm = (secs_of_day % 3600) / 60;
-    let ss = secs_of_day % 60;
-    let (y, m, d) = civil_from_days(days);
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        y, m, d, hh, mm, ss
-    )
-}
-
-/// Convert days-from-1970-01-01 to (year, month, day).
-/// Reference: Howard Hinnant, "chrono-Compatible Low-Level Date Algorithms".
-fn civil_from_days(z: i64) -> (i32, u32, u32) {
-    let z = z + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u64; // [0, 146096]
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365; // [0, 399]
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
-    let mp = (5 * doy + 2) / 153; // [0, 11]
-    let d = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
-    let m = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
-    let y = y + if m <= 2 { 1 } else { 0 };
-    (y as i32, m as u32, d as u32)
 }
 
 pub fn topic_push(
@@ -341,10 +288,8 @@ fn read_reply_input(local_path: Option<&Path>) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        civil_from_days, format_date_only, read_reply_input, render_full_thread,
-        topic_display_title, yaml_scalar,
-    };
+    use super::{format_date_only, read_reply_input, render_full_thread, topic_display_title};
+    use crate::utils::yaml_scalar;
     use crate::api::{Post, PostStream, TopicResponse};
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -470,15 +415,6 @@ mod tests {
         assert!(out.contains("## Post 1 · alice"));
     }
 
-    #[test]
-    fn civil_from_days_matches_known_dates() {
-        // 1970-01-01 is day 0.
-        assert_eq!(civil_from_days(0), (1970, 1, 1));
-        // 2026-06-10 = 20614 days from epoch (well-known via cal / date).
-        assert_eq!(civil_from_days(20614), (2026, 6, 10));
-        // Leap-day check: 2024-02-29.
-        assert_eq!(civil_from_days(19782), (2024, 2, 29));
-    }
 }
 
 fn confirm_sync(pull: bool) -> Result<bool> {
