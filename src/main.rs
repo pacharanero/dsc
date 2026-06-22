@@ -223,7 +223,15 @@ fn main() -> Result<()> {
                 discourse,
                 local_path,
                 category,
-            } => commands::category::category_push(&config, &discourse, &category, &local_path),
+                updates_only,
+            } => commands::category::category_push(
+                &config,
+                &discourse,
+                &category,
+                &local_path,
+                dry_run,
+                updates_only,
+            ),
         },
 
         Commands::Group { command } => match command {

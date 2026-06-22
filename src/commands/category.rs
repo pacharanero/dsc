@@ -3,12 +3,12 @@ use crate::cli::ListFormat;
 use crate::commands::common::{ensure_api_credentials, not_found, select_discourse};
 use crate::config::Config;
 use crate::utils::{
-    current_utc_iso8601, ensure_dir, normalize_baseurl, read_markdown, slugify, write_markdown,
-    yaml_scalar,
+    current_utc_iso8601, ensure_dir, normalize_baseurl, read_markdown, slugify, strip_frontmatter,
+    write_markdown, yaml_scalar,
 };
 use anyhow::{Context, Result, anyhow};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn category_list(
     config: &Config,
@@ -166,47 +166,183 @@ fn render_category_topic(topic: &TopicSummary, baseurl: &str, raw: &str) -> Stri
     out
 }
 
+/// One planned change for `category push`, decided before any mutation so
+/// the whole plan can be printed and reviewed up front. This satisfies the
+/// governance requirement driving the spec: never push without a reviewable
+/// plan, never create a topic without deliberate intent.
+enum PushAction {
+    /// Body differs from the remote OP; update post `post_id`.
+    Update {
+        path: PathBuf,
+        topic_id: u64,
+        post_id: u64,
+        body: String,
+    },
+    /// Body matches the remote OP (modulo trailing whitespace); no write.
+    Unchanged { path: PathBuf, topic_id: u64 },
+    /// No remote match; create a new topic (skipped under `--updates-only`).
+    Create {
+        path: PathBuf,
+        title: String,
+        body: String,
+    },
+}
+
 pub fn category_push(
     config: &Config,
     discourse_name: &str,
     category: &str,
     local_path: &Path,
+    dry_run: bool,
+    updates_only: bool,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
     let category_id = resolve_category_id(&client, category)?;
     let existing = client.fetch_category(category_id)?;
-    let mut topics = existing.topic_list.topics;
-    let entries =
-        fs::read_dir(local_path).with_context(|| format!("reading {}", local_path.display()))?;
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()) != Some("md") {
-            continue;
-        }
+    let topics = existing.topic_list.topics;
+
+    // Collect Markdown files in a stable order so the plan is deterministic.
+    let mut paths: Vec<PathBuf> = fs::read_dir(local_path)
+        .with_context(|| format!("reading {}", local_path.display()))?
+        .filter_map(|entry| entry.ok().map(|e| e.path()))
+        .filter(|path| path.extension().and_then(|s| s.to_str()) == Some("md"))
+        .collect();
+    paths.sort();
+
+    // Plan first: decide every action (and fail any --updates-only mismatch)
+    // before mutating anything on the server.
+    let mut plan = Vec::with_capacity(paths.len());
+    for path in paths {
         let raw = read_markdown(&path)?;
-        let title = extract_title(&raw)
+        let (front, body) = strip_frontmatter(&raw);
+        let title = front
+            .get("title")
+            .cloned()
+            .or_else(|| extract_title(&body))
             .unwrap_or_else(|| path.file_stem().unwrap().to_string_lossy().to_string());
-        if let Some(topic) = find_topic_match(&topics, &title, &path) {
-            let detail = client.fetch_topic(topic.id, true)?;
-            let post = detail
-                .post_stream
-                .posts
-                .get(0)
-                .ok_or_else(|| anyhow!("topic has no posts"))?;
-            client.update_post(post.id, &raw)?;
-        } else {
-            let topic_id = client.create_topic(category_id, &title, &raw)?;
-            topics.push(TopicSummary {
-                id: topic_id,
-                title: title.clone(),
-                slug: slugify(&title),
-            });
+
+        let topic_id = route_topic_id(&front, &title, &path, &topics);
+
+        match topic_id {
+            Some(id) => {
+                let detail = client.fetch_topic(id, true)?;
+                let post = detail
+                    .post_stream
+                    .posts
+                    .first()
+                    .ok_or_else(|| anyhow!("topic {} has no posts", id))?;
+                let remote = post.raw.as_deref().unwrap_or_default();
+                if remote.trim_end() == body.trim_end() {
+                    plan.push(PushAction::Unchanged { path, topic_id: id });
+                } else {
+                    plan.push(PushAction::Update {
+                        path,
+                        topic_id: id,
+                        post_id: post.id,
+                        body,
+                    });
+                }
+            }
+            None => {
+                if updates_only {
+                    return Err(anyhow!(
+                        "no matching topic for {} (title: {:?})\n\
+                         hint: remove --updates-only to allow new topic creation, \
+                         or check the filename/topic_id matches an existing topic",
+                        path.display(),
+                        title
+                    ));
+                }
+                plan.push(PushAction::Create { path, title, body });
+            }
         }
     }
+
+    print_push_plan(&plan, &discourse.name, category_id, dry_run);
+
+    if !dry_run {
+        for action in &plan {
+            match action {
+                PushAction::Update { post_id, body, .. } => {
+                    client.update_post(*post_id, body)?;
+                }
+                PushAction::Create { title, body, .. } => {
+                    client.create_topic(category_id, title, body)?;
+                }
+                PushAction::Unchanged { .. } => {}
+            }
+        }
+    }
+
     Ok(())
+}
+
+/// Print the push plan using the same `~` (change) / `+` (create) /
+/// `=` (unchanged) sigils as `setting push`, prefixed with `[dry-run]`
+/// when nothing will actually be written.
+fn print_push_plan(plan: &[PushAction], discourse: &str, category_id: u64, dry_run: bool) {
+    let prefix = if dry_run { "[dry-run] " } else { "" };
+    let updates = plan
+        .iter()
+        .filter(|a| matches!(a, PushAction::Update { .. }))
+        .count();
+    let creates = plan
+        .iter()
+        .filter(|a| matches!(a, PushAction::Create { .. }))
+        .count();
+    let unchanged = plan
+        .iter()
+        .filter(|a| matches!(a, PushAction::Unchanged { .. }))
+        .count();
+
+    println!(
+        "{}Category push plan for {} (category {}): {} update{}, {} create{}, {} unchanged",
+        prefix,
+        discourse,
+        category_id,
+        updates,
+        if updates == 1 { "" } else { "s" },
+        creates,
+        if creates == 1 { "" } else { "s" },
+        unchanged,
+    );
+    for action in plan {
+        match action {
+            PushAction::Update {
+                path,
+                topic_id,
+                body,
+                ..
+            } => {
+                println!(
+                    "  ~ {} → topic {} ({} bytes)",
+                    file_label(path),
+                    topic_id,
+                    body.len()
+                );
+            }
+            PushAction::Unchanged { path, topic_id } => {
+                println!("  = {} (topic {}, unchanged)", file_label(path), topic_id);
+            }
+            PushAction::Create { path, title, body } => {
+                println!(
+                    "  + {} → new topic \"{}\" ({} bytes)",
+                    file_label(path),
+                    title,
+                    body.len()
+                );
+            }
+        }
+    }
+}
+
+/// File name for plan output, falling back to the full path if there is none.
+fn file_label(path: &Path) -> String {
+    path.file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.display().to_string())
 }
 
 fn resolve_category_id(client: &DiscourseClient, category: &str) -> Result<u64> {
@@ -337,6 +473,23 @@ fn extract_title(raw: &str) -> Option<String> {
     None
 }
 
+/// Resolve which remote topic a local file targets. A `topic_id` from front
+/// matter wins outright (the durable binding written by `category pull`);
+/// otherwise fall back to slug/title matching for pre-front-matter snapshots.
+/// `None` means "no remote match" — which `category push` turns into a create
+/// (or, under `--updates-only`, an error).
+fn route_topic_id(
+    front: &std::collections::HashMap<String, String>,
+    title: &str,
+    path: &Path,
+    topics: &[TopicSummary],
+) -> Option<u64> {
+    front
+        .get("topic_id")
+        .and_then(|s| s.trim().parse::<u64>().ok())
+        .or_else(|| find_topic_match(topics, title, path).map(|t| t.id))
+}
+
 fn find_topic_match<'a>(
     topics: &'a [TopicSummary],
     title: &str,
@@ -356,7 +509,8 @@ fn find_topic_match<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::strip_frontmatter;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
 
     fn summary(id: u64, title: &str, slug: &str) -> TopicSummary {
         TopicSummary {
@@ -364,6 +518,13 @@ mod tests {
             title: title.to_string(),
             slug: slug.to_string(),
         }
+    }
+
+    fn front(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     #[test]
@@ -391,5 +552,46 @@ mod tests {
             Some("Intro: getting started")
         );
         assert_eq!(recovered, body);
+    }
+
+    #[test]
+    fn route_prefers_front_matter_topic_id_over_slug() {
+        // The slug would match topic 1, but the front-matter id wins — this is
+        // the whole point of Gap 1: a renamed/retitled file still routes home.
+        let topics = vec![summary(1, "Old Title", "renamed-file")];
+        let f = front(&[("topic_id", "412")]);
+        let path = PathBuf::from("renamed-file.md");
+        assert_eq!(route_topic_id(&f, "New Title", &path, &topics), Some(412));
+    }
+
+    #[test]
+    fn route_falls_back_to_slug_match_without_front_matter() {
+        let topics = vec![summary(55, "Dependency management", "dependency-management")];
+        let f = HashMap::new();
+        let path = PathBuf::from("dependency-management.md");
+        assert_eq!(
+            route_topic_id(&f, "Dependency management", &path, &topics),
+            Some(55)
+        );
+    }
+
+    #[test]
+    fn route_returns_none_when_nothing_matches() {
+        let topics = vec![summary(55, "Dependency management", "dependency-management")];
+        let f = HashMap::new();
+        let path = PathBuf::from("brand-new-file.md");
+        assert_eq!(route_topic_id(&f, "Brand new file", &path, &topics), None);
+    }
+
+    #[test]
+    fn route_ignores_unparseable_front_matter_topic_id() {
+        // A garbage topic_id must not route; fall through to slug matching.
+        let topics = vec![summary(55, "Dependency management", "dependency-management")];
+        let f = front(&[("topic_id", "not-a-number")]);
+        let path = PathBuf::from("dependency-management.md");
+        assert_eq!(
+            route_topic_id(&f, "Dependency management", &path, &topics),
+            Some(55)
+        );
     }
 }

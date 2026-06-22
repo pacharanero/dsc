@@ -491,6 +491,10 @@ pub enum CategoryCommand {
         category: String,
         /// Local directory containing Markdown files.
         local_path: PathBuf,
+        /// Only update existing topics; error instead of creating a new topic
+        /// when a local file has no remote match.
+        #[arg(long)]
+        updates_only: bool,
     },
 }
 
