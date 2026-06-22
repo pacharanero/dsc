@@ -1,36 +1,41 @@
-# `dsc category` pull/push workflow — three gaps
+# `dsc category` pull/push workflow — three gaps + admonition/URL conversion
 
-> **Status: Planned.** Three related gaps surfaced from a real-world offline
-> playbook sync workflow against `forum.rcpch.tech`. All three affect the
-> same `category pull` / `category push` command pair. They are grouped here
-> because Gap 2 and Gap 3 are both downstream consequences of Gap 1.
+> **Status: Planned.** Four related gaps surfaced from a real-world offline
+> playbook sync workflow against `forum.rcpch.tech`. Gaps 1–3 affect the
+> `category pull` / `category push` command pair. Gap 4 is a content
+> transformation feature needed to support a single-source content workflow
+> between Discourse and Zensical/MkDocs.
 
-Spec for three missing features in `dsc category pull` and `dsc category push`:
+Spec for four missing features in `dsc category pull` and `dsc category push`:
 
-1. **`category pull` does not embed topic IDs** — pulled files have no YAML
-   front matter, so the local file has no durable binding to its remote topic.
+1. **`category pull` does not embed topic IDs** — pulled files have no
+   machine-readable metadata, so the local file has no durable binding to its
+   remote topic.
 2. **`category push` ignores `--dry-run`** — the flag is parsed at CLI level
    but never passed into `category_push()`, so the push always executes live.
 3. **`category push` silently creates new topics on slug mismatch** — when
    a local file cannot be matched to a remote topic, a new topic is created
    without warning instead of erroring or skipping.
+4. **No admonition/URL conversion on pull/push** — MkDocs admonitions and
+   relative links need to be converted to Discourse equivalents (and back) for
+   a single-source content workflow.
 
 ## Context: the real-world driver
 
 `playbook.rcpch.tech` is being migrated to use `forum.rcpch.tech/c/playbook`
 (category 34) as its canonical home. The workflow is:
 
-1. `dsc category pull rcpch 34 forum-export/` — snapshot all 27 topics to a
+1. `dsc category pull rcpch 34 discourse/` — snapshot all 27 topics to a
    Git-tracked local directory.
-2. Edit files in `forum-export/` and commit changes to Git.
-3. `dsc category push rcpch 34 forum-export/` — push edits back to Discourse.
+2. Edit files in `discourse/` and commit changes to Git.
+3. `dsc category push rcpch 34 discourse/` — push edits back to Discourse.
 
 The git history provides an offline audit trail. Discourse's built-in edit
 revisions provide an online one. The two together give full provenance.
 
 This workflow has a hard governance constraint: **no push to the forum without
 human review of exactly what will change, and no accidental topic creation or
-deletion.** Both of those requirements are blocked by the three gaps below.
+deletion.** Both of those requirements are blocked by gaps 1–3 below.
 
 Tested against `forum.rcpch.tech` (Discourse stable, June 2026), category 34,
 27 topics.
@@ -58,8 +63,8 @@ for topic in category.topic_list.topics {
 ```
 
 At this point the code has `topic.id` in scope, but writes only the raw
-Markdown body. No YAML front matter is prepended. The mapping from local file
-→ Discourse topic ID is lost the moment the file is written.
+Markdown body. The mapping from local file → Discourse topic ID is lost the
+moment the file is written.
 
 ### Why this matters
 
@@ -95,18 +100,16 @@ and a **new duplicate topic is created**:
 
 Gap 3 describes the silent-create consequence; the root fix is here in Gap 1.
 
-### Precedent
+### Metadata format: YAML front matter (stripped before push)
 
-`dsc topic pull --full` (implemented in v0.10.11, `src/commands/topic.rs`
-`render_full_thread()`) already writes YAML front matter with `topic_id` and
-`url`. The same pattern should be applied to `category pull`.
+Pulled files get standard YAML front matter (`---` fences). Discourse does not
+"know" about front matter — if a file were pasted manually into a Discourse
+topic, the `---` lines would render as horizontal rules and the YAML would
+appear as plain text. This is not a problem in practice because all Discourse
+writes go via `dsc`, which calls `strip_frontmatter()` before sending content
+to the API. The metadata is local-only and never reaches the published post.
 
-### What is needed
-
-Prepend YAML front matter to every file written by `category pull`, using
-the topic ID, URL, and title that are already in scope:
-
-```yaml
+```markdown
 ---
 title: Dependency management
 topic_id: 412
@@ -114,25 +117,18 @@ url: https://forum.rcpch.tech/t/dependency-management/412
 pulled_at: 2026-06-22T09:19:00Z
 ---
 
-[raw markdown body follows, unchanged]
+[raw markdown body follows, unchanged — existing HTML comment headers preserved]
 ```
 
-`category push` must then:
-
-1. Detect YAML front matter in the local file (fenced by `---\n … \n---\n`).
-2. Parse `topic_id` from it.
-3. Use `topic_id` directly to route the update (`client.fetch_topic(topic_id,
-   true)` → `client.update_post(post.id, &stripped_body)`).
-4. Strip the front matter from the body before sending to Discourse (so the
-   `---` block does not appear in the published post).
-5. Fall back to the existing slug/title matching only when front matter is
-   absent (backwards compatibility with pre-front-matter files).
-
-`read_markdown` (`src/utils.rs`) currently returns the raw file content
-unchanged. A companion `strip_frontmatter(raw: &str) -> (Option<FrontMatter>,
-String)` helper should be added to `utils.rs` and used by `category push`
-(and by `topic push`, which has the same blind-read problem if someone
-manually adds front matter to a file).
+The existing HTML comment blocks (e.g. `<!-- Authors: ...\nOrigin: ... -->`)
+in topics are part of the raw body from Discourse and are preserved unchanged
+below the YAML front matter. They remain invisible when rendered in Discourse
+(HTML comments are stripped) and in MkDocs (same). `authors` and `origin` are
+not added to the YAML front matter by `category pull` — those fields live in
+the existing HTML comment convention already established in these files. They
+can be added manually by a human editor and will be preserved on re-pull
+(since the YAML front matter block is overwritten but the HTML comment body is
+left as-is from the remote).
 
 ### Reference: API calls observed in the field
 
@@ -274,9 +270,9 @@ topics pollute the index and confuse readers. The governance rule for this
 workflow is that **no new topics should ever be created without deliberate
 human intent**.
 
-This gap is primarily addressed by Gap 1 (with `topic_id` in front matter,
-the slug match is no longer needed for known topics). But an explicit guard
-is still valuable for cases where a completely new file is introduced.
+This gap is primarily addressed by Gap 1 (with `topic_id` in the `<!--dsc-meta`
+block, the slug match is no longer needed for known topics). But an explicit
+guard is still valuable for cases where a completely new file is introduced.
 
 ### What is needed
 
@@ -291,8 +287,8 @@ Options:
   -n, --dry-run    ...
 ```
 
-When `--updates-only` is set and `find_topic_match()` returns `None`, emit a
-clear error (not just a warning) and stop:
+When `--updates-only` is set and neither `<!--dsc-meta topic_id` nor
+`find_topic_match()` resolves, emit a clear error:
 
 ```
 error: no matching topic found for "my-new-file.md" (title: "My New File")
@@ -304,56 +300,157 @@ workflows are not broken.
 
 ---
 
+## Gap 4 — No admonition/URL conversion on pull/push
+
+### Background
+
+The playbook workflow uses a single folder of Markdown files that feeds both
+Discourse (via `dsc category push`) and a Zensical/MkDocs static site. The
+two platforms have incompatible conventions for two common patterns:
+
+**Admonitions:**
+- MkDocs: `!!! note "Title"\n    Content` (pymdownx admonition syntax)
+- Discourse: no native admonition syntax; use blockquotes with bold lead-ins
+
+**Internal cross-links:**
+- MkDocs: relative file paths — `[see versioning](../versioning.md)`
+- Discourse: full forum URLs — `[see versioning](https://forum.rcpch.tech/t/versioning/NNN)`
+
+Currently these conversions are done manually, which is error-prone and
+creates friction when content moves between platforms.
+
+### What is needed
+
+Two optional flags on `dsc category push` and `dsc category pull` that
+auto-convert between the two conventions. These are opt-in; the default
+behaviour is unchanged.
+
+#### `--convert-admonitions` flag
+
+On **push** (MkDocs → Discourse): convert admonitions to blockquotes.
+
+```markdown
+# Input (MkDocs admonition)
+!!! note "Important"
+    Remember to commit before pushing.
+
+# Output (Discourse blockquote)
+> **📝 Note — Important**
+> Remember to commit before pushing.
+```
+
+Admonition types and their suggested Discourse emoji mapping:
+
+| MkDocs type | Emoji | Bold label |
+|---|---|---|
+| `note` / `info` | 📝 | Note |
+| `warning` / `caution` | ⚠️ | Warning |
+| `danger` / `error` | 🚨 | Danger |
+| `tip` / `hint` | 💡 | Tip |
+| `success` / `check` | ✅ | Success |
+| `question` / `faq` | ❓ | FAQ |
+| `quote` | 💬 | Quote |
+| (other) | 📌 | (type name, capitalised) |
+
+On **pull** (Discourse → MkDocs): convert blockquotes with bold emoji lead-ins
+back to admonitions. Match on `> **{emoji} {Type}` pattern. This conversion
+is best-effort — not all blockquotes are admonitions, so only match the
+specific emoji-prefixed bold pattern.
+
+#### `--rewrite-links` flag
+
+On **push** (MkDocs → Discourse): rewrite relative Markdown links to full
+forum URLs. Requires a resolved map of `{filename_stem}` → `{topic_id, slug}`
+(available from `<!--dsc-meta` blocks or from a fresh category listing).
+
+```markdown
+# Input
+[See versioning](../versioning.md)
+
+# Output
+[See versioning](https://forum.rcpch.tech/t/versioning/NNN)
+```
+
+Algorithm:
+1. Scan body for `[text](path)` where `path` does not start with `http` and ends in `.md`.
+2. Derive the stem: `path.rsplit('/').last().strip_suffix(".md")`.
+3. Look up the stem in the local `topic_id` map (built from `<!--dsc-meta` blocks
+   in the same directory, or by querying the category listing).
+4. If found, rewrite the URL. If not found, emit a warning (do not silently drop the link).
+
+On **pull** (Discourse → MkDocs): rewrite full `forum.rcpch.tech/t/…` URLs
+back to relative `.md` paths. This is best-effort; links to non-playbook topics
+(e.g., sysadmin topics) are left as full URLs.
+
+### Priority
+
+If implementation becomes complex, **prioritise Discourse output** (the push
+direction). The Discourse version is the canonical publication target, and
+conversion back to MkDocs format is a lower-frequency operation. The
+`--convert-admonitions` flag is more tractable than `--rewrite-links`; if
+only one ships first, prefer admonitions.
+
+### Backward compatibility
+
+Both flags are opt-in. Default push/pull behaviour is unchanged.
+
+---
+
 ## Implementation order
 
-Implement in this order — each phase unblocks the next:
+### Phase 1 — `category pull` embeds YAML front matter (Gap 1, pull side) ✅
 
-### Phase 1 — `category pull` embeds front matter (Gap 1, pull side)
+- [x] Add `strip_frontmatter(raw: &str) -> (HashMap<String, String>, String)` helper to `src/utils.rs`.
+- [x] Move `current_utc_iso8601()` and `yaml_scalar()` from `src/commands/topic.rs` to `src/utils.rs` and share.
+- [x] Update `category_pull()` to call `render_category_topic()` which prepends YAML front matter (`title`, `topic_id`, `url`, `pulled_at`) before writing each file.
 
-- [ ] Add `strip_frontmatter(raw: &str) -> (Option<HashMap<String, String>>, String)` helper to `src/utils.rs`. Parse the `---`-fenced block at the start of the file into key→value pairs; return the stripped body as the second element.
-- [ ] Update `category_pull()` to prepend YAML front matter (`title`, `topic_id`, `url`, `pulled_at`) before writing each file.
-- [ ] Add a `current_utc_iso8601()` call (already exists in `src/commands/topic.rs` — consider moving to `utils.rs` and sharing it).
+### Phase 2 — `category push` routes by front-matter `topic_id` (Gap 1, push side) ✅
 
-### Phase 2 — `category push` reads front matter and routes by ID (Gap 1, push side)
+- [x] In `category_push()`, call `strip_frontmatter()` on each file to separate metadata from body.
+- [x] If `topic_id` is present, use it directly to route the update (skip `find_topic_match()`).
+- [x] Pass only the stripped body to `client.update_post()` and `client.create_topic()`.
+- [x] `find_topic_match()` retained as fallback for files without front matter.
+- [x] `topic push` also strips front matter before sending.
 
-- [ ] In `category_push()`, after reading each file, call `strip_frontmatter()` to separate the body from the front matter.
-- [ ] If `topic_id` is present in front matter, use it directly to route the update (skip `find_topic_match()`).
-- [ ] Pass only the stripped body (not the front matter) to `client.update_post()` and `client.create_topic()`.
-- [ ] Keep `find_topic_match()` as a fallback for files without front matter.
+### Phase 3 — working `--dry-run` for `category push` (Gap 2) ✅
 
-### Phase 3 — working `--dry-run` for `category push` (Gap 2)
+- [x] `dry_run: bool` parameter added to `category_push()`.
+- [x] `dry_run` passed at the call site in `src/main.rs`.
+- [x] Dry-run output uses `~` / `+` / `=` sigils; no-op writes skipped when body is byte-identical to remote.
 
-- [ ] Add `dry_run: bool` parameter to `category_push()`.
-- [ ] Pass `dry_run` at the call site in `src/main.rs`.
-- [ ] Implement dry-run output using `~` / `+` / `=` sigils.
-- [ ] Optionally: skip the `client.update_post()` call when body is
-  byte-identical to remote (avoids no-op edits and `=` output is honest).
+### Phase 4 — `--updates-only` guard (Gap 3) ✅
 
-### Phase 4 — `--updates-only` guard (Gap 3)
+- [x] `updates_only: bool` parameter added to `category_push()` and wired from CLI.
+- [x] When `updates_only` is true and no match is found, a structured error is emitted instead of calling `create_topic()`.
 
-- [ ] Add `updates_only: bool` parameter to `category_push()` and wire it from CLI.
-- [ ] When `updates_only` is true and no match is found, emit a structured error instead of calling `create_topic()`.
+### Phase 5 — admonition/URL conversion (Gap 4)
+
+- [ ] Add `--convert-admonitions` flag to `category push` and `category pull`.
+- [ ] Implement MkDocs admonition → Discourse blockquote conversion (push direction).
+- [ ] Implement Discourse blockquote → MkDocs admonition best-effort reversal (pull direction).
+- [ ] Add `--rewrite-links` flag to `category push` and `category pull`.
+- [ ] Implement relative-path → full-forum-URL rewriting on push (requires front-matter topic ID map).
+- [ ] Implement full-forum-URL → relative-path best-effort reversal on pull.
 
 ---
 
 ## Backward compatibility
 
-- Files written by the current `category pull` (no front matter) continue to
-  work — `strip_frontmatter()` returns an empty map and the full file content
-  as the body, and `find_topic_match()` is used as before.
+- Files without YAML front matter continue to work — `strip_frontmatter()`
+  returns an empty map and the full file content, and `find_topic_match()` is
+  used as before. This covers files edited before this feature shipped and
+  files added manually without a pull.
 - Default `category push` behaviour (create on mismatch) is unchanged unless
   `--updates-only` is explicitly set.
-- `topic push` is not changed (it already takes an explicit topic ID).
-- `topic pull` (non-`--full`) is not changed — it is already used for the
-  OP-edit workflow and adding front matter there is a separate decision.
+- Conversion flags (`--convert-admonitions`, `--rewrite-links`) are opt-in.
+- `topic pull` (non-`--full`) is not changed.
 
 ## Out of scope
 
-- Adding front matter to `topic pull` (non-`--full`): related but separate;
-  worth a follow-up if the same ID-binding problem surfaces for single-topic
-  workflows.
-- Title editing via `category push`: the front matter `title` field is
-  metadata only; changing the title of a Discourse topic requires a separate
-  API call (`PUT /t/{slug}/{id}.json` with `title`) and is not in scope here.
-- Topic deletion: explicitly out of scope and should remain so. `dsc` should
-  never delete topics in a category push workflow.
+- Title editing via `category push`: changing a Discourse topic's title
+  requires `PUT /t/{slug}/{id}.json` with `title` and is not in scope here.
+- Topic deletion: explicitly out of scope. `dsc` should never delete topics
+  in a category push workflow.
+- Converting Discourse-only markup (e.g. `[quote]` BBCode, `@mentions`,
+  Discourse-specific emoji) to MkDocs — these are best left as-is or
+  handled by the human editor.
