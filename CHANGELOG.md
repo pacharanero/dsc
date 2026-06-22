@@ -5,6 +5,24 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.16] - 2026-06-22
+
+### Features
+
+- **topic,category**: Add --no-bump/--skip-revision; strip front matter on topic push ([0c7e3f0](https://github.com/pacharanero/dsc/commit/0c7e3f0ab5bc954e17352e9efa31954ae96c9132))
+
+- **category**: Route push by topic_id, honour --dry-run, add --updates-only ([705289e](https://github.com/pacharanero/dsc/commit/705289e5caf858edf7494a242cef96731e1e4db0))
+
+- **category**: Embed YAML front matter in category pull (Gap 1, pull side) ([61cd71f](https://github.com/pacharanero/dsc/commit/61cd71faf94c80bcf4d977c15b6e062dc03523a2))
+
+### Spec
+
+- **category-workflow**: Add gap 5 --no-bump/--skip-revision for silent bulk edits ([86f08bc](https://github.com/pacharanero/dsc/commit/86f08bc2ddbdacde79f71ae003a3f4ca15c03266))
+
+- **category-workflow**: Update for YAML front matter (not HTML comments); mark gaps 1-4 implemented; add gap 4 admonition/URL conversion ([2113c35](https://github.com/pacharanero/dsc/commit/2113c35fa6e0196131cf5676a8e7a545a04d7ab1))
+
+- Category pull/push workflow gaps (field-driven, forum.rcpch.tech) ([7254a01](https://github.com/pacharanero/dsc/commit/7254a0118d34198950dce2ee5419812b5d46248d))
+
 ## [0.10.15] - 2026-06-17
 
 ### Documentation
