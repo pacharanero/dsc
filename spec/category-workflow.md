@@ -1,24 +1,18 @@
-# `dsc category` pull/push workflow — three gaps + admonition/URL conversion
+# `dsc category` pull/push workflow — gaps + admonition/URL conversion + silent push
 
-> **Status: Planned.** Four related gaps surfaced from a real-world offline
-> playbook sync workflow against `forum.rcpch.tech`. Gaps 1–3 affect the
-> `category pull` / `category push` command pair. Gap 4 is a content
-> transformation feature needed to support a single-source content workflow
-> between Discourse and Zensical/MkDocs.
+> **Status: Gaps 1–3 implemented (unreleased). Gap 4 and Gap 5 planned.**
+> Surfaced from a real-world offline playbook sync workflow against
+> `forum.rcpch.tech`. Gaps 1–3 affect the `category pull` / `category push`
+> command pair. Gap 4 is content transformation for a single-source workflow.
+> Gap 5 is notification/bump suppression for bulk migration edits.
 
-Spec for four missing features in `dsc category pull` and `dsc category push`:
+Spec for five features in `dsc category pull` and `dsc category push`:
 
-1. **`category pull` does not embed topic IDs** — pulled files have no
-   machine-readable metadata, so the local file has no durable binding to its
-   remote topic.
-2. **`category push` ignores `--dry-run`** — the flag is parsed at CLI level
-   but never passed into `category_push()`, so the push always executes live.
-3. **`category push` silently creates new topics on slug mismatch** — when
-   a local file cannot be matched to a remote topic, a new topic is created
-   without warning instead of erroring or skipping.
-4. **No admonition/URL conversion on pull/push** — MkDocs admonitions and
-   relative links need to be converted to Discourse equivalents (and back) for
-   a single-source content workflow.
+1. **`category pull` does not embed topic IDs** ✅ implemented
+2. **`category push` ignores `--dry-run`** ✅ implemented
+3. **`category push` silently creates new topics on slug mismatch** ✅ implemented
+4. **No admonition/URL conversion on pull/push** — planned
+5. **No `--no-bump` / `--skip-revision` for silent bulk edits** — planned
 
 ## Context: the real-world driver
 
@@ -396,6 +390,83 @@ Both flags are opt-in. Default push/pull behaviour is unchanged.
 
 ---
 
+## Gap 5 — No `--no-bump` / `--skip-revision` for silent bulk edits
+
+### Background: Discourse notification behaviour for edits
+
+When `dsc category push` updates an existing topic's first post via
+`PUT /posts/{id}.json`, Discourse does **not** send inbox notifications to
+topic watchers or trackers. Notifications are only triggered by new replies
+and new topics. So bulk editing via `dsc` does not spam anyone's notification
+inbox.
+
+However, edited topics are **bumped to the top of the category activity feed**
+by default (Discourse orders topics by `last_posted_at` / `bumped_at`). For a
+bulk migration push of 20+ topics, this causes the entire category to
+re-sort — visually noisy for anyone browsing the category at the time.
+
+**Current `dsc` behaviour:** `update_post()` sends only `post[raw]`. It does
+not send `no_bump` or `skip_revision`, so every push bumps the topic and
+creates a revision entry.
+
+### Practical guidance (no `dsc` change needed for now)
+
+The Playbook category (`forum.rcpch.tech/c/playbook/34`) is currently
+**private**. The bulk migration edits should all be done before the category
+is made public. When the category is private, the bump behaviour is invisible
+to non-members, and the team can choose to mute the category in their own
+notification preferences during the migration window if desired.
+
+Once the category is public and you want to do **quiet maintenance edits**
+(correcting typos, updating links, etc.) without churning the activity feed,
+`--no-bump` becomes important.
+
+### What is needed
+
+Add a `--no-bump` flag to `dsc topic push` and `dsc category push`:
+
+```text
+dsc topic push [OPTIONS] <DISCOURSE> <TOPIC_ID> <LOCAL_PATH>
+dsc category push [OPTIONS] <DISCOURSE> <CATEGORY> <LOCAL_PATH>
+
+Options:
+  --no-bump   Update post content without bumping the topic in the
+              activity feed. Passes no_bump=true to the API.
+              Use for silent maintenance edits.
+```
+
+Implementation: add `"no_bump"` → `"true"` to the form payload in
+`update_post()` when the flag is set:
+
+```rust
+// src/api/topics.rs  update_post()
+pub fn update_post(&self, post_id: u64, raw: &str, no_bump: bool) -> Result<()> {
+    let path = format!("/posts/{}.json", post_id);
+    let no_bump_str = no_bump.to_string();
+    let mut payload = vec![("post[raw]", raw)];
+    if no_bump {
+        payload.push(("post[no_bump]", no_bump_str.as_str()));
+    }
+    // ...
+}
+```
+
+Optionally, add `--skip-revision` as a companion flag (passes
+`post[skip_revision]=true`) to suppress edit history entries during bulk
+migration. This is a stronger "silence" but prevents the revision trail from
+being useful — consider whether you want it. For the playbook migration,
+**don't** use `--skip-revision` (Discourse revision history is part of the
+audit trail).
+
+### Reference: API field names observed
+
+From the Discourse source and Meta documentation:
+- `post[no_bump]` = `"true"` — prevents topic bump on post edit
+- `post[skip_revision]` = `"true"` — prevents new revision entry
+- Neither is currently sent by `dsc`
+
+---
+
 ## Implementation order
 
 ### Phase 1 — `category pull` embeds YAML front matter (Gap 1, pull side) ✅
@@ -432,11 +503,12 @@ Both flags are opt-in. Default push/pull behaviour is unchanged.
 - [ ] Implement relative-path → full-forum-URL rewriting on push (requires front-matter topic ID map).
 - [ ] Implement full-forum-URL → relative-path best-effort reversal on pull.
 
----
+### Phase 6 — `--no-bump` and `--skip-revision` flags (Gap 5)
 
-## Backward compatibility
-
-- Files without YAML front matter continue to work — `strip_frontmatter()`
+- [ ] Add `no_bump: bool` and `skip_revision: bool` parameters to `update_post()` in `src/api/topics.rs`.
+- [ ] Wire `--no-bump` flag through `topic push`, `category push` CLI → `category_push()` → `update_post()`.
+- [ ] Wire `--skip-revision` flag the same way (optional companion; document that it suppresses Discourse revision history).
+- [ ] Document in `dsc topic push --help`: "use `--no-bump` for silent maintenance edits to avoid churning the activity feed." — `strip_frontmatter()`
   returns an empty map and the full file content, and `find_topic_match()` is
   used as before. This covers files edited before this feature shipped and
   files added manually without a pull.
