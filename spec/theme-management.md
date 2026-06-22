@@ -1,5 +1,9 @@
 # `dsc theme` - management gaps spec
 
+> **Status: Phase 1 implemented (unreleased).** `dsc theme setting list/get/set`,
+> `theme enable/disable`, and `theme attach/detach` ship. Phases 2 (`theme field`,
+> `theme asset`) and 3 (`theme show`, `theme update`) remain planned.
+
 Spec for extending `dsc theme` to cover component configuration, enable/disable, per-field editing, and asset binding. Goal: drive a Discourse theme/component setup end-to-end from the CLI, without dropping into the Admin UI. Motivated by the ACCM (kitchen.culinarymedicine.org) header customisation work, where configuring header-nav components and iterating on theme SCSS from `dsc` is currently impossible.
 
 ## Context

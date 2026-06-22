@@ -746,6 +746,79 @@ pub enum ThemeCommand {
         /// Theme ID to duplicate (from `dsc theme list`).
         theme_id: u64,
     },
+    /// Read and write a theme/component's settings (not site settings).
+    Setting {
+        #[command(subcommand)]
+        command: ThemeSettingCommand,
+    },
+    /// Enable a theme or component.
+    Enable {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID (from `dsc theme list`).
+        theme_id: u64,
+    },
+    /// Disable a theme or component.
+    Disable {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID (from `dsc theme list`).
+        theme_id: u64,
+    },
+    /// Attach a component to a parent theme (makes it active on that theme).
+    Attach {
+        /// Discourse name.
+        discourse: String,
+        /// Parent theme ID.
+        parent_id: u64,
+        /// Component (child theme) ID to attach.
+        component_id: u64,
+    },
+    /// Detach a component from a parent theme.
+    Detach {
+        /// Discourse name.
+        discourse: String,
+        /// Parent theme ID.
+        parent_id: u64,
+        /// Component (child theme) ID to detach.
+        component_id: u64,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ThemeSettingCommand {
+    /// List a theme/component's settings.
+    #[command(visible_alias = "ls")]
+    List {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID (from `dsc theme list`).
+        theme_id: u64,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Print a single setting's current value.
+    Get {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Setting key (the `setting` name from `theme setting list`).
+        key: String,
+    },
+    /// Set a single setting. Value is sent verbatim (pass JSON text for
+    /// json-schema list settings). Honours global `--dry-run`.
+    Set {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Setting key.
+        key: String,
+        /// New value (verbatim).
+        value: String,
+    },
 }
 
 #[derive(Subcommand)]

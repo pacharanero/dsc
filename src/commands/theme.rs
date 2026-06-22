@@ -1,12 +1,12 @@
 use crate::api::DiscourseClient;
 use crate::cli::ListFormat;
-use crate::commands::common::{ensure_api_credentials, select_discourse};
+use crate::commands::common::{ensure_api_credentials, not_found, select_discourse};
 use crate::commands::update::run_ssh_command;
 use crate::config::{Config, DiscourseConfig};
 use crate::utils::slugify;
 use anyhow::{Context, Result, anyhow};
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::path::Path;
 
 #[derive(Debug, Serialize)]
@@ -284,4 +284,270 @@ fn render_template(template: &str, replacements: &[(&str, &str)]) -> String {
         out = out.replace(&format!("{{{}}}", key), value);
     }
     out
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1: component settings + enable/disable + attach/detach
+// (spec/theme-management.md). Themes are handled as raw JSON values, matching
+// the rest of this module.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+struct ThemeSettingEntry {
+    setting: String,
+    #[serde(rename = "type")]
+    kind: String,
+    value: Value,
+    default: Value,
+}
+
+/// Unwrap the `{ "theme": { … } }` envelope returned by some endpoints,
+/// falling back to the bare object.
+fn extract_theme(value: &Value) -> &Value {
+    value.get("theme").unwrap_or(value)
+}
+
+/// Render a setting value for human-readable (text) output: strings bare,
+/// null as empty, everything else as compact JSON.
+fn value_display(v: &Value) -> String {
+    match v {
+        Value::String(s) => s.clone(),
+        Value::Null => String::new(),
+        other => other.to_string(),
+    }
+}
+
+fn theme_setting_entries(theme: &Value) -> Vec<ThemeSettingEntry> {
+    theme
+        .get("settings")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(|s| ThemeSettingEntry {
+                    setting: s
+                        .get("setting")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    kind: s
+                        .get("type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    value: s.get("value").cloned().unwrap_or(Value::Null),
+                    default: s.get("default").cloned().unwrap_or(Value::Null),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// List a theme/component's settings (distinct from site settings).
+pub fn theme_setting_list(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    format: ListFormat,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let entries = theme_setting_entries(theme);
+    match format {
+        ListFormat::Text => {
+            if entries.is_empty() {
+                println!("No settings found for theme {}.", theme_id);
+                return Ok(());
+            }
+            for entry in &entries {
+                println!("{} = {}", entry.setting, value_display(&entry.value));
+            }
+        }
+        ListFormat::Json => println!("{}", serde_json::to_string_pretty(&entries)?),
+        ListFormat::Yaml => println!("{}", serde_yaml::to_string(&entries)?),
+    }
+    Ok(())
+}
+
+/// Print a single theme/component setting's current value.
+pub fn theme_setting_get(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    key: &str,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let setting = theme
+        .get("settings")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|s| s.get("setting").and_then(|v| v.as_str()) == Some(key))
+        })
+        .ok_or_else(|| not_found("theme setting", key))?;
+    let value = setting.get("value").cloned().unwrap_or(Value::Null);
+    println!("{}", value_display(&value));
+    Ok(())
+}
+
+/// Set a single theme/component setting. The value is sent verbatim, so a
+/// JSON-schema list setting takes its JSON text directly.
+pub fn theme_setting_set(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    key: &str,
+    value: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    if dry_run {
+        println!(
+            "[dry-run] {}: would set theme {} setting {} = {}",
+            discourse.name, theme_id, key, value
+        );
+        return Ok(());
+    }
+    client.set_theme_setting(theme_id, key, value)?;
+    println!("{}: set theme {} setting {}", discourse.name, theme_id, key);
+    Ok(())
+}
+
+/// Enable or disable a theme/component (`PUT /admin/themes/:id.json` toggling
+/// the `enabled` boolean).
+pub fn theme_set_enabled(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    enabled: bool,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let action = if enabled { "enable" } else { "disable" };
+    if dry_run {
+        println!("[dry-run] {}: would {} theme {}", discourse.name, action, theme_id);
+        return Ok(());
+    }
+    client.update_theme(theme_id, &json!({ "enabled": enabled }))?;
+    println!("{}: {}d theme {}", discourse.name, action, theme_id);
+    Ok(())
+}
+
+/// Attach or detach a component to/from a parent theme. Reads the parent's
+/// current `child_themes`, adds/removes the component id, and PUTs the full
+/// replacement `child_theme_ids` set (disabled components stay in the list).
+pub fn theme_set_child(
+    config: &Config,
+    discourse_name: &str,
+    parent_id: u64,
+    component_id: u64,
+    attach: bool,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(parent_id)?;
+    let theme = extract_theme(&response);
+    let mut child_ids: Vec<u64> = theme
+        .get("child_themes")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|c| c.get("id").and_then(|v| v.as_u64()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let present = child_ids.contains(&component_id);
+    if attach && present {
+        println!(
+            "{}: component {} already attached to theme {}",
+            discourse.name, component_id, parent_id
+        );
+        return Ok(());
+    }
+    if !attach && !present {
+        println!(
+            "{}: component {} is not attached to theme {}",
+            discourse.name, component_id, parent_id
+        );
+        return Ok(());
+    }
+    if attach {
+        child_ids.push(component_id);
+    } else {
+        child_ids.retain(|&id| id != component_id);
+    }
+
+    let (verb, prep) = if attach { ("attach", "to") } else { ("detach", "from") };
+    if dry_run {
+        println!(
+            "[dry-run] {}: would {} component {} {} theme {} (child_theme_ids -> {:?})",
+            discourse.name, verb, component_id, prep, parent_id, child_ids
+        );
+        return Ok(());
+    }
+    client.update_theme(parent_id, &json!({ "child_theme_ids": child_ids }))?;
+    println!(
+        "{}: {}ed component {} {} theme {}",
+        discourse.name, verb, component_id, prep, parent_id
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_theme_unwraps_envelope_and_passes_bare() {
+        let wrapped = json!({ "theme": { "id": 11, "name": "kitchen" } });
+        assert_eq!(extract_theme(&wrapped).get("id").and_then(|v| v.as_u64()), Some(11));
+        let bare = json!({ "id": 7, "name": "bare" });
+        assert_eq!(extract_theme(&bare).get("id").and_then(|v| v.as_u64()), Some(7));
+    }
+
+    #[test]
+    fn value_display_renders_each_json_kind() {
+        assert_eq!(value_display(&json!("right")), "right");
+        assert_eq!(value_display(&Value::Null), "");
+        assert_eq!(value_display(&json!(true)), "true");
+        assert_eq!(value_display(&json!(42)), "42");
+        // json-schema list settings arrive as a JSON string already; an actual
+        // array still renders as compact JSON for text output.
+        assert_eq!(value_display(&json!(["a", "b"])), "[\"a\",\"b\"]");
+    }
+
+    #[test]
+    fn theme_setting_entries_parses_settings_array() {
+        let theme = json!({
+            "settings": [
+                { "setting": "links_position", "type": "enum", "default": "right", "value": "left" },
+                { "setting": "header_links", "type": "string", "default": "[]", "value": "[{\"id\":1}]" }
+            ]
+        });
+        let entries = theme_setting_entries(&theme);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].setting, "links_position");
+        assert_eq!(entries[0].kind, "enum");
+        assert_eq!(value_display(&entries[0].value), "left");
+        assert_eq!(entries[1].setting, "header_links");
+        assert_eq!(value_display(&entries[1].value), "[{\"id\":1}]");
+    }
+
+    #[test]
+    fn theme_setting_entries_empty_when_absent() {
+        assert!(theme_setting_entries(&json!({ "name": "no settings" })).is_empty());
+    }
 }

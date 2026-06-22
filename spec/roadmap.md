@@ -73,8 +73,8 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 
 ### New command surfaces
 
-- [ ] ⭐ **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Spec: [spec/theme-management.md](theme-management.md)
-  - [ ] Phase 1: `dsc theme setting` (get/set/list) + `dsc theme enable|disable|attach|detach`
+- [ ] ⭐ **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Phase 1 implemented (unreleased). Spec: [spec/theme-management.md](theme-management.md)
+  - [x] Phase 1: `dsc theme setting` (get/set/list) + `dsc theme enable|disable|attach|detach`
   - [ ] Phase 2: `dsc theme field pull/push` + `dsc theme asset set/list`
   - [ ] Phase 3: `dsc theme show` + `dsc theme update` (remote component refresh)
 - [ ] **`dsc chat`** - Discourse Chat is core now and the API is there. Subcommands: `chat channels`, `chat send <discourse> <channel> [<file>]`, `chat fetch <channel> [--since …]`. Mirrors the existing `dsc topic`/`pm` split.

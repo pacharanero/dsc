@@ -144,6 +144,167 @@ fn theme_pull_push() {
 }
 
 #[test]
+fn theme_setting_list() {
+    let Some(test) = test_discourse() else {
+        return;
+    };
+    let Some(theme_id) = test.test_theme_id else {
+        return;
+    };
+    vprintln("e2e_theme_setting_list: list a theme's settings");
+    let dir = TempDir::new().expect("tempdir");
+    let config_path = write_temp_config(
+        &dir,
+        &format!(
+            "[[discourse]]\nname = \"{}\"\nbaseurl = \"{}\"\napikey = \"{}\"\napi_username = \"{}\"\n",
+            test.name, test.baseurl, test.apikey, test.api_username
+        ),
+    );
+    // JSON format so the output is parseable regardless of how many settings
+    // the theme has (a theme with no settings is still valid).
+    let output = run_dsc(
+        &[
+            "theme",
+            "setting",
+            "list",
+            &test.name,
+            &theme_id.to_string(),
+            "--format",
+            "json",
+        ],
+        &config_path,
+    );
+    assert!(
+        output.status.success(),
+        "theme setting list failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("theme setting list should emit JSON array");
+    assert!(parsed.is_array(), "expected a JSON array of settings");
+}
+
+#[test]
+fn theme_setting_set_dry_run() {
+    let Some(test) = test_discourse() else {
+        return;
+    };
+    let Some(theme_id) = test.test_theme_id else {
+        return;
+    };
+    vprintln("e2e_theme_setting_set_dry_run: dry-run set must not write");
+    let dir = TempDir::new().expect("tempdir");
+    let config_path = write_temp_config(
+        &dir,
+        &format!(
+            "[[discourse]]\nname = \"{}\"\nbaseurl = \"{}\"\napikey = \"{}\"\napi_username = \"{}\"\n",
+            test.name, test.baseurl, test.apikey, test.api_username
+        ),
+    );
+    // -n keeps this from touching the live theme even with a bogus key.
+    let output = run_dsc(
+        &[
+            "-n",
+            "theme",
+            "setting",
+            "set",
+            &test.name,
+            &theme_id.to_string(),
+            "dsc_e2e_probe_key",
+            "probe-value",
+        ],
+        &config_path,
+    );
+    assert!(
+        output.status.success(),
+        "theme setting set --dry-run failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("[dry-run]"),
+        "expected dry-run notice, got: {stdout}"
+    );
+}
+
+#[test]
+fn theme_enable_disable_dry_run() {
+    let Some(test) = test_discourse() else {
+        return;
+    };
+    let Some(theme_id) = test.test_theme_id else {
+        return;
+    };
+    vprintln("e2e_theme_enable_disable_dry_run: dry-run toggles must not write");
+    let dir = TempDir::new().expect("tempdir");
+    let config_path = write_temp_config(
+        &dir,
+        &format!(
+            "[[discourse]]\nname = \"{}\"\nbaseurl = \"{}\"\napikey = \"{}\"\napi_username = \"{}\"\n",
+            test.name, test.baseurl, test.apikey, test.api_username
+        ),
+    );
+    for verb in ["enable", "disable"] {
+        let output = run_dsc(
+            &["-n", "theme", verb, &test.name, &theme_id.to_string()],
+            &config_path,
+        );
+        assert!(
+            output.status.success(),
+            "theme {verb} --dry-run failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("[dry-run]") && stdout.contains(verb),
+            "expected dry-run {verb} notice, got: {stdout}"
+        );
+    }
+}
+
+#[test]
+fn theme_detach_unattached_is_noop() {
+    let Some(test) = test_discourse() else {
+        return;
+    };
+    let Some(theme_id) = test.test_theme_id else {
+        return;
+    };
+    vprintln("e2e_theme_detach_unattached: detaching an unattached id is a safe no-op");
+    let dir = TempDir::new().expect("tempdir");
+    let config_path = write_temp_config(
+        &dir,
+        &format!(
+            "[[discourse]]\nname = \"{}\"\nbaseurl = \"{}\"\napikey = \"{}\"\napi_username = \"{}\"\n",
+            test.name, test.baseurl, test.apikey, test.api_username
+        ),
+    );
+    // Detaching a component id that is not a child reads the parent's
+    // child_themes (real API call) and reports a no-op without mutating.
+    let output = run_dsc(
+        &[
+            "theme",
+            "detach",
+            &test.name,
+            &theme_id.to_string(),
+            "999999999",
+        ],
+        &config_path,
+    );
+    assert!(
+        output.status.success(),
+        "theme detach no-op failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("not attached"),
+        "expected 'not attached' no-op message, got: {stdout}"
+    );
+}
+
+#[test]
 fn theme_duplicate() {
     let Some(test) = test_discourse() else {
         return;

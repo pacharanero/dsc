@@ -612,6 +612,58 @@ fn main() -> Result<()> {
                 discourse,
                 theme_id,
             } => commands::theme::theme_duplicate(&config, &discourse, theme_id),
+            ThemeCommand::Setting { command } => match command {
+                ThemeSettingCommand::List {
+                    discourse,
+                    theme_id,
+                    format,
+                } => commands::theme::theme_setting_list(&config, &discourse, theme_id, format),
+                ThemeSettingCommand::Get {
+                    discourse,
+                    theme_id,
+                    key,
+                } => commands::theme::theme_setting_get(&config, &discourse, theme_id, &key),
+                ThemeSettingCommand::Set {
+                    discourse,
+                    theme_id,
+                    key,
+                    value,
+                } => commands::theme::theme_setting_set(
+                    &config, &discourse, theme_id, &key, &value, dry_run,
+                ),
+            },
+            ThemeCommand::Enable {
+                discourse,
+                theme_id,
+            } => commands::theme::theme_set_enabled(&config, &discourse, theme_id, true, dry_run),
+            ThemeCommand::Disable {
+                discourse,
+                theme_id,
+            } => commands::theme::theme_set_enabled(&config, &discourse, theme_id, false, dry_run),
+            ThemeCommand::Attach {
+                discourse,
+                parent_id,
+                component_id,
+            } => commands::theme::theme_set_child(
+                &config,
+                &discourse,
+                parent_id,
+                component_id,
+                true,
+                dry_run,
+            ),
+            ThemeCommand::Detach {
+                discourse,
+                parent_id,
+                component_id,
+            } => commands::theme::theme_set_child(
+                &config,
+                &discourse,
+                parent_id,
+                component_id,
+                false,
+                dry_run,
+            ),
         },
 
         Commands::Setting {

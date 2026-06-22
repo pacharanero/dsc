@@ -72,4 +72,20 @@ impl DiscourseClient {
         }
         Ok(())
     }
+
+    /// Set a single theme/component setting via
+    /// `PUT /admin/themes/:id/setting.json` with `name` + `value` form fields.
+    /// For JSON-schema list settings, `value` is the JSON text as a string
+    /// (the caller passes it through verbatim).
+    pub fn set_theme_setting(&self, theme_id: u64, name: &str, value: &str) -> Result<()> {
+        let path = format!("/admin/themes/{}/setting.json", theme_id);
+        let payload = [("name", name), ("value", value)];
+        let response = self.send_retrying(|| Ok(self.put(&path)?.form(&payload)))?;
+        let status = response.status();
+        let text = response.text().context("reading theme setting response")?;
+        if !status.is_success() {
+            return Err(http_error("theme setting update request", status, &text));
+        }
+        Ok(())
+    }
 }
