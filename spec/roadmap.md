@@ -32,10 +32,6 @@ Specs marked ⭐ are **field-driven** - they came from real-world use and are in
 
 _(nothing currently in progress)_
 
-## Planned
-
-- [ ] **`dsc user list` negative IDs (bug)** - `user list` fails to parse any page containing Discourse system accounts (`system` id `-1`, `discobot` id `-2`) because `id` is typed `u64`. Field-reported against `rjc-vcop`. Spec: [spec/user-list-negative-ids.md](user-list-negative-ids.md)
-
 ## Pre-1.0 launch checklist
 
 Polish items to land before announcing on [meta.discourse.org](https://meta.discourse.org). Most are small but cumulatively shift perception from "promising 0.x" to "stable, take it seriously."
@@ -59,6 +55,12 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 - [ ] **Evaluate `dsc open` and `dsc import`** - keep, deprecate, or document why they earn their keep before locking the CLI surface.
 
 ## Planned
+
+- [ ] ⭐ **`category pull/push` workflow gaps** — three related gaps: (1) `category pull` does not embed topic IDs in front matter, making push routing fragile; (2) `category push` ignores `--dry-run` (flag not passed to the function); (3) `category push` silently creates duplicate topics on slug mismatch. Spec: [spec/category-workflow.md](category-workflow.md)
+  - [ ] Phase 1: `category pull` writes YAML front matter (`title`, `topic_id`, `url`, `pulled_at`) + `strip_frontmatter()` helper in `utils.rs`
+  - [ ] Phase 2: `category push` reads `topic_id` from front matter and routes by ID; strips front matter before sending body to Discourse
+  - [ ] Phase 3: working `--dry-run` for `category push` with `~`/`+`/`=` output
+  - [ ] Phase 4: `--updates-only` flag errors instead of silently creating on mismatch
 
 ### CLI papercuts and finishing touches
 
