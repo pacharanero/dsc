@@ -5,6 +5,24 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.18] - 2026-06-23
+
+### Bug fixes
+
+- **emoji**: Preserve hyphens in bulk-upload emoji names ([b35aac7](https://github.com/pacharanero/dsc/commit/b35aac7c556cbb4841e145f50c2e8226e825304b))
+
+### Features
+
+- **topic**: Add `topic title` and `topic tags` for metadata editing ([72b3e4e](https://github.com/pacharanero/dsc/commit/72b3e4e862991ee790a1be9c1898782b69cd70d1))
+
+- **theme**: Move `palette` under `theme palette` with a deprecation alias ([63a9320](https://github.com/pacharanero/dsc/commit/63a932030ecd824fa99babfb5f1e1f142d74d083))
+
+- **cli**: Universal --format json|yaml on single-value commands ([3b5c1b5](https://github.com/pacharanero/dsc/commit/3b5c1b5b7681bc553ca201f83bae5534ed0604da))
+
+### Spec
+
+- Dsc topic title and topic tags subcommands ([0f85375](https://github.com/pacharanero/dsc/commit/0f8537567bd69289cabdbec051ef5647ec47449f))
+
 ## [0.10.17] - 2026-06-22
 
 ### Features
