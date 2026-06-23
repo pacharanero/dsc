@@ -97,7 +97,7 @@ pub fn pm_list(
 
 fn parse_recipients(input: &str) -> Vec<String> {
     input
-        .split(|ch| ch == ',' || ch == ';')
+        .split([',', ';'])
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .collect()

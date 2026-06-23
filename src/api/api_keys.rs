@@ -43,8 +43,7 @@ impl DiscourseClient {
         if !status.is_success() {
             return Err(http_error("api keys list request", status, &text));
         }
-        let value: Value =
-            serde_json::from_str(&text).context("parsing api keys response json")?;
+        let value: Value = serde_json::from_str(&text).context("parsing api keys response json")?;
         let keys_value = value
             .get("keys")
             .cloned()
@@ -55,13 +54,17 @@ impl DiscourseClient {
     }
 
     /// Create a new API key. `username` of `None` makes a global all-users key.
-    pub fn create_api_key(&self, description: &str, username: Option<&str>) -> Result<CreatedApiKey> {
+    pub fn create_api_key(
+        &self,
+        description: &str,
+        username: Option<&str>,
+    ) -> Result<CreatedApiKey> {
         let mut payload: Vec<(&str, &str)> = vec![("key[description]", description)];
         if let Some(u) = username {
             payload.push(("key[username]", u));
         }
-        let response = self
-            .send_retrying(|| Ok(self.post("/admin/api/keys.json")?.form(&payload)))?;
+        let response =
+            self.send_retrying(|| Ok(self.post("/admin/api/keys.json")?.form(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading api key create response")?;
         if !status.is_success() {
@@ -77,7 +80,7 @@ impl DiscourseClient {
 
     pub fn revoke_api_key(&self, key_id: u64) -> Result<()> {
         let path = format!("/admin/api/keys/{}.json", key_id);
-        let response = self.send_retrying(|| Ok(self.delete_builder(&path)?))?;
+        let response = self.send_retrying(|| self.delete_builder(&path))?;
         let status = response.status();
         if !status.is_success() {
             let text = response

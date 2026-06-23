@@ -85,7 +85,9 @@ impl DiscourseClient {
         if status.as_u16() == 403 {
             return Ok(None);
         }
-        let text = response.text().context("reading tag groups response body")?;
+        let text = response
+            .text()
+            .context("reading tag groups response body")?;
         if !status.is_success() {
             return Err(http_error("tag groups request", status, &text));
         }
@@ -96,16 +98,16 @@ impl DiscourseClient {
 
     /// Create a tag group. Returns the created group's ID.
     pub fn create_tag_group(&self, payload: &Value) -> Result<u64> {
-        let response = self.send_retrying(|| {
-            Ok(self.post("/tag_groups.json")?.json(payload))
-        })?;
+        let response = self.send_retrying(|| Ok(self.post("/tag_groups.json")?.json(payload)))?;
         let status = response.status();
-        let text = response.text().context("reading create tag group response")?;
+        let text = response
+            .text()
+            .context("reading create tag group response")?;
         if !status.is_success() {
             return Err(http_error("create tag group", status, &text));
         }
-        let value: Value = serde_json::from_str(&text)
-            .context("parsing create tag group response")?;
+        let value: Value =
+            serde_json::from_str(&text).context("parsing create tag group response")?;
         let id = value
             .pointer("/tag_group/id")
             .and_then(|v| v.as_u64())
@@ -116,11 +118,11 @@ impl DiscourseClient {
     /// Update an existing tag group.
     pub fn update_tag_group(&self, group_id: u64, payload: &Value) -> Result<()> {
         let path = format!("/tag_groups/{}.json", group_id);
-        let response = self.send_retrying(|| {
-            Ok(self.put(&path)?.json(payload))
-        })?;
+        let response = self.send_retrying(|| Ok(self.put(&path)?.json(payload)))?;
         let status = response.status();
-        let text = response.text().context("reading update tag group response")?;
+        let text = response
+            .text()
+            .context("reading update tag group response")?;
         if !status.is_success() {
             return Err(http_error("update tag group", status, &text));
         }
@@ -146,9 +148,7 @@ impl DiscourseClient {
         if let Some(desc) = description {
             payload.insert("tag".to_string(), serde_json::json!({"description": desc}));
         }
-        let response = self.send_retrying(|| {
-            Ok(self.put(&path)?.json(&payload))
-        })?;
+        let response = self.send_retrying(|| Ok(self.put(&path)?.json(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading update tag response")?;
         if !status.is_success() {

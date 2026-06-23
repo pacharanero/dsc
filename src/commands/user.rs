@@ -150,7 +150,10 @@ pub fn user_suspend(
 
     let detail = client.fetch_user_detail(username)?;
     client.suspend_user(detail.id, until, reason)?;
-    println!("Suspended {} (id:{}) until {}", detail.username, detail.id, until);
+    println!(
+        "Suspended {} (id:{}) until {}",
+        detail.username, detail.id, until
+    );
     Ok(())
 }
 
@@ -268,7 +271,10 @@ pub fn user_promote(
         Role::Admin => client.grant_admin(detail.id)?,
         Role::Moderator => client.grant_moderation(detail.id)?,
     }
-    println!("Granted {} to {} (id:{})", role_label, detail.username, detail.id);
+    println!(
+        "Granted {} to {} (id:{})",
+        role_label, detail.username, detail.id
+    );
     Ok(())
 }
 
@@ -460,13 +466,12 @@ pub fn user_activity(
 
         let mut past_cutoff = false;
         for action in page {
-            if let Some(cutoff) = cutoff {
-                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&action.created_at) {
-                    if created.with_timezone(&chrono::Utc) < cutoff {
-                        past_cutoff = true;
-                        continue;
-                    }
-                }
+            if let Some(cutoff) = cutoff
+                && let Ok(created) = chrono::DateTime::parse_from_rfc3339(&action.created_at)
+                && created.with_timezone(&chrono::Utc) < cutoff
+            {
+                past_cutoff = true;
+                continue;
             }
             collected.push(action);
             if collected.len() as u32 >= max {
@@ -483,11 +488,7 @@ pub fn user_activity(
     render_activity(&collected, &normalize_baseurl(&discourse.baseurl), format)
 }
 
-fn render_activity(
-    actions: &[UserAction],
-    baseurl: &str,
-    format: ActivityFormat,
-) -> Result<()> {
+fn render_activity(actions: &[UserAction], baseurl: &str, format: ActivityFormat) -> Result<()> {
     match format {
         ActivityFormat::Text => {
             if actions.is_empty() {
@@ -511,12 +512,7 @@ fn render_activity(
             for a in actions {
                 let date = a.created_at.split('T').next().unwrap_or(&a.created_at);
                 let title = a.title.as_deref().unwrap_or("(untitled)");
-                println!(
-                    "- [{}]({}) — {}",
-                    title,
-                    activity_url(baseurl, a),
-                    date
-                );
+                println!("- [{}]({}) — {}", title, activity_url(baseurl, a), date);
             }
         }
         ActivityFormat::Csv => {
@@ -761,7 +757,10 @@ pub fn user_password_reset(
     // Discourse deliberately returns a generic success even for unknown
     // users to prevent enumeration — surface that so the caller doesn't
     // over-trust the result.
-    println!("Password reset request sent for {} (if that user exists).", username);
+    println!(
+        "Password reset request sent for {} (if that user exists).",
+        username
+    );
     Ok(())
 }
 

@@ -1,7 +1,5 @@
 use super::models::{AboutResponse, SiteResponse};
-use super::rate_limit::{
-    RETRY_BUFFER, parse_rate_limit_wait, summarize_rate_limit_body,
-};
+use super::rate_limit::{RETRY_BUFFER, parse_rate_limit_wait, summarize_rate_limit_body};
 use crate::config::DiscourseConfig;
 use crate::utils::normalize_baseurl;
 use anyhow::{Context, Result, anyhow};
@@ -83,7 +81,10 @@ impl DiscourseClient {
 
     pub(crate) fn delete(&self, path: &str) -> Result<reqwest::blocking::Response> {
         let url = format!("{}{}", self.baseurl, path);
-        self.client.delete(url).send().context("sending delete request")
+        self.client
+            .delete(url)
+            .send()
+            .context("sending delete request")
     }
 
     pub(crate) fn delete_builder(&self, path: &str) -> Result<RequestBuilder> {

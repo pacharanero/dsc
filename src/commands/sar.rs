@@ -88,7 +88,11 @@ pub fn sar(
     write_json(&dir.join("groups.json"), &groups)?;
 
     // Authored posts, with full raw content fetched per post.
-    let post_actions = collect_all_actions(&client, &subject.username, &[ACTION_NEW_TOPIC, ACTION_REPLY])?;
+    let post_actions = collect_all_actions(
+        &client,
+        &subject.username,
+        &[ACTION_NEW_TOPIC, ACTION_REPLY],
+    )?;
     let posts_dir = dir.join("posts");
     ensure_dir(&posts_dir)?;
     let mut posts_json: Vec<Value> = Vec::with_capacity(post_actions.len());
@@ -137,8 +141,8 @@ pub fn sar(
         groups: groups.as_array().map(|a| a.len()).unwrap_or(0),
         messages: message_count,
     };
-    let has_ip = profile.get("ip_address").is_some()
-        || profile.get("registration_ip_address").is_some();
+    let has_ip =
+        profile.get("ip_address").is_some() || profile.get("registration_ip_address").is_some();
     let manifest = build_manifest(
         &subject,
         &discourse.name,
@@ -457,7 +461,14 @@ mod tests {
             groups: 3,
             messages: 7,
         };
-        let m = build_manifest(&subject(), "rcpch", "2026-06-23T09:00:00Z", &counts, true, true);
+        let m = build_manifest(
+            &subject(),
+            "rcpch",
+            "2026-06-23T09:00:00Z",
+            &counts,
+            true,
+            true,
+        );
         assert_eq!(m["subject"]["user_id"], 412);
         assert_eq!(m["sections"]["posts"], 84);
         assert_eq!(m["messages_included"], true);

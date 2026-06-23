@@ -56,10 +56,10 @@ pub fn update_all(
     let max_threads = parallel_worker_count(max, updatable.len());
     let mut handles: Vec<thread::JoinHandle<Result<()>>> = Vec::new();
     for discourse in updatable {
-        if handles.len() >= max_threads {
-            if let Some(handle) = handles.pop() {
-                handle.join().expect("thread panicked")?;
-            }
+        if handles.len() >= max_threads
+            && let Some(handle) = handles.pop()
+        {
+            handle.join().expect("thread panicked")?;
         }
         let do_post = post_changelog;
         let auto_yes = yes;
@@ -173,15 +173,15 @@ fn run_update(discourse: &DiscourseConfig) -> Result<UpdateMetadata> {
         .and_then(|raw| raw.trim().parse::<u64>().ok())
         .filter(|gb| *gb > 0)
         .unwrap_or(5);
-    if let Some(available_gb) = get_root_disk_available_gb(&target)? {
-        if available_gb < min_free_gb {
-            return Err(anyhow!(
-                "insufficient disk space on {}: {}G free (minimum {}G). Please run an interactive update via SSH to clean up space, then retry.",
-                target,
-                available_gb,
-                min_free_gb
-            ));
-        }
+    if let Some(available_gb) = get_root_disk_available_gb(&target)?
+        && available_gb < min_free_gb
+    {
+        return Err(anyhow!(
+            "insufficient disk space on {}: {}G free (minimum {}G). Please run an interactive update via SSH to clean up space, then retry.",
+            target,
+            available_gb,
+            min_free_gb
+        ));
     }
 
     let rootless = discourse.docker_rootless.unwrap_or(false);
@@ -199,17 +199,16 @@ fn run_update(discourse: &DiscourseConfig) -> Result<UpdateMetadata> {
             "cd /var/discourse && sudo -n ./launcher rebuild app".to_string()
         }
     });
-    let cleanup_cmd = std::env::var("DSC_SSH_CLEANUP_CMD")
-        .unwrap_or_else(|_| {
-            // ./launcher cleanup runs docker container prune + docker image prune, both of which
-            // prompt for [y/N] confirmation. Without a TTY, they read EOF and default to N,
-            // silently doing nothing. Use -f to skip confirmation in non-interactive SSH.
-            if rootless {
-                "docker container prune -f && docker image prune -f".to_string()
-            } else {
-                "sudo -n docker container prune -f && sudo -n docker image prune -f".to_string()
-            }
-        });
+    let cleanup_cmd = std::env::var("DSC_SSH_CLEANUP_CMD").unwrap_or_else(|_| {
+        // ./launcher cleanup runs docker container prune + docker image prune, both of which
+        // prompt for [y/N] confirmation. Without a TTY, they read EOF and default to N,
+        // silently doing nothing. Use -f to skip confirmation in non-interactive SSH.
+        if rootless {
+            "docker container prune -f && docker image prune -f".to_string()
+        } else {
+            "sudo -n docker container prune -f && sudo -n docker image prune -f".to_string()
+        }
+    });
 
     let mut server_rebooted = false;
 
@@ -506,10 +505,10 @@ fn build_ssh_command(target: &str, extra_options: &[&str]) -> Result<std::proces
     for option in extra_options {
         cmd.arg(option);
     }
-    if let Ok(raw) = std::env::var("DSC_SSH_OPTIONS") {
-        if !raw.trim().is_empty() {
-            cmd.args(raw.split_whitespace());
-        }
+    if let Ok(raw) = std::env::var("DSC_SSH_OPTIONS")
+        && !raw.trim().is_empty()
+    {
+        cmd.args(raw.split_whitespace());
     }
     cmd.arg("--").arg(target);
     Ok(cmd)
@@ -604,11 +603,11 @@ fn parse_reclaimed_space(output: &str) -> Option<String> {
             let lower = line.to_ascii_lowercase();
             let idx = lower.find("total reclaimed space:")?;
             let (_, rest) = line.split_at(idx);
-            rest.splitn(2, ':')
-                .nth(1)
+            rest.split_once(':')
+                .map(|x| x.1)
                 .map(|value| value.trim().to_string())
         })
-        .last()
+        .next_back()
 }
 
 fn get_root_disk_usage(target: &str) -> Result<String> {
@@ -786,16 +785,14 @@ fn strip_ansi_codes(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut chars = input.chars().peekable();
     while let Some(ch) = chars.next() {
-        if ch == '\u{1b}' {
-            if matches!(chars.peek(), Some('[')) {
-                chars.next();
-                while let Some(next) = chars.next() {
-                    if next.is_ascii_alphabetic() {
-                        break;
-                    }
+        if ch == '\u{1b}' && matches!(chars.peek(), Some('[')) {
+            chars.next();
+            for next in chars.by_ref() {
+                if next.is_ascii_alphabetic() {
+                    break;
                 }
-                continue;
             }
+            continue;
         }
         out.push(ch);
     }

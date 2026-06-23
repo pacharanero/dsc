@@ -2,7 +2,7 @@ use crate::api::{DiscourseClient, SiteSettingDetail};
 use crate::cli::ListFormat;
 use crate::commands::common::{emit_result, ensure_api_credentials, parse_tags, select_discourse};
 use crate::config::{Config, DiscourseConfig};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -165,15 +165,22 @@ fn render_audit_text(setting: &str, rows: &[AuditRow]) -> String {
             (None, Some(e)) => format!("<error: {}>", e),
             (None, None) => String::new(),
         };
-        out.push_str(&format!("{:width$}  {}\n", row.discourse, cell, width = width));
+        out.push_str(&format!(
+            "{:width$}  {}\n",
+            row.discourse,
+            cell,
+            width = width
+        ));
     }
     let values: Vec<&String> = rows.iter().filter_map(|r| r.value.as_ref()).collect();
-    let distinct: std::collections::BTreeSet<&str> =
-        values.iter().map(|v| v.as_str()).collect();
+    let distinct: std::collections::BTreeSet<&str> = values.iter().map(|v| v.as_str()).collect();
     let summary = match (values.len(), distinct.len()) {
         (0, _) => format!("no forum returned a value for '{}'", setting),
         (n, 1) => format!("all {} forum(s) agree on '{}'", n, setting),
-        (n, d) => format!("{} distinct values for '{}' across {} forum(s)", d, setting, n),
+        (n, d) => format!(
+            "{} distinct values for '{}' across {} forum(s)",
+            d, setting, n
+        ),
     };
     out.push_str(&format!("\n{}\n", summary));
     out
@@ -332,9 +339,7 @@ pub fn pull_settings(
         ca.cmp(cb).then_with(|| a.name.cmp(&b.name))
     });
 
-    let pulled_at = chrono::Utc::now()
-        .format("%Y-%m-%dT%H:%M:%SZ")
-        .to_string();
+    let pulled_at = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
     let file = SettingsFile {
         version: 1,
@@ -349,8 +354,7 @@ pub fn pull_settings(
         serde_yaml::to_string(&file).context("serializing settings as YAML")?
     };
 
-    fs::write(local_path, &content)
-        .with_context(|| format!("writing {}", local_path.display()))?;
+    fs::write(local_path, &content).with_context(|| format!("writing {}", local_path.display()))?;
 
     println!(
         "Wrote {} setting{} to {}",
@@ -430,10 +434,8 @@ pub fn push_settings(
     }
 
     let server = client.list_site_settings_detailed()?;
-    let server_by_name: std::collections::HashMap<&str, &SiteSettingDetail> = server
-        .iter()
-        .map(|s| (s.setting.as_str(), s))
-        .collect();
+    let server_by_name: std::collections::HashMap<&str, &SiteSettingDetail> =
+        server.iter().map(|s| (s.setting.as_str(), s)).collect();
 
     let mut plan: Vec<PushAction> = Vec::new();
 
@@ -723,8 +725,8 @@ fn load_diff_source(config: &Config, src: &str) -> Result<DiffSource> {
             Some(ref ext) if ext == "yaml" || ext == "yml" || ext == "json"
         );
     if looks_like_file {
-        let raw = fs::read_to_string(path)
-            .with_context(|| format!("reading {}", path.display()))?;
+        let raw =
+            fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
         let file: SettingsFile = if is_json_path(path) {
             serde_json::from_str(&raw).context("parsing settings file as JSON")?
         } else {
@@ -835,34 +837,52 @@ mod tests {
     #[test]
     fn tag_filter_matches_case_insensitively() {
         let filter = vec!["Prod".to_string()];
-        assert!(matches_tag_filter(&disc("a", Some(vec!["prod", "eu"])), &filter));
+        assert!(matches_tag_filter(
+            &disc("a", Some(vec!["prod", "eu"])),
+            &filter
+        ));
     }
 
     #[test]
     fn tag_filter_rejects_untagged_or_nonmatching() {
         let filter = vec!["prod".to_string()];
         assert!(!matches_tag_filter(&disc("a", None), &filter));
-        assert!(!matches_tag_filter(&disc("a", Some(vec!["staging"])), &filter));
+        assert!(!matches_tag_filter(
+            &disc("a", Some(vec!["staging"])),
+            &filter
+        ));
     }
 
     #[test]
     fn audit_text_reports_agreement() {
-        let rows = vec![row("forum-a", Some("My Forum"), None), row("forum-b", Some("My Forum"), None)];
+        let rows = vec![
+            row("forum-a", Some("My Forum"), None),
+            row("forum-b", Some("My Forum"), None),
+        ];
         let out = render_audit_text("title", &rows);
         assert!(out.contains("forum-a  My Forum"));
-        assert!(out.contains("all 2 forum(s) agree on 'title'"), "got: {out}");
+        assert!(
+            out.contains("all 2 forum(s) agree on 'title'"),
+            "got: {out}"
+        );
     }
 
     #[test]
     fn audit_text_reports_distinct_values() {
         let rows = vec![row("a", Some("X"), None), row("b", Some("Y"), None)];
         let out = render_audit_text("title", &rows);
-        assert!(out.contains("2 distinct values for 'title' across 2 forum(s)"), "got: {out}");
+        assert!(
+            out.contains("2 distinct values for 'title' across 2 forum(s)"),
+            "got: {out}"
+        );
     }
 
     #[test]
     fn audit_text_renders_errors_and_excludes_them_from_agreement() {
-        let rows = vec![row("a", Some("X"), None), row("b", None, Some("auth failed"))];
+        let rows = vec![
+            row("a", Some("X"), None),
+            row("b", None, Some("auth failed")),
+        ];
         let out = render_audit_text("title", &rows);
         assert!(out.contains("<error: auth failed>"));
         // Only one forum returned a value, so they trivially "agree".

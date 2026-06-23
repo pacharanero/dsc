@@ -6,25 +6,21 @@ pub(crate) const DEFAULT_BACKOFF: Duration = Duration::from_secs(5);
 pub(crate) const RETRY_BUFFER: Duration = Duration::from_secs(1);
 
 pub(crate) fn parse_rate_limit_wait(headers: &HeaderMap, body: &str) -> Duration {
-    if let Some(val) = headers.get(reqwest::header::RETRY_AFTER) {
-        if let Ok(s) = val.to_str() {
-            if let Ok(secs) = s.trim().parse::<u64>() {
-                if secs > 0 {
-                    return Duration::from_secs(secs);
-                }
-            }
-        }
+    if let Some(val) = headers.get(reqwest::header::RETRY_AFTER)
+        && let Ok(s) = val.to_str()
+        && let Ok(secs) = s.trim().parse::<u64>()
+        && secs > 0
+    {
+        return Duration::from_secs(secs);
     }
-    if let Ok(val) = serde_json::from_str::<Value>(body) {
-        if let Some(secs) = val
+    if let Ok(val) = serde_json::from_str::<Value>(body)
+        && let Some(secs) = val
             .get("extras")
             .and_then(|e| e.get("wait_seconds"))
             .and_then(|w| w.as_u64())
-        {
-            if secs > 0 {
-                return Duration::from_secs(secs);
-            }
-        }
+        && secs > 0
+    {
+        return Duration::from_secs(secs);
     }
     if let Some(secs) = extract_retry_seconds_from_text(body) {
         return Duration::from_secs(secs);
@@ -38,10 +34,10 @@ pub(crate) fn extract_retry_seconds_from_text(body: &str) -> Option<u64> {
         if let Some(pos) = lower.find(needle) {
             let tail = &lower[pos + needle.len()..];
             let digits: String = tail.chars().take_while(|c| c.is_ascii_digit()).collect();
-            if let Ok(secs) = digits.parse::<u64>() {
-                if secs > 0 {
-                    return Some(secs);
-                }
+            if let Ok(secs) = digits.parse::<u64>()
+                && secs > 0
+            {
+                return Some(secs);
             }
         }
     }
@@ -49,15 +45,15 @@ pub(crate) fn extract_retry_seconds_from_text(body: &str) -> Option<u64> {
 }
 
 pub(crate) fn summarize_rate_limit_body(body: &str) -> String {
-    if let Ok(val) = serde_json::from_str::<Value>(body) {
-        if let Some(errs) = val.get("errors").and_then(|e| e.as_array()) {
-            let joined: Vec<String> = errs
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect();
-            if !joined.is_empty() {
-                return joined.join("; ");
-            }
+    if let Ok(val) = serde_json::from_str::<Value>(body)
+        && let Some(errs) = val.get("errors").and_then(|e| e.as_array())
+    {
+        let joined: Vec<String> = errs
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
+        if !joined.is_empty() {
+            return joined.join("; ");
         }
     }
     let first_line = body.lines().next().unwrap_or("").trim();
@@ -70,7 +66,9 @@ pub(crate) fn summarize_rate_limit_body(body: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_retry_seconds_from_text, parse_rate_limit_wait, summarize_rate_limit_body};
+    use super::{
+        extract_retry_seconds_from_text, parse_rate_limit_wait, summarize_rate_limit_body,
+    };
     use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
     use std::time::Duration;
 

@@ -29,10 +29,7 @@ impl DiscourseClient {
     /// Search for topics. The `query` is passed through to Discourse verbatim
     /// (so callers can use `category:`, `status:`, `@user`, etc. filters).
     pub fn search_topics(&self, query: &str) -> Result<Vec<SearchHit>> {
-        let path = format!(
-            "/search.json?q={}",
-            urlencode_form(query)
-        );
+        let path = format!("/search.json?q={}", urlencode_form(query));
         let response = self.get(&path)?;
         let status = response.status();
         let text = response.text().context("reading search response body")?;

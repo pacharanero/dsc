@@ -49,16 +49,16 @@ impl DiscourseClient {
         let upload_json_path = emoji_admin_path("/admin/customize/emojis.json");
         let upload_path = emoji_admin_path("/admin/customize/emojis");
 
-        let mut response = self
-            .send_retrying(|| Ok(self.post(&upload_v2_json_path)?.multipart(make_form_v2()?)))?;
+        let mut response =
+            self.send_retrying(|| Ok(self.post(&upload_v2_json_path)?.multipart(make_form_v2()?)))?;
         if response.status() == StatusCode::NOT_FOUND {
             response = self.send_retrying(|| {
                 Ok(self.post(&upload_json_path)?.multipart(make_form_legacy()?))
             })?;
         }
         if response.status() == StatusCode::NOT_FOUND {
-            response = self
-                .send_retrying(|| Ok(self.post(&upload_path)?.multipart(make_form_legacy()?)))?;
+            response =
+                self.send_retrying(|| Ok(self.post(&upload_path)?.multipart(make_form_legacy()?)))?;
         }
         if !response.status().is_success() {
             let status = response.status();
@@ -139,10 +139,10 @@ impl DiscourseClient {
         if let Some(val) = value.get("custom") {
             out.extend(extract_emojis_from_value(val, baseurl));
         }
-        if out.is_empty() {
-            if let Some(val) = value.get("emoji") {
-                out.extend(extract_emojis_from_value(val, baseurl));
-            }
+        if out.is_empty()
+            && let Some(val) = value.get("emoji")
+        {
+            out.extend(extract_emojis_from_value(val, baseurl));
         }
         Ok(out)
     }
@@ -260,4 +260,3 @@ fn normalize_emoji_url(baseurl: &str, url: &str) -> String {
         format!("{}/{}", baseurl, url)
     }
 }
-

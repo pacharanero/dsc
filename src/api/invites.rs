@@ -43,10 +43,10 @@ impl DiscourseClient {
         if let Some(topic) = topic_id {
             payload.push(("topic_id", topic.to_string()));
         }
-        if let Some(msg) = custom_message {
-            if !msg.trim().is_empty() {
-                payload.push(("custom_message", msg.to_string()));
-            }
+        if let Some(msg) = custom_message
+            && !msg.trim().is_empty()
+        {
+            payload.push(("custom_message", msg.to_string()));
         }
         let response = self.send_retrying(|| Ok(self.post("/invites.json")?.form(&payload)))?;
         let status = response.status();
@@ -56,8 +56,7 @@ impl DiscourseClient {
         }
         // The response is sometimes the bare invite object, sometimes wrapped
         // — accept either.
-        let value: Value =
-            serde_json::from_str(&text).context("parsing invite response json")?;
+        let value: Value = serde_json::from_str(&text).context("parsing invite response json")?;
         let target = value.get("invite").unwrap_or(&value);
         let result: InviteResult =
             serde_json::from_value(target.clone()).context("deserialising invite")?;

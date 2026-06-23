@@ -10,11 +10,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-pub fn pull_emojis(
-    config: &Config,
-    discourse_name: &str,
-    output_dir: &Path,
-) -> Result<()> {
+pub fn pull_emojis(config: &Config, discourse_name: &str, output_dir: &Path) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
@@ -52,7 +48,10 @@ pub fn pull_emojis(
             .next()
             .and_then(|e| {
                 let lower = e.to_lowercase();
-                if matches!(lower.as_str(), "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp") {
+                if matches!(
+                    lower.as_str(),
+                    "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp"
+                ) {
                     Some(lower)
                 } else {
                     None
@@ -74,22 +73,20 @@ pub fn pull_emojis(
         };
 
         match http.get(&url).send() {
-            Ok(resp) if resp.status().is_success() => {
-                match resp.bytes() {
-                    Ok(bytes) => {
-                        if let Err(e) = fs::write(&dest, &bytes) {
-                            eprintln!("Failed to write {}: {}", dest.display(), e);
-                            failed += 1;
-                        } else {
-                            downloaded += 1;
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to read response for {}: {}", emoji.name, e);
+            Ok(resp) if resp.status().is_success() => match resp.bytes() {
+                Ok(bytes) => {
+                    if let Err(e) = fs::write(&dest, &bytes) {
+                        eprintln!("Failed to write {}: {}", dest.display(), e);
                         failed += 1;
+                    } else {
+                        downloaded += 1;
                     }
                 }
-            }
+                Err(e) => {
+                    eprintln!("Failed to read response for {}: {}", emoji.name, e);
+                    failed += 1;
+                }
+            },
             Ok(resp) => {
                 eprintln!("HTTP {} downloading {}", resp.status(), emoji.name);
                 failed += 1;
@@ -320,10 +317,10 @@ fn detect_inline_protocol() -> Option<InlineProtocol> {
             return None;
         }
     }
-    if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
-        if term_program == "iTerm.app" || term_program == "WezTerm" {
-            return Some(InlineProtocol::Iterm2);
-        }
+    if let Ok(term_program) = std::env::var("TERM_PROGRAM")
+        && (term_program == "iTerm.app" || term_program == "WezTerm")
+    {
+        return Some(InlineProtocol::Iterm2);
     }
     if std::env::var("KITTY_WINDOW_ID").is_ok()
         || std::env::var("KITTY_SESSION_ID").is_ok()

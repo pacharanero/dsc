@@ -4,11 +4,7 @@ use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
 use anyhow::Result;
 
-pub fn api_key_list(
-    config: &Config,
-    discourse_name: &str,
-    format: ListFormat,
-) -> Result<()> {
+pub fn api_key_list(config: &Config, discourse_name: &str, format: ListFormat) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
@@ -86,7 +82,10 @@ pub fn api_key_create(
             if let Some(d) = &created.description {
                 println!("description: {}", d);
             }
-            println!("username:    {}", created.username.as_deref().unwrap_or("(all-users)"));
+            println!(
+                "username:    {}",
+                created.username.as_deref().unwrap_or("(all-users)")
+            );
             if let Some(c) = &created.created_at {
                 println!("created_at:  {}", c);
             }
@@ -108,7 +107,10 @@ pub fn api_key_revoke(
     let client = DiscourseClient::new(discourse)?;
 
     if dry_run {
-        println!("[dry-run] {}: would revoke api key id:{}", discourse.name, key_id);
+        println!(
+            "[dry-run] {}: would revoke api key id:{}",
+            discourse.name, key_id
+        );
         return Ok(());
     }
 

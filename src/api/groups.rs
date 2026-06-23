@@ -261,7 +261,7 @@ impl DiscourseClient {
             group_id,
             usernames.join(",")
         );
-        let response = self.send_retrying(|| Ok(self.delete_builder(&path)?))?;
+        let response = self.send_retrying(|| self.delete_builder(&path))?;
         let status = response.status();
         if !status.is_success() {
             let text = response

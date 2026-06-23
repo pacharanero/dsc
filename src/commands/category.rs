@@ -375,10 +375,10 @@ fn unique_categories(flat: Vec<CategoryInfo>) -> Vec<CategoryInfo> {
     let mut seen = std::collections::HashSet::new();
     let mut unique = Vec::new();
     for category in flat {
-        if let Some(id) = category.id {
-            if !seen.insert(id) {
-                continue;
-            }
+        if let Some(id) = category.id
+            && !seen.insert(id)
+        {
+            continue;
         }
         unique.push(category);
     }
@@ -390,21 +390,21 @@ fn print_category_tree(categories: &[CategoryInfo]) {
     let mut map = std::collections::HashMap::new();
     for category in categories {
         if let Some(id) = category.id {
-            if !map.contains_key(&id) {
+            map.entry(id).or_insert_with(|| {
                 ordered_ids.push(id);
-                map.insert(id, category.clone());
-            }
+                category.clone()
+            });
         }
     }
 
     let mut children: std::collections::HashMap<u64, Vec<u64>> = std::collections::HashMap::new();
     for category in map.values() {
-        if let (Some(id), Some(parent_id)) = (category.id, category.parent_category_id) {
-            if map.contains_key(&parent_id) {
-                let entry = children.entry(parent_id).or_default();
-                if !entry.contains(&id) {
-                    entry.push(id);
-                }
+        if let (Some(id), Some(parent_id)) = (category.id, category.parent_category_id)
+            && map.contains_key(&parent_id)
+        {
+            let entry = children.entry(parent_id).or_default();
+            if !entry.contains(&id) {
+                entry.push(id);
             }
         }
     }
@@ -567,7 +567,11 @@ mod tests {
 
     #[test]
     fn route_falls_back_to_slug_match_without_front_matter() {
-        let topics = vec![summary(55, "Dependency management", "dependency-management")];
+        let topics = vec![summary(
+            55,
+            "Dependency management",
+            "dependency-management",
+        )];
         let f = HashMap::new();
         let path = PathBuf::from("dependency-management.md");
         assert_eq!(
@@ -578,7 +582,11 @@ mod tests {
 
     #[test]
     fn route_returns_none_when_nothing_matches() {
-        let topics = vec![summary(55, "Dependency management", "dependency-management")];
+        let topics = vec![summary(
+            55,
+            "Dependency management",
+            "dependency-management",
+        )];
         let f = HashMap::new();
         let path = PathBuf::from("brand-new-file.md");
         assert_eq!(route_topic_id(&f, "Brand new file", &path, &topics), None);
@@ -587,7 +595,11 @@ mod tests {
     #[test]
     fn route_ignores_unparseable_front_matter_topic_id() {
         // A garbage topic_id must not route; fall through to slug matching.
-        let topics = vec![summary(55, "Dependency management", "dependency-management")];
+        let topics = vec![summary(
+            55,
+            "Dependency management",
+            "dependency-management",
+        )];
         let f = front(&[("topic_id", "not-a-number")]);
         let path = PathBuf::from("dependency-management.md");
         assert_eq!(

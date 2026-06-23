@@ -140,7 +140,10 @@ fn theme_pull_push() {
         .trim()
         .parse()
         .expect("theme push should print numeric ID");
-    assert_eq!(returned_id, theme_id, "push should return the updated theme ID");
+    assert_eq!(
+        returned_id, theme_id,
+        "push should return the updated theme ID"
+    );
 }
 
 #[test]
@@ -184,7 +187,10 @@ fn theme_show() {
         Some(theme_id),
         "theme show id should match requested theme"
     );
-    assert!(parsed.get("settings_count").is_some(), "missing settings_count");
+    assert!(
+        parsed.get("settings_count").is_some(),
+        "missing settings_count"
+    );
     assert!(parsed.get("fields").is_some(), "missing fields inventory");
 }
 

@@ -26,8 +26,7 @@ pub fn post_pull(
                 fs::create_dir_all(parent)
                     .with_context(|| format!("creating directory {}", parent.display()))?;
             }
-            fs::write(path, &raw)
-                .with_context(|| format!("writing {}", path.display()))?;
+            fs::write(path, &raw).with_context(|| format!("writing {}", path.display()))?;
             println!("Post {} pulled to {}", post_id, path.display());
         }
         None => {
@@ -79,7 +78,10 @@ pub fn post_delete(
     let client = DiscourseClient::new(discourse)?;
 
     if dry_run {
-        println!("[dry-run] {}: would delete post {}", discourse.name, post_id);
+        println!(
+            "[dry-run] {}: would delete post {}",
+            discourse.name, post_id
+        );
         return Ok(());
     }
 
@@ -101,11 +103,7 @@ pub fn post_move(
 
     let info = client.fetch_post(post_id)?;
     if info.topic_id == to_topic {
-        return Err(anyhow!(
-            "post {} is already in topic {}",
-            post_id,
-            to_topic
-        ));
+        return Err(anyhow!("post {} is already in topic {}", post_id, to_topic));
     }
 
     if dry_run {

@@ -32,14 +32,14 @@ impl DiscourseClient {
     /// Create a new theme and return its ID.
     pub fn create_theme(&self, theme: &Value) -> Result<u64> {
         let payload = json!({ "theme": theme });
-        let response = self.send_retrying(|| Ok(self.post("/admin/themes.json")?.json(&payload)))?;
+        let response =
+            self.send_retrying(|| Ok(self.post("/admin/themes.json")?.json(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading create theme response")?;
         if !status.is_success() {
             return Err(http_error("create theme request", status, &text));
         }
-        let value: Value =
-            serde_json::from_str(&text).context("parsing create theme response")?;
+        let value: Value = serde_json::from_str(&text).context("parsing create theme response")?;
         let id = value
             .get("theme")
             .and_then(|v| v.get("id"))

@@ -184,14 +184,13 @@ fn colors_from_value(value: &Value) -> BTreeMap<String, String> {
         Value::Array(items) => {
             let mut out = BTreeMap::new();
             for item in items {
-                if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
-                    if let Some(hex) = item
+                if let Some(name) = item.get("name").and_then(|v| v.as_str())
+                    && let Some(hex) = item
                         .get("hex")
                         .and_then(|v| v.as_str())
                         .or_else(|| item.get("value").and_then(|v| v.as_str()))
-                    {
-                        out.insert(name.to_string(), hex.to_string());
-                    }
+                {
+                    out.insert(name.to_string(), hex.to_string());
                 }
             }
             out
@@ -216,10 +215,10 @@ fn write_palette_file(path: &Path, palette: &PaletteFile) -> Result<()> {
     } else {
         serde_json::to_string_pretty(palette).context("serializing palette json")?
     };
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
-        }
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     }
     fs::write(path, content).with_context(|| format!("writing {}", path.display()))?;
     Ok(())

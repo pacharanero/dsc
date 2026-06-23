@@ -181,7 +181,12 @@ mod tests {
 }
 
 fn print_text(reports: &[CheckReport]) {
-    let name_width = reports.iter().map(|r| r.name.len()).max().unwrap_or(0).max(4);
+    let name_width = reports
+        .iter()
+        .map(|r| r.name.len())
+        .max()
+        .unwrap_or(0)
+        .max(4);
     for r in reports {
         let api_mark = if r.api.ok { "ok " } else { "FAIL" };
         println!(
@@ -203,4 +208,3 @@ fn print_text(reports: &[CheckReport]) {
         }
     }
 }
-

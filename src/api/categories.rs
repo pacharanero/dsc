@@ -45,10 +45,10 @@ impl DiscourseClient {
                 }
             }
             for cat in site_categories {
-                if let Some(id) = cat.id {
-                    if !seen.contains_key(&id) {
-                        categories.push(cat);
-                    }
+                if let Some(id) = cat.id
+                    && !seen.contains_key(&id)
+                {
+                    categories.push(cat);
                 }
             }
         }

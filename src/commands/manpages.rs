@@ -46,8 +46,7 @@ fn write_subtree(cmd: &Command, dir: &Path, prefix: &str, count: &mut usize) -> 
     let mut buffer: Vec<u8> = Vec::new();
     man.render(&mut buffer)
         .with_context(|| format!("rendering {}", file_path.display()))?;
-    fs::write(&file_path, &buffer)
-        .with_context(|| format!("writing {}", file_path.display()))?;
+    fs::write(&file_path, &buffer).with_context(|| format!("writing {}", file_path.display()))?;
     *count += 1;
 
     for sub in cmd.get_subcommands() {

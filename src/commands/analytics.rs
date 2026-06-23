@@ -107,7 +107,11 @@ pub fn analytics(
 
 fn window_from_since(since: &str, now: DateTime<Utc>) -> Result<Window> {
     let cutoff = parse_since_cutoff(since)?;
-    let (start, end) = if cutoff <= now { (cutoff, now) } else { (now, cutoff) };
+    let (start, end) = if cutoff <= now {
+        (cutoff, now)
+    } else {
+        (now, cutoff)
+    };
     Ok(Window {
         since: start,
         until: end,
@@ -226,7 +230,10 @@ impl Metric {
     }
     /// % delta from values[1] → values[0]. Used in compare mode.
     fn delta_pct(&self) -> Option<f64> {
-        match (self.values.first().copied().flatten(), self.values.get(1).copied().flatten()) {
+        match (
+            self.values.first().copied().flatten(),
+            self.values.get(1).copied().flatten(),
+        ) {
             (Some(c), Some(p)) if p != 0.0 => Some(((c - p) / p) * 100.0),
             _ => None,
         }
@@ -286,14 +293,16 @@ fn populate_cache(client: &DiscourseClient, windows: &[Window]) -> Result<Report
             let client = client.clone();
             let cache = cache.clone();
             let queue = queue.clone();
-            scope.spawn(move || loop {
-                let next = { queue.lock().ok().and_then(|mut q| q.next()) };
-                let Some((id, w_idx, start, end)) = next else {
-                    break;
-                };
-                let value = fetch_optional(&client, &id, &start, &end);
-                if let Ok(mut guard) = cache.lock() {
-                    guard.insert((id, w_idx), value);
+            scope.spawn(move || {
+                loop {
+                    let next = { queue.lock().ok().and_then(|mut q| q.next()) };
+                    let Some((id, w_idx, start, end)) = next else {
+                        break;
+                    };
+                    let value = fetch_optional(&client, &id, &start, &end);
+                    if let Ok(mut guard) = cache.lock() {
+                        guard.insert((id, w_idx), value);
+                    }
                 }
             });
         }
@@ -306,9 +315,7 @@ fn populate_cache(client: &DiscourseClient, windows: &[Window]) -> Result<Report
 }
 
 fn report_at<'a>(cache: &'a ReportCache, id: &str, w: usize) -> Option<&'a AdminReport> {
-    cache
-        .get(&(id.to_string(), w))
-        .and_then(|opt| opt.as_ref())
+    cache.get(&(id.to_string(), w)).and_then(|opt| opt.as_ref())
 }
 
 /// Per-window total for a single report. None when the report was
@@ -379,19 +386,54 @@ fn build_growth(cache: &ReportCache, n: usize) -> Vec<Metric> {
     let mut out = Vec::new();
 
     out.push(
-        Metric::new("new contributors", "new_contributors", Direction::Up, Unit::Count, n)
-            .with_values(totals_for(cache, "new_contributors", n)),
+        Metric::new(
+            "new contributors",
+            "new_contributors",
+            Direction::Up,
+            Unit::Count,
+            n,
+        )
+        .with_values(totals_for(cache, "new_contributors", n)),
     );
     out.push(
-        Metric::new("reactivated users", "reactivated_users", Direction::Up, Unit::Count, n).stub(),
+        Metric::new(
+            "reactivated users",
+            "reactivated_users",
+            Direction::Up,
+            Unit::Count,
+            n,
+        )
+        .stub(),
     );
-    out.push(Metric::new("lost regulars", "lost_regulars", Direction::Down, Unit::Count, n).stub());
     out.push(
-        Metric::new("net active change", "net_active_change", Direction::Up, Unit::Count, n).stub(),
+        Metric::new(
+            "lost regulars",
+            "lost_regulars",
+            Direction::Down,
+            Unit::Count,
+            n,
+        )
+        .stub(),
     );
     out.push(
-        Metric::new("trust-level promotions", "trust_level_promotions", Direction::Up, Unit::Count, n)
-            .with_values(totals_for(cache, "trust_level_growth", n)),
+        Metric::new(
+            "net active change",
+            "net_active_change",
+            Direction::Up,
+            Unit::Count,
+            n,
+        )
+        .stub(),
+    );
+    out.push(
+        Metric::new(
+            "trust-level promotions",
+            "trust_level_promotions",
+            Direction::Up,
+            Unit::Count,
+            n,
+        )
+        .with_values(totals_for(cache, "trust_level_growth", n)),
     );
 
     out
@@ -405,22 +447,54 @@ fn build_activity(cache: &ReportCache, n: usize) -> Vec<Metric> {
     let no_response = totals_for(cache, "topics_with_no_response", n);
 
     out.push(
-        Metric::new("topics created", "topics_created", Direction::Up, Unit::Count, n)
-            .with_values(topics.clone()),
+        Metric::new(
+            "topics created",
+            "topics_created",
+            Direction::Up,
+            Unit::Count,
+            n,
+        )
+        .with_values(topics.clone()),
     );
     out.push(
-        Metric::new("posts created", "posts_created", Direction::Up, Unit::Count, n)
-            .with_values(posts.clone()),
+        Metric::new(
+            "posts created",
+            "posts_created",
+            Direction::Up,
+            Unit::Count,
+            n,
+        )
+        .with_values(posts.clone()),
     );
     out.push(
-        Metric::new("posts per topic", "posts_per_topic", Direction::Up, Unit::Ratio, n)
-            .with_values(ratio_per_window(&posts, &topics)),
+        Metric::new(
+            "posts per topic",
+            "posts_per_topic",
+            Direction::Up,
+            Unit::Ratio,
+            n,
+        )
+        .with_values(ratio_per_window(&posts, &topics)),
     );
     out.push(
-        Metric::new("unique posters", "unique_posters", Direction::Up, Unit::Count, n).stub(),
+        Metric::new(
+            "unique posters",
+            "unique_posters",
+            Direction::Up,
+            Unit::Count,
+            n,
+        )
+        .stub(),
     );
     out.push(
-        Metric::new("top-10 share", "top_10_share", Direction::Down, Unit::Percent, n).stub(),
+        Metric::new(
+            "top-10 share",
+            "top_10_share",
+            Direction::Down,
+            Unit::Percent,
+            n,
+        )
+        .stub(),
     );
 
     let coverage: Vec<Option<f64>> = topics
@@ -432,8 +506,14 @@ fn build_activity(cache: &ReportCache, n: usize) -> Vec<Metric> {
         })
         .collect();
     out.push(
-        Metric::new("reply coverage", "reply_coverage", Direction::Up, Unit::Percent, n)
-            .with_values(coverage),
+        Metric::new(
+            "reply coverage",
+            "reply_coverage",
+            Direction::Up,
+            Unit::Percent,
+            n,
+        )
+        .with_values(coverage),
     );
 
     out.push(
@@ -457,8 +537,14 @@ fn build_health(cache: &ReportCache, n: usize) -> Vec<Metric> {
     let mods = totals_for(cache, "moderators_activity", n);
 
     out.push(
-        Metric::new("likes per post", "likes_per_post", Direction::Up, Unit::Ratio, n)
-            .with_values(ratio_per_window(&likes, &posts)),
+        Metric::new(
+            "likes per post",
+            "likes_per_post",
+            Direction::Up,
+            Unit::Ratio,
+            n,
+        )
+        .with_values(ratio_per_window(&likes, &posts)),
     );
     out.push(
         Metric::new(
@@ -471,8 +557,14 @@ fn build_health(cache: &ReportCache, n: usize) -> Vec<Metric> {
         .stub(),
     );
     out.push(
-        Metric::new("flags raised", "flags_raised", Direction::Down, Unit::Count, n)
-            .with_values(totals_for(cache, "flags", n)),
+        Metric::new(
+            "flags raised",
+            "flags_raised",
+            Direction::Down,
+            Unit::Count,
+            n,
+        )
+        .with_values(totals_for(cache, "flags", n)),
     );
     out.push(
         Metric::new(
@@ -504,8 +596,14 @@ fn build_health(cache: &ReportCache, n: usize) -> Vec<Metric> {
         .with_values(mar),
     );
     out.push(
-        Metric::new("solo-thread rate", "solo_thread_rate", Direction::Down, Unit::Percent, n)
-            .stub(),
+        Metric::new(
+            "solo-thread rate",
+            "solo_thread_rate",
+            Direction::Down,
+            Unit::Percent,
+            n,
+        )
+        .stub(),
     );
 
     out
@@ -544,7 +642,11 @@ fn render_text(report: &AnalyticsReport) -> Result<()> {
         for m in metrics {
             print!("  {}", pad_right(&m.label, label_w));
             for c in 0..cols {
-                let s = format_value(m.values.get(c).copied().flatten(), m.unit, m.not_implemented);
+                let s = format_value(
+                    m.values.get(c).copied().flatten(),
+                    m.unit,
+                    m.not_implemented,
+                );
                 print!("  {}", right_align(&s, val_w[c]));
             }
             if compare_mode {
@@ -587,7 +689,9 @@ fn render_table(report: &AnalyticsReport) -> Result<()> {
         let pct_w = if compare_mode { 7 } else { 0 };
 
         // Top border
-        let mut widths: Vec<usize> = std::iter::once(label_w).chain(col_w.iter().copied()).collect();
+        let mut widths: Vec<usize> = std::iter::once(label_w)
+            .chain(col_w.iter().copied())
+            .collect();
         if compare_mode {
             widths.push(pct_w);
         }
@@ -609,7 +713,11 @@ fn render_table(report: &AnalyticsReport) -> Result<()> {
         for m in metrics {
             print!("│ {} ", pad_right(&m.label, label_w));
             for c in 0..cols {
-                let s = format_value(m.values.get(c).copied().flatten(), m.unit, m.not_implemented);
+                let s = format_value(
+                    m.values.get(c).copied().flatten(),
+                    m.unit,
+                    m.not_implemented,
+                );
                 print!("│ {} ", right_align(&s, col_w[c]));
             }
             if compare_mode {
@@ -666,7 +774,10 @@ fn render_markdown(report: &AnalyticsReport, table: bool) -> Result<()> {
     println!("# analytics for {}", report.discourse);
     println!();
     if report.snapshot {
-        println!("Snapshot at **{}**", Utc::now().format("%Y-%m-%d %H:%M UTC"));
+        println!(
+            "Snapshot at **{}**",
+            Utc::now().format("%Y-%m-%d %H:%M UTC")
+        );
     } else {
         let w = &report.windows[0];
         println!(
@@ -701,7 +812,11 @@ fn render_markdown(report: &AnalyticsReport, table: bool) -> Result<()> {
             for m in metrics {
                 print!("| {} |", m.label);
                 for c in 0..cols {
-                    let s = format_value(m.values.get(c).copied().flatten(), m.unit, m.not_implemented);
+                    let s = format_value(
+                        m.values.get(c).copied().flatten(),
+                        m.unit,
+                        m.not_implemented,
+                    );
                     print!(" {} |", s);
                 }
                 if compare_mode {
@@ -717,7 +832,11 @@ fn render_markdown(report: &AnalyticsReport, table: bool) -> Result<()> {
             for m in metrics {
                 print!("- **{}** —", m.label);
                 for (i, h) in report.column_headers.iter().enumerate() {
-                    let s = format_value(m.values.get(i).copied().flatten(), m.unit, m.not_implemented);
+                    let s = format_value(
+                        m.values.get(i).copied().flatten(),
+                        m.unit,
+                        m.not_implemented,
+                    );
                     if cols == 1 {
                         print!(" {}", s);
                     } else {
@@ -727,10 +846,8 @@ fn render_markdown(report: &AnalyticsReport, table: bool) -> Result<()> {
                         }
                     }
                 }
-                if compare_mode {
-                    if let Some(p) = m.delta_pct() {
-                        print!(" (`{:+.0}%`)", p);
-                    }
+                if compare_mode && let Some(p) = m.delta_pct() {
+                    print!(" (`{:+.0}%`)", p);
                 }
                 println!();
             }
@@ -816,7 +933,10 @@ fn fetch_optional(
             if known_missing {
                 None
             } else {
-                eprintln!("[analytics] warning fetching report '{}': {}", report_id, err);
+                eprintln!(
+                    "[analytics] warning fetching report '{}': {}",
+                    report_id, err
+                );
                 None
             }
         }
@@ -926,7 +1046,7 @@ fn format_count(x: f64) -> String {
     let len = bytes.len();
     for (i, b) in bytes.iter().enumerate() {
         let from_right = len - i;
-        if i > 0 && from_right % 3 == 0 {
+        if i > 0 && from_right.is_multiple_of(3) {
             out.push(',');
         }
         out.push(*b as char);
@@ -976,7 +1096,10 @@ fn report_to_json(report: &AnalyticsReport) -> Value {
         ),
     );
     for (name, metrics) in iter_sections(report) {
-        top.insert(name.to_string(), section_to_json(metrics, &report.column_headers));
+        top.insert(
+            name.to_string(),
+            section_to_json(metrics, &report.column_headers),
+        );
     }
     Value::Object(top)
 }
@@ -1039,8 +1162,7 @@ mod tests {
 
     #[test]
     fn metric_delta_pct_none_for_single_window() {
-        let m = Metric::new("x", "x", Direction::Up, Unit::Count, 1)
-            .with_values(vec![Some(10.0)]);
+        let m = Metric::new("x", "x", Direction::Up, Unit::Count, 1).with_values(vec![Some(10.0)]);
         assert!(m.delta_pct().is_none());
     }
 

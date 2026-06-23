@@ -94,8 +94,7 @@ impl DiscourseClient {
         if !status.is_success() {
             return Err(http_error("user detail request", status, &text));
         }
-        let value: Value =
-            serde_json::from_str(&text).context("parsing user detail response")?;
+        let value: Value = serde_json::from_str(&text).context("parsing user detail response")?;
         let user = value
             .get("user")
             .ok_or_else(|| anyhow!("user detail response missing `user` field"))?;
@@ -182,12 +181,7 @@ impl DiscourseClient {
 
     /// Grant moderator to a user.
     pub fn grant_moderation(&self, user_id: i64) -> Result<()> {
-        self.put_admin_user_action(
-            user_id,
-            "grant_moderation",
-            &[],
-            "grant moderation request",
-        )
+        self.put_admin_user_action(user_id, "grant_moderation", &[], "grant moderation request")
     }
 
     /// Revoke moderator from a user.
@@ -212,21 +206,18 @@ impl DiscourseClient {
         name: Option<&str>,
         approve: bool,
     ) -> Result<i64> {
-        let mut payload: Vec<(&str, &str)> = vec![
-            ("email", email),
-            ("username", username),
-            ("active", "true"),
-        ];
+        let mut payload: Vec<(&str, &str)> =
+            vec![("email", email), ("username", username), ("active", "true")];
         if approve {
             payload.push(("approved", "true"));
         }
         if let Some(p) = password {
             payload.push(("password", p));
         }
-        if let Some(n) = name {
-            if !n.is_empty() {
-                payload.push(("name", n));
-            }
+        if let Some(n) = name
+            && !n.is_empty()
+        {
+            payload.push(("name", n));
         }
         let response = self.send_retrying(|| Ok(self.post("/u.json")?.form(&payload)))?;
         let status = response.status();
@@ -234,8 +225,7 @@ impl DiscourseClient {
         if !status.is_success() {
             return Err(http_error("user create request", status, &text));
         }
-        let value: Value =
-            serde_json::from_str(&text).context("parsing user create response")?;
+        let value: Value = serde_json::from_str(&text).context("parsing user create response")?;
         // Discourse wraps this variably depending on version; grab user_id from
         // the top level first, then fall back to `user.id`.
         let id = value
@@ -256,8 +246,8 @@ impl DiscourseClient {
     /// regardless of whether the user exists (to prevent enumeration).
     pub fn trigger_password_reset(&self, login: &str) -> Result<()> {
         let payload = [("login", login)];
-        let response = self
-            .send_retrying(|| Ok(self.post("/session/forgot_password.json")?.form(&payload)))?;
+        let response =
+            self.send_retrying(|| Ok(self.post("/session/forgot_password.json")?.form(&payload)))?;
         let status = response.status();
         if !status.is_success() {
             let text = response
@@ -354,8 +344,7 @@ mod tests {
             {"id": 42, "username": "alice", "name": "Alice",
              "email": "alice@example.com"}
         ]"#;
-        let users: Vec<UserSummary> =
-            serde_json::from_str(json).expect("negative ids must parse");
+        let users: Vec<UserSummary> = serde_json::from_str(json).expect("negative ids must parse");
         assert_eq!(users.len(), 3);
         assert_eq!(users[0].id, -1);
         assert_eq!(users[1].id, -2);

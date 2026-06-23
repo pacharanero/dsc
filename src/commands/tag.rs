@@ -8,11 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
-pub fn tag_list(
-    config: &Config,
-    discourse_name: &str,
-    format: ListFormat,
-) -> Result<()> {
+pub fn tag_list(config: &Config, discourse_name: &str, format: ListFormat) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
@@ -26,19 +22,9 @@ pub fn tag_list(
                 println!("No tags found.");
                 return Ok(());
             }
-            let name_width = tags
-                .iter()
-                .map(|t| t.text.len())
-                .max()
-                .unwrap_or(0)
-                .max(4);
+            let name_width = tags.iter().map(|t| t.text.len()).max().unwrap_or(0).max(4);
             for tag in &tags {
-                println!(
-                    "{:<width$}  {}",
-                    tag.text,
-                    tag.count,
-                    width = name_width
-                );
+                println!("{:<width$}  {}", tag.text, tag.count, width = name_width);
             }
         }
         ListFormat::Json => {
@@ -240,11 +226,7 @@ fn is_false(v: &bool) -> bool {
 
 // ─── Pull ─────────────────────────────────────────────────────────────────────
 
-pub fn tag_pull(
-    config: &Config,
-    discourse_name: &str,
-    local_path: &Path,
-) -> Result<()> {
+pub fn tag_pull(config: &Config, discourse_name: &str, local_path: &Path) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
@@ -289,7 +271,9 @@ pub fn tag_pull(
             entries
         }
         None => {
-            eprintln!("Warning: tag groups not accessible (requires admin API key); omitting from output.");
+            eprintln!(
+                "Warning: tag groups not accessible (requires admin API key); omitting from output."
+            );
             Vec::new()
         }
     };
@@ -306,8 +290,7 @@ pub fn tag_pull(
         serde_yaml::to_string(&taxonomy).context("serializing taxonomy as YAML")?
     };
 
-    fs::write(local_path, &content)
-        .with_context(|| format!("writing {}", local_path.display()))?;
+    fs::write(local_path, &content).with_context(|| format!("writing {}", local_path.display()))?;
     println!("Wrote taxonomy to {}", local_path.display());
     Ok(())
 }
@@ -405,7 +388,11 @@ pub fn tag_push(
             println!("  + create tag: {}", name);
         }
         for (name, desc) in &tags_to_update {
-            println!("  ~ update tag: {} (set description: {:?})", name, desc.as_deref().unwrap_or(""));
+            println!(
+                "  ~ update tag: {} (set description: {:?})",
+                name,
+                desc.as_deref().unwrap_or("")
+            );
         }
         for name in &tags_to_delete {
             println!("  - delete tag: {}", name);
@@ -413,17 +400,20 @@ pub fn tag_push(
     } else {
         for name in &tags_to_create {
             let desc = desired_descriptions.get(*name).and_then(|d| d.as_deref());
-            client.update_tag(name, desc)
+            client
+                .update_tag(name, desc)
                 .with_context(|| format!("creating/updating tag '{}'", name))?;
             println!("  + created tag: {}", name);
         }
         for (name, desc) in &tags_to_update {
-            client.update_tag(name, desc.as_deref())
+            client
+                .update_tag(name, desc.as_deref())
                 .with_context(|| format!("updating tag '{}'", name))?;
             println!("  ~ updated tag: {}", name);
         }
         for name in &tags_to_delete {
-            client.delete_tag(name)
+            client
+                .delete_tag(name)
                 .with_context(|| format!("deleting tag '{}'", name))?;
             println!("  - deleted tag: {}", name);
         }
@@ -434,16 +424,16 @@ pub fn tag_push(
         Some(groups) => groups,
         None => {
             if !taxonomy.tag_groups.is_empty() {
-                eprintln!("Warning: tag groups not accessible (requires admin API key); skipping group reconciliation.");
+                eprintln!(
+                    "Warning: tag groups not accessible (requires admin API key); skipping group reconciliation."
+                );
             }
             return Ok(());
         }
     };
 
-    let server_groups_by_name: BTreeMap<String, &TagGroupInfo> = server_groups
-        .iter()
-        .map(|g| (g.name.clone(), g))
-        .collect();
+    let server_groups_by_name: BTreeMap<String, &TagGroupInfo> =
+        server_groups.iter().map(|g| (g.name.clone(), g)).collect();
 
     let desired_group_names: BTreeSet<String> =
         taxonomy.tag_groups.iter().map(|g| g.name.clone()).collect();
@@ -459,11 +449,7 @@ pub fn tag_push(
     let groups_to_update: Vec<(&TagGroupEntry, u64)> = taxonomy
         .tag_groups
         .iter()
-        .filter_map(|g| {
-            server_groups_by_name
-                .get(&g.name)
-                .map(|sg| (g, sg.id))
-        })
+        .filter_map(|g| server_groups_by_name.get(&g.name).map(|sg| (g, sg.id)))
         .filter(|(desired, _id)| {
             // Only update if something differs
             let server = server_groups_by_name.get(&desired.name).unwrap();
@@ -494,10 +480,18 @@ pub fn tag_push(
             println!("  (no group changes)");
         }
         for g in &groups_to_create {
-            println!("  + create group: {} (tags: [{}])", g.name, g.tags.join(", "));
+            println!(
+                "  + create group: {} (tags: [{}])",
+                g.name,
+                g.tags.join(", ")
+            );
         }
         for (g, _id) in &groups_to_update {
-            println!("  ~ update group: {} (tags: [{}])", g.name, g.tags.join(", "));
+            println!(
+                "  ~ update group: {} (tags: [{}])",
+                g.name,
+                g.tags.join(", ")
+            );
         }
         for (name, _id) in &groups_to_delete {
             println!("  - delete group: {}", name);
@@ -505,18 +499,21 @@ pub fn tag_push(
     } else {
         for g in &groups_to_create {
             let payload = build_tag_group_payload(g);
-            client.create_tag_group(&payload)
+            client
+                .create_tag_group(&payload)
                 .with_context(|| format!("creating tag group '{}'", g.name))?;
             println!("  + created group: {}", g.name);
         }
         for (g, id) in &groups_to_update {
             let payload = build_tag_group_payload(g);
-            client.update_tag_group(*id, &payload)
+            client
+                .update_tag_group(*id, &payload)
                 .with_context(|| format!("updating tag group '{}'", g.name))?;
             println!("  ~ updated group: {}", g.name);
         }
         for (name, id) in &groups_to_delete {
-            client.delete_tag_group(*id)
+            client
+                .delete_tag_group(*id)
                 .with_context(|| format!("deleting tag group '{}'", name))?;
             println!("  - deleted group: {}", name);
         }
@@ -534,7 +531,10 @@ fn build_tag_group_payload(entry: &TagGroupEntry) -> serde_json::Value {
     let mut group = serde_json::Map::new();
     group.insert("name".to_string(), serde_json::json!(entry.name));
     group.insert("tag_names".to_string(), serde_json::json!(entry.tags));
-    group.insert("one_per_topic".to_string(), serde_json::json!(entry.one_per_topic));
+    group.insert(
+        "one_per_topic".to_string(),
+        serde_json::json!(entry.one_per_topic),
+    );
     if let Some(parent) = &entry.parent_tag {
         group.insert("parent_tag_name".to_string(), serde_json::json!([parent]));
     }

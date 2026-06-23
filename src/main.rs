@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Parser;
 use dsc::cli::*;
 use dsc::commands;
@@ -14,8 +14,8 @@ fn map_section(s: SectionArg) -> SectionFilter {
     }
 }
 use dsc::config::{
-    config_search_paths, load_config, resolve_config_source, save_config, ConfigSource,
-    ENV_CONFIG, ENV_CONFIG_HOME,
+    ConfigSource, ENV_CONFIG, ENV_CONFIG_HOME, config_search_paths, load_config,
+    resolve_config_source, save_config,
 };
 
 fn map_role(role: RoleArg) -> Role {
@@ -311,13 +311,9 @@ fn main() -> Result<()> {
                 discourse,
                 target,
                 group,
-            } => commands::group::group_copy(
-                &config,
-                &discourse,
-                target.as_deref(),
-                group,
-                dry_run,
-            ),
+            } => {
+                commands::group::group_copy(&config, &discourse, target.as_deref(), group, dry_run)
+            }
 
             GroupCommand::Add {
                 discourse,
@@ -429,12 +425,7 @@ fn main() -> Result<()> {
                 until,
                 reason,
             } => commands::user::user_suspend(
-                &config,
-                &discourse,
-                &username,
-                &until,
-                &reason,
-                dry_run,
+                &config, &discourse, &username, &until, &reason, dry_run,
             ),
             UserCommand::Unsuspend {
                 discourse,
@@ -446,12 +437,7 @@ fn main() -> Result<()> {
                 until,
                 reason,
             } => commands::user::user_silence(
-                &config,
-                &discourse,
-                &username,
-                &until,
-                &reason,
-                dry_run,
+                &config, &discourse, &username, &until, &reason, dry_run,
             ),
             UserCommand::Unsilence {
                 discourse,
@@ -472,13 +458,9 @@ fn main() -> Result<()> {
                 discourse,
                 username,
                 role,
-            } => commands::user::user_demote(
-                &config,
-                &discourse,
-                &username,
-                map_role(role),
-                dry_run,
-            ),
+            } => {
+                commands::user::user_demote(&config, &discourse, &username, map_role(role), dry_run)
+            }
             UserCommand::Create {
                 discourse,
                 email,
@@ -536,23 +518,14 @@ fn main() -> Result<()> {
                     group_id,
                     notify,
                 } => commands::user::user_groups_add(
-                    &config,
-                    &discourse,
-                    &username,
-                    group_id,
-                    notify,
-                    dry_run,
+                    &config, &discourse, &username, group_id, notify, dry_run,
                 ),
                 UserGroupsCommand::Remove {
                     discourse,
                     username,
                     group_id,
                 } => commands::user::user_groups_remove(
-                    &config,
-                    &discourse,
-                    &username,
-                    group_id,
-                    dry_run,
+                    &config, &discourse, &username, group_id, dry_run,
                 ),
             },
         },
@@ -572,7 +545,12 @@ fn main() -> Result<()> {
                 discourse,
                 backup_filename,
                 local_path,
-            } => commands::backup::backup_pull(&config, &discourse, &backup_filename, local_path.as_deref()),
+            } => commands::backup::backup_pull(
+                &config,
+                &discourse,
+                &backup_filename,
+                local_path.as_deref(),
+            ),
 
             BackupCommand::Push {
                 discourse,
@@ -618,12 +596,7 @@ fn main() -> Result<()> {
                 discourse,
                 theme_id,
                 local_path,
-            } => commands::theme::theme_pull(
-                &config,
-                &discourse,
-                theme_id,
-                local_path.as_deref(),
-            ),
+            } => commands::theme::theme_pull(&config, &discourse, theme_id, local_path.as_deref()),
             ThemeCommand::Push {
                 discourse,
                 local_path,
@@ -650,7 +623,9 @@ fn main() -> Result<()> {
                     theme_id,
                     key,
                     format,
-                } => commands::theme::theme_setting_get(&config, &discourse, theme_id, &key, format),
+                } => {
+                    commands::theme::theme_setting_get(&config, &discourse, theme_id, &key, format)
+                }
                 ThemeSettingCommand::Set {
                     discourse,
                     theme_id,
@@ -714,12 +689,10 @@ fn main() -> Result<()> {
                         "cannot pass <discourse> together with --tags; specify either a single discourse or a tag filter"
                     ));
                 }
-                let shifted_setting = discourse.ok_or_else(|| {
-                    anyhow::anyhow!("missing <setting> argument")
-                })?;
-                let shifted_value = setting.ok_or_else(|| {
-                    anyhow::anyhow!("missing <value> argument")
-                })?;
+                let shifted_setting =
+                    discourse.ok_or_else(|| anyhow::anyhow!("missing <setting> argument"))?;
+                let shifted_value =
+                    setting.ok_or_else(|| anyhow::anyhow!("missing <value> argument"))?;
                 (None, shifted_setting, shifted_value)
             } else {
                 let d = discourse.ok_or_else(|| {
@@ -963,12 +936,20 @@ fn main() -> Result<()> {
                 println!("Search order:");
                 for (i, path) in candidates.iter().enumerate() {
                     let exists = path.exists();
-                    let marker = if path == &config_path { " <-- active" } else { "" };
+                    let marker = if path == &config_path {
+                        " <-- active"
+                    } else {
+                        ""
+                    };
                     println!(
                         "  {}. {}{}{}",
                         i + 1,
                         path.display(),
-                        if exists && marker.is_empty() { " (exists)" } else { "" },
+                        if exists && marker.is_empty() {
+                            " (exists)"
+                        } else {
+                            ""
+                        },
                         marker
                     );
                 }

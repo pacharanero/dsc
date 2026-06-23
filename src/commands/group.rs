@@ -219,4 +219,3 @@ fn read_email_source(local_path: Option<&Path>) -> Result<String> {
         fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))
     }
 }
-

@@ -98,12 +98,14 @@ impl DiscourseClient {
             );
             let response = self.get(&path)?;
             let status = response.status();
-            let text = response.text().context("reading topic posts response body")?;
+            let text = response
+                .text()
+                .context("reading topic posts response body")?;
             if !status.is_success() {
                 return Err(http_error("topic posts request", status, &text));
             }
-            let body: TopicResponse = serde_json::from_str(&text)
-                .context("parsing topic posts response")?;
+            let body: TopicResponse =
+                serde_json::from_str(&text).context("parsing topic posts response")?;
             topic.post_stream.posts.extend(body.post_stream.posts);
         }
 
@@ -146,7 +148,7 @@ impl DiscourseClient {
     /// Soft-delete a post by ID (DELETE /posts/:id.json).
     pub fn delete_post(&self, post_id: u64) -> Result<()> {
         let path = format!("/posts/{}.json", post_id);
-        let response = self.send_retrying(|| Ok(self.delete_builder(&path)?))?;
+        let response = self.send_retrying(|| self.delete_builder(&path))?;
         let status = response.status();
         if !status.is_success() {
             let text = response
@@ -184,8 +186,7 @@ impl DiscourseClient {
         if !status.is_success() {
             return Err(http_error("move posts request", status, &text));
         }
-        let value: Value =
-            serde_json::from_str(&text).context("parsing move-posts response")?;
+        let value: Value = serde_json::from_str(&text).context("parsing move-posts response")?;
         let url = value
             .get("url")
             .and_then(|v| v.as_str())

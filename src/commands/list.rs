@@ -180,4 +180,3 @@ fn open_discourse_urls(discourses: &[&DiscourseConfig]) -> Result<()> {
     }
     Ok(())
 }
-

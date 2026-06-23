@@ -43,14 +43,14 @@ impl DiscourseClient {
                 .text("synchronous", "true".to_string()))
         };
 
-        let response = self.send_retrying(|| Ok(self.post("/uploads.json")?.multipart(make_form()?)))?;
+        let response =
+            self.send_retrying(|| Ok(self.post("/uploads.json")?.multipart(make_form()?)))?;
         let status = response.status();
         let text = response.text().context("reading upload response body")?;
         if !status.is_success() {
             return Err(http_error("upload request", status, &text));
         }
-        let info: UploadInfo =
-            serde_json::from_str(&text).context("parsing upload response")?;
+        let info: UploadInfo = serde_json::from_str(&text).context("parsing upload response")?;
         Ok(info)
     }
 }

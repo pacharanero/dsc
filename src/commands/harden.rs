@@ -58,8 +58,7 @@ pub(crate) struct Options {
 /// - Remove known-legacy algorithms.
 /// - Prefer PQ-hybrid KEX first.
 const DEFAULT_CIPHERS: &str = "-*-cbc,-3des-cbc";
-const DEFAULT_KEX: &str =
-    "^sntrup761x25519-sha512@openssh.com,-diffie-hellman-group1-sha1,-diffie-hellman-group14-sha1,-diffie-hellman-group-exchange-sha1";
+const DEFAULT_KEX: &str = "^sntrup761x25519-sha512@openssh.com,-diffie-hellman-group1-sha1,-diffie-hellman-group14-sha1,-diffie-hellman-group-exchange-sha1";
 const DEFAULT_MACS: &str =
     "-hmac-sha1,-hmac-sha1-96,-hmac-md5,-hmac-md5-96,-umac-64@openssh.com,-umac-64-etm@openssh.com";
 
@@ -92,9 +91,18 @@ pub(crate) fn resolve_options(
         unattended_security_upgrades: cfg.unattended_security_upgrades.unwrap_or(true),
         fail2ban: cfg.fail2ban.unwrap_or(true),
         mosh: cfg.mosh.unwrap_or(false),
-        sshd_ciphers: cfg.sshd_ciphers.clone().unwrap_or_else(|| DEFAULT_CIPHERS.to_string()),
-        sshd_kex: cfg.sshd_kex.clone().unwrap_or_else(|| DEFAULT_KEX.to_string()),
-        sshd_macs: cfg.sshd_macs.clone().unwrap_or_else(|| DEFAULT_MACS.to_string()),
+        sshd_ciphers: cfg
+            .sshd_ciphers
+            .clone()
+            .unwrap_or_else(|| DEFAULT_CIPHERS.to_string()),
+        sshd_kex: cfg
+            .sshd_kex
+            .clone()
+            .unwrap_or_else(|| DEFAULT_KEX.to_string()),
+        sshd_macs: cfg
+            .sshd_macs
+            .clone()
+            .unwrap_or_else(|| DEFAULT_MACS.to_string()),
         extra_ufw_allow: cfg.extra_ufw_allow.clone().unwrap_or_default(),
     }
 }
@@ -117,10 +125,7 @@ pub fn harden(
         .trim()
         .to_string();
     if pubkey.is_empty() {
-        return Err(anyhow!(
-            "pubkey file {} is empty",
-            pubkey_file.display()
-        ));
+        return Err(anyhow!("pubkey file {} is empty", pubkey_file.display()));
     }
     if !looks_like_ssh_pubkey(&pubkey) {
         return Err(anyhow!(
@@ -146,7 +151,11 @@ pub fn harden(
     let os_release = ssh_run(&initial, "cat /etc/os-release", dry_run)?;
     assert_ubuntu(&os_release, dry_run)?;
 
-    let mem_kb_raw = ssh_run(&initial, "awk '/^MemTotal:/ {print $2}' /proc/meminfo", dry_run)?;
+    let mem_kb_raw = ssh_run(
+        &initial,
+        "awk '/^MemTotal:/ {print $2}' /proc/meminfo",
+        dry_run,
+    )?;
     assert_enough_memory(&mem_kb_raw, dry_run)?;
 
     // Check free disk on /var — Docker (and later, Discourse rebuilds)
@@ -171,16 +180,25 @@ pub fn harden(
     // exists — makes the whole command safely re-runnable.
     let user_exists = ssh_run(
         &initial,
-        &format!("id -u {} >/dev/null 2>&1 && echo yes || echo no", shell_quote(new_user)),
+        &format!(
+            "id -u {} >/dev/null 2>&1 && echo yes || echo no",
+            shell_quote(new_user)
+        ),
         dry_run,
     )?;
     if user_exists.trim() == "yes" {
-        announce(&format!("user `{}` already exists, skipping creation", new_user));
+        announce(&format!(
+            "user `{}` already exists, skipping creation",
+            new_user
+        ));
     } else {
         announce(&format!("creating user `{}`", new_user));
         ssh_run(
             &initial,
-            &format!("adduser --disabled-password --gecos '' {}", shell_quote(new_user)),
+            &format!(
+                "adduser --disabled-password --gecos '' {}",
+                shell_quote(new_user)
+            ),
             dry_run,
         )?;
     }
@@ -191,7 +209,10 @@ pub fn harden(
     // /etc/sudoers.d/ instead, which is both safer (not editing the main
     // sudoers) and idempotent (a second write is a no-op). visudo -cf
     // validates syntax before the file is moved into place.
-    announce(&format!("granting `{}` sudo NOPASSWD (via /etc/sudoers.d/)", new_user));
+    announce(&format!(
+        "granting `{}` sudo NOPASSWD (via /etc/sudoers.d/)",
+        new_user
+    ));
     let sudoers_line = format!("{} ALL=(ALL) NOPASSWD: ALL", new_user);
     ssh_run(
         &initial,
@@ -241,11 +262,10 @@ grep -qxF {key} /home/{user}/.ssh/authorized_keys || printf '%s\n' {key} >> /hom
             "verifying SSH login as `{}@{}` works…",
             new_user, host
         ));
-        let who = ssh_run(&new_target, "whoami", false)
-            .context(
-                "failed to SSH as the new user — NOT proceeding. \
+        let who = ssh_run(&new_target, "whoami", false).context(
+            "failed to SSH as the new user — NOT proceeding. \
                  The original root SSH is still usable; fix the pubkey or user setup and re-run.",
-            )?;
+        )?;
         if who.trim() != new_user {
             return Err(anyhow!(
                 "SSH as {} succeeded but `whoami` returned {:?} — something is very wrong, stopping",
@@ -293,8 +313,7 @@ fn run_stage_2(
         dry_run,
     )?;
     let already_matches = !dry_run && normalise(&current) == normalise(&drop_in);
-    let already_exists_different =
-        !dry_run && !current.trim().is_empty() && !already_matches;
+    let already_exists_different = !dry_run && !current.trim().is_empty() && !already_matches;
 
     if already_matches {
         announce("sshd drop-in already in place with matching content, skipping");
@@ -357,10 +376,8 @@ rm -f "$tmp"
             // and `systemctl restart ssh.socket` because the restart
             // itself flips the listener away from port 22, which would
             // refuse any subsequent root@22 SSH attempts.
-            let socket_drop_in = format!(
-                "[Socket]\nListenStream=\nListenStream={}\n",
-                opts.ssh_port
-            );
+            let socket_drop_in =
+                format!("[Socket]\nListenStream=\nListenStream={}\n", opts.ssh_port);
             let b64 = base64::engine::general_purpose::STANDARD.encode(socket_drop_in.as_bytes());
             let cmd = format!(
                 r#"
@@ -667,7 +684,9 @@ mod tests {
     fn rejects_non_pubkeys() {
         assert!(!looks_like_ssh_pubkey(""));
         assert!(!looks_like_ssh_pubkey("not an ssh key"));
-        assert!(!looks_like_ssh_pubkey("-----BEGIN OPENSSH PRIVATE KEY-----"));
+        assert!(!looks_like_ssh_pubkey(
+            "-----BEGIN OPENSSH PRIVATE KEY-----"
+        ));
     }
 
     #[test]
@@ -774,12 +793,7 @@ mod tests {
             "ClientAliveInterval 300",
             "ClientAliveCountMax 2",
         ] {
-            assert!(
-                s.contains(needle),
-                "drop-in missing `{}`:\n{}",
-                needle,
-                s
-            );
+            assert!(s.contains(needle), "drop-in missing `{}`:\n{}", needle, s);
         }
     }
 
@@ -838,7 +852,10 @@ mod tests {
                         // The removal token (`-weak`) and the additive form
                         // (`weak` or `+weak` or `^weak`) need to be told apart:
                         // we want NO additive form, only removals.
-                        if token == *weak || token == format!("+{}", weak) || token == format!("^{}", weak) {
+                        if token == *weak
+                            || token == format!("+{}", weak)
+                            || token == format!("^{}", weak)
+                        {
                             panic!(
                                 "{} directive includes weak algorithm `{}` additively: {}",
                                 directive.trim(),

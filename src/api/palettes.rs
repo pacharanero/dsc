@@ -45,8 +45,8 @@ impl DiscourseClient {
         for (key, value) in colors {
             payload.push((format!("color_scheme[colors][{}]", key), value.to_string()));
         }
-        let response = self
-            .send_retrying(|| Ok(self.post("/admin/color_schemes.json")?.form(&payload)))?;
+        let response =
+            self.send_retrying(|| Ok(self.post("/admin/color_schemes.json")?.form(&payload)))?;
         let status = response.status();
         let text = response.text().context("reading color scheme response")?;
         if !status.is_success() {
@@ -71,10 +71,10 @@ impl DiscourseClient {
         colors: &BTreeMap<String, String>,
     ) -> Result<()> {
         let mut payload: Vec<(String, String)> = Vec::new();
-        if let Some(name) = name {
-            if !name.trim().is_empty() {
-                payload.push(("color_scheme[name]".to_string(), name.to_string()));
-            }
+        if let Some(name) = name
+            && !name.trim().is_empty()
+        {
+            payload.push(("color_scheme[name]".to_string(), name.to_string()));
         }
         for (key, value) in colors {
             payload.push((format!("color_scheme[colors][{}]", key), value.to_string()));

@@ -70,7 +70,9 @@ pub fn yaml_scalar(value: &str) -> String {
         || value.contains(':')
         || value.contains('#')
         || value.contains('\n')
-        || value.starts_with(['-', '?', '!', '&', '*', '|', '>', '@', '`', '%', '\'', '"', '['])
+        || value.starts_with([
+            '-', '?', '!', '&', '*', '|', '>', '@', '`', '%', '\'', '"', '[',
+        ])
         || value.starts_with("  ");
     if needs_quoting {
         let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
@@ -264,10 +266,11 @@ pub fn parse_since_cutoff(input: &str) -> anyhow::Result<chrono::DateTime<chrono
     }
     // Try date-only — treat as midnight UTC.
     if let Ok(d) = chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
-        return Ok(
-            chrono::NaiveDateTime::new(d, chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap())
-                .and_utc(),
-        );
+        return Ok(chrono::NaiveDateTime::new(
+            d,
+            chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+        )
+        .and_utc());
     }
 
     Err(anyhow!(
@@ -377,9 +380,18 @@ mod tests {
 
     #[test]
     fn normalize_baseurl_strips_trailing_slashes() {
-        assert_eq!(normalize_baseurl("https://example.com/"), "https://example.com");
-        assert_eq!(normalize_baseurl("https://example.com///"), "https://example.com");
-        assert_eq!(normalize_baseurl("https://example.com"), "https://example.com");
+        assert_eq!(
+            normalize_baseurl("https://example.com/"),
+            "https://example.com"
+        );
+        assert_eq!(
+            normalize_baseurl("https://example.com///"),
+            "https://example.com"
+        );
+        assert_eq!(
+            normalize_baseurl("https://example.com"),
+            "https://example.com"
+        );
     }
 
     #[test]
@@ -507,7 +519,10 @@ mod tests {
 
     #[test]
     fn yaml_scalar_leaves_simple_values_bare() {
-        assert_eq!(yaml_scalar("Dependency management"), "Dependency management");
+        assert_eq!(
+            yaml_scalar("Dependency management"),
+            "Dependency management"
+        );
         assert_eq!(yaml_scalar("Topic 42"), "Topic 42");
     }
 
@@ -568,7 +583,10 @@ mod tests {
     fn strip_frontmatter_unquotes_yaml_scalar_values() {
         // yaml_scalar quotes a title containing a colon; strip must invert it.
         let title = "Intro: getting started";
-        let raw = format!("---\ntitle: {}\ntopic_id: 3\n---\n\nbody\n", yaml_scalar(title));
+        let raw = format!(
+            "---\ntitle: {}\ntopic_id: 3\n---\n\nbody\n",
+            yaml_scalar(title)
+        );
         let (front, body) = strip_frontmatter(&raw);
         assert_eq!(front.get("title").map(String::as_str), Some(title));
         assert_eq!(front.get("topic_id").map(String::as_str), Some("3"));
@@ -614,4 +632,3 @@ mod tests {
         assert_eq!(civil_from_days(19782), (2024, 2, 29));
     }
 }
-

@@ -4,12 +4,12 @@ use crate::api::TopicResponse;
 use crate::cli::ListFormat;
 use crate::commands::common::{emit_result, ensure_api_credentials, select_discourse};
 use crate::config::Config;
-use serde_json::json;
 use crate::utils::{
     current_utc_iso8601, read_markdown, resolve_topic_path, slugify, strip_frontmatter,
     write_markdown, yaml_scalar,
 };
 use anyhow::{Context, Result, anyhow};
+use serde_json::json;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::Path;
@@ -182,7 +182,7 @@ pub fn topic_sync(
     let post = topic
         .post_stream
         .posts
-        .get(0)
+        .first()
         .ok_or_else(|| anyhow!("topic has no posts"))?;
     let local_meta =
         fs::metadata(local_path).with_context(|| format!("reading {}", local_path.display()))?;
@@ -333,7 +333,10 @@ pub fn topic_title(
     }
 
     client.set_topic_title(topic_id, title)?;
-    println!("renamed topic {}: \"{}\" → \"{}\"", topic_id, old_title, title);
+    println!(
+        "renamed topic {}: \"{}\" → \"{}\"",
+        topic_id, old_title, title
+    );
     if !url_note.is_empty() {
         println!("{}", url_note);
     }
@@ -396,8 +399,8 @@ fn read_reply_input(local_path: Option<&Path>) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::{format_date_only, read_reply_input, render_full_thread, topic_display_title};
-    use crate::utils::yaml_scalar;
     use crate::api::{Post, PostStream, TopicResponse};
+    use crate::utils::yaml_scalar;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -485,8 +488,20 @@ mod tests {
     #[test]
     fn render_full_thread_emits_frontmatter_and_per_post_headings() {
         let posts = vec![
-            make_post(101, Some(1), Some("alice"), Some("hello"), Some("2026-03-24T11:00:00Z")),
-            make_post(102, Some(2), Some("bob"), Some("hi back"), Some("2026-03-25T09:00:00Z")),
+            make_post(
+                101,
+                Some(1),
+                Some("alice"),
+                Some("hello"),
+                Some("2026-03-24T11:00:00Z"),
+            ),
+            make_post(
+                102,
+                Some(2),
+                Some("bob"),
+                Some("hi back"),
+                Some("2026-03-25T09:00:00Z"),
+            ),
         ];
         let topic = make_topic(Some("Hello World"), posts, vec![101, 102]);
         let out = render_full_thread(&topic, 42, "https://forum.example.com/");
@@ -521,7 +536,6 @@ mod tests {
         // Single post with no post_number → numbered 1 from index.
         assert!(out.contains("## Post 1 · alice"));
     }
-
 }
 
 fn confirm_sync(pull: bool) -> Result<bool> {

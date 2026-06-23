@@ -161,16 +161,14 @@ pub fn theme_pull(
         }
     };
 
-    let content =
-        serde_json::to_string_pretty(theme).context("serializing theme to JSON")?;
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("creating {}", parent.display()))?;
-        }
+    let content = serde_json::to_string_pretty(theme).context("serializing theme to JSON")?;
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating {}", parent.display()))?;
     }
-    std::fs::write(&path, content)
-        .with_context(|| format!("writing {}", path.display()))?;
+    std::fs::write(&path, content).with_context(|| format!("writing {}", path.display()))?;
     println!("{}", path.display());
     Ok(())
 }
@@ -439,7 +437,10 @@ pub fn theme_set_enabled(
     let client = DiscourseClient::new(discourse)?;
     let action = if enabled { "enable" } else { "disable" };
     if dry_run {
-        println!("[dry-run] {}: would {} theme {}", discourse.name, action, theme_id);
+        println!(
+            "[dry-run] {}: would {} theme {}",
+            discourse.name, action, theme_id
+        );
         return Ok(());
     }
     client.update_theme(theme_id, &json!({ "enabled": enabled }))?;
@@ -494,7 +495,11 @@ pub fn theme_set_child(
         child_ids.retain(|&id| id != component_id);
     }
 
-    let (verb, prep) = if attach { ("attach", "to") } else { ("detach", "from") };
+    let (verb, prep) = if attach {
+        ("attach", "to")
+    } else {
+        ("detach", "from")
+    };
     if dry_run {
         println!(
             "[dry-run] {}: would {} component {} {} theme {} (child_theme_ids -> {:?})",
@@ -584,9 +589,18 @@ fn build_theme_show(theme: &Value, theme_id: u64) -> ThemeShow {
             .and_then(|v| v.as_str())
             .unwrap_or("unknown")
             .to_string(),
-        component: theme.get("component").and_then(|v| v.as_bool()).unwrap_or(false),
-        enabled: theme.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false),
-        default: theme.get("default").and_then(|v| v.as_bool()).unwrap_or(false),
+        component: theme
+            .get("component")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        enabled: theme
+            .get("enabled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        default: theme
+            .get("default")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
         user_selectable: theme
             .get("user_selectable")
             .and_then(|v| v.as_bool())
@@ -640,8 +654,14 @@ pub fn theme_show(
             if let Some(cs) = show.color_scheme_id {
                 println!("  color scheme:    {}", cs);
             }
-            println!("  parents:         {}", format_relations(&show.parent_themes));
-            println!("  children:        {}", format_relations(&show.child_themes));
+            println!(
+                "  parents:         {}",
+                format_relations(&show.parent_themes)
+            );
+            println!(
+                "  children:        {}",
+                format_relations(&show.child_themes)
+            );
             println!("  settings:        {}", show.settings_count);
             let fields = if show.fields.is_empty() {
                 "(none)".to_string()
@@ -661,9 +681,15 @@ mod tests {
     #[test]
     fn extract_theme_unwraps_envelope_and_passes_bare() {
         let wrapped = json!({ "theme": { "id": 11, "name": "kitchen" } });
-        assert_eq!(extract_theme(&wrapped).get("id").and_then(|v| v.as_u64()), Some(11));
+        assert_eq!(
+            extract_theme(&wrapped).get("id").and_then(|v| v.as_u64()),
+            Some(11)
+        );
         let bare = json!({ "id": 7, "name": "bare" });
-        assert_eq!(extract_theme(&bare).get("id").and_then(|v| v.as_u64()), Some(7));
+        assert_eq!(
+            extract_theme(&bare).get("id").and_then(|v| v.as_u64()),
+            Some(7)
+        );
     }
 
     #[test]

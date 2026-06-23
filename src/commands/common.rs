@@ -57,7 +57,7 @@ pub fn missing_config(field: &str, resource: &str, hint: &str) -> anyhow::Error 
 }
 
 pub fn parse_tags(raw: &str) -> Vec<String> {
-    raw.split(|ch| ch == ';' || ch == ',')
+    raw.split([';', ','])
         .map(|tag| tag.trim().to_string())
         .filter(|tag| !tag.is_empty())
         .collect()

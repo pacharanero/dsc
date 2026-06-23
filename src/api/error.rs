@@ -14,15 +14,25 @@ pub fn http_error(action: &str, status: StatusCode, text: &str) -> anyhow::Error
 
 pub(crate) fn status_hint(status: StatusCode) -> Option<&'static str> {
     match status {
-        StatusCode::NOT_FOUND => Some("not found (check the resource ID and that the endpoint exists on this Discourse version)"),
-        StatusCode::FORBIDDEN => Some("forbidden (the API key's user likely lacks admin scope for this action)"),
-        StatusCode::UNAUTHORIZED => Some("unauthorized (check apikey and api_username in your config)"),
-        StatusCode::TOO_MANY_REQUESTS => Some("rate-limited (raise DISCOURSE_MAX_ADMIN_API_REQS_PER_MINUTE or slow the request rate)"),
+        StatusCode::NOT_FOUND => Some(
+            "not found (check the resource ID and that the endpoint exists on this Discourse version)",
+        ),
+        StatusCode::FORBIDDEN => {
+            Some("forbidden (the API key's user likely lacks admin scope for this action)")
+        }
+        StatusCode::UNAUTHORIZED => {
+            Some("unauthorized (check apikey and api_username in your config)")
+        }
+        StatusCode::TOO_MANY_REQUESTS => Some(
+            "rate-limited (raise DISCOURSE_MAX_ADMIN_API_REQS_PER_MINUTE or slow the request rate)",
+        ),
         StatusCode::UNPROCESSABLE_ENTITY => Some("validation error (see details below)"),
         StatusCode::INTERNAL_SERVER_ERROR
         | StatusCode::BAD_GATEWAY
         | StatusCode::SERVICE_UNAVAILABLE
-        | StatusCode::GATEWAY_TIMEOUT => Some("server error (try again; check the Discourse host is healthy)"),
+        | StatusCode::GATEWAY_TIMEOUT => {
+            Some("server error (try again; check the Discourse host is healthy)")
+        }
         _ => None,
     }
 }
@@ -41,7 +51,10 @@ mod tests {
     #[test]
     fn hint_maps_forbidden_to_scope_message() {
         let h = status_hint(StatusCode::FORBIDDEN).unwrap();
-        assert!(h.contains("admin scope"), "expected admin-scope hint, got {h:?}");
+        assert!(
+            h.contains("admin scope"),
+            "expected admin-scope hint, got {h:?}"
+        );
     }
 
     #[test]

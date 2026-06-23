@@ -171,7 +171,13 @@ fn topic_title_roundtrip() {
 
     // Restore the original title so the test leaves no trace.
     let restore = run_dsc(
-        &["topic", "title", &test.name, &topic_id.to_string(), &original],
+        &[
+            "topic",
+            "title",
+            &test.name,
+            &topic_id.to_string(),
+            &original,
+        ],
         &config_path,
     );
     assert!(

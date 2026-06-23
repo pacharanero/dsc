@@ -37,17 +37,27 @@ fn sar_creates_bundle() {
 
     // Core bundle artefacts must exist.
     assert!(out_dir.join("README.md").exists(), "README.md missing");
-    assert!(out_dir.join("manifest.json").exists(), "manifest.json missing");
-    assert!(out_dir.join("profile.json").exists(), "profile.json missing");
+    assert!(
+        out_dir.join("manifest.json").exists(),
+        "manifest.json missing"
+    );
+    assert!(
+        out_dir.join("profile.json").exists(),
+        "profile.json missing"
+    );
 
-    let manifest: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(out_dir.join("manifest.json")).expect("read manifest"))
-            .expect("parse manifest");
+    let manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_dir.join("manifest.json")).expect("read manifest"),
+    )
+    .expect("parse manifest");
     assert_eq!(
         manifest["subject"]["username"].as_str(),
         Some(test.api_username.as_str())
     );
     // Messages were not requested, so the section must be absent and unflagged.
     assert_eq!(manifest["messages_included"], serde_json::json!(false));
-    assert!(!out_dir.join("messages").exists(), "messages/ should be absent without --messages");
+    assert!(
+        !out_dir.join("messages").exists(),
+        "messages/ should be absent without --messages"
+    );
 }

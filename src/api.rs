@@ -22,13 +22,13 @@ mod users;
 
 pub use api_keys::{ApiKeySummary, CreatedApiKey};
 pub use client::{DiscourseClient, VersionInfo};
-pub use models::*;
-pub use tags::TagGroupInfo;
 pub use groups::AddMembersOutcome;
 pub use invites::InviteResult;
+pub use models::*;
 pub use reports::{AdminReport, ReportPoint};
 pub use search::SearchHit;
 pub use settings::SiteSettingDetail;
+pub use tags::TagGroupInfo;
 pub use tags::TagInfo;
 pub use topics::{PmTopicSummary, PostEditOptions, PostInfo};
 pub use uploads::UploadInfo;

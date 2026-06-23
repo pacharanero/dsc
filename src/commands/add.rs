@@ -38,10 +38,10 @@ pub fn add_discourses(config: &mut Config, names: &str, interactive: bool) -> Re
             });
             entry.ssh_host = prompt_optional("SSH host (for remote updates)")?;
             let changelog_id_str = prompt_optional("Changelog topic ID (for update posts)")?;
-            if let Some(id_str) = changelog_id_str {
-                if let Ok(id) = id_str.parse::<u64>() {
-                    entry.changelog_topic_id = Some(id);
-                }
+            if let Some(id_str) = changelog_id_str
+                && let Ok(id) = id_str.parse::<u64>()
+            {
+                entry.changelog_topic_id = Some(id);
             }
             if !entry.baseurl.trim().is_empty() {
                 entry.fullname = fetch_fullname_from_url(&entry.baseurl);

@@ -1,6 +1,6 @@
 use super::client::DiscourseClient;
 use super::error::http_error;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -74,8 +74,8 @@ impl DiscourseClient {
             .ok_or_else(|| anyhow!("site_settings response missing 'site_settings' array"))?;
         let mut out = Vec::with_capacity(arr.len());
         for entry in arr {
-            let detail: SiteSettingDetail = serde_json::from_value(entry.clone())
-                .with_context(|| {
+            let detail: SiteSettingDetail =
+                serde_json::from_value(entry.clone()).with_context(|| {
                     format!(
                         "parsing site setting entry: {}",
                         entry.get("setting").and_then(|v| v.as_str()).unwrap_or("?")

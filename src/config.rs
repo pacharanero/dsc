@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
@@ -149,14 +149,14 @@ fn write_config_file(path: &Path, raw: &[u8]) -> Result<()> {
 
     let metadata = fs::metadata(path).with_context(|| format!("reading {}", path.display()))?;
     let mode = metadata.permissions().mode() & 0o777;
-    if mode & 0o077 != 0 {
-        if let Err(err) = fs::set_permissions(path, fs::Permissions::from_mode(0o600)) {
-            eprintln!(
-                "Warning: unable to tighten permissions on {}: {}",
-                path.display(),
-                err
-            );
-        }
+    if mode & 0o077 != 0
+        && let Err(err) = fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+    {
+        eprintln!(
+            "Warning: unable to tighten permissions on {}: {}",
+            path.display(),
+            err
+        );
     }
     Ok(())
 }

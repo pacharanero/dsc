@@ -208,8 +208,14 @@ fn setting_audit_json() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value =
         serde_json::from_str(stdout.trim()).expect("setting audit --format json should emit JSON");
-    let rows = parsed.as_array().expect("audit output should be a JSON array");
-    assert_eq!(rows.len(), 1, "expected one row for the single configured forum");
+    let rows = parsed
+        .as_array()
+        .expect("audit output should be a JSON array");
+    assert_eq!(
+        rows.len(),
+        1,
+        "expected one row for the single configured forum"
+    );
     assert_eq!(
         rows[0].get("discourse").and_then(|v| v.as_str()),
         Some(test.name.as_str())

@@ -162,10 +162,8 @@ impl DiscourseClient {
                 &text,
             ));
         }
-        let env: ReportEnvelope =
-            serde_json::from_str(&text).with_context(|| {
-                format!("parsing admin report {} response", report_id)
-            })?;
+        let env: ReportEnvelope = serde_json::from_str(&text)
+            .with_context(|| format!("parsing admin report {} response", report_id))?;
         Ok(env.report)
     }
 }

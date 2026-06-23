@@ -193,8 +193,7 @@ pub fn backup_pull(
     let bytes = response
         .bytes()
         .with_context(|| format!("reading backup response from {}", url))?;
-    fs::write(&dest, &bytes)
-        .with_context(|| format!("writing {}", dest.display()))?;
+    fs::write(&dest, &bytes).with_context(|| format!("writing {}", dest.display()))?;
     println!(
         "Backup {} pulled to {} ({} bytes)",
         backup_filename,
