@@ -5,6 +5,28 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.19] - 2026-06-23
+
+### Documentation
+
+- **readme**: Add a "What works today" capability matrix ([bc7fcc8](https://github.com/pacharanero/dsc/commit/bc7fcc8cb9ee77f11c4635cecb94bebac90e2cec))
+
+- **roadmap**: Refresh stale test count (125 → 181) in the 1.0 bullet ([9f0741b](https://github.com/pacharanero/dsc/commit/9f0741b3645cde3373ee284acfe532dc4fb51e28))
+
+### Features
+
+- **sar**: One-shot Subject Access Request export (`dsc sar`, Phase 1) ([c3a1ff9](https://github.com/pacharanero/dsc/commit/c3a1ff95a1300594cb0f99e0c6d7669120605e9e))
+
+- **setting**: Add `setting audit` - one setting across every forum ([1530f4e](https://github.com/pacharanero/dsc/commit/1530f4eda18d1fcddff9e93864c2259dfa214de8))
+
+### Styling
+
+- Apply clippy autofixes and cargo fmt ([6c3bc81](https://github.com/pacharanero/dsc/commit/6c3bc818558b0a0feba81aa91e9c1d1be85f9ea6))
+
+### Spec
+
+- **sar**: One-shot Subject Access Request export (`dsc sar`) ([57ec43a](https://github.com/pacharanero/dsc/commit/57ec43a4f3aa528cf4e5777fa7b74d5227d849a9))
+
 ## [0.10.18] - 2026-06-23
 
 ### Bug fixes
