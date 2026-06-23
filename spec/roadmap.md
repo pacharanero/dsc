@@ -38,7 +38,7 @@ _(nothing currently in progress)_
 
 Polish items to land before announcing on [meta.discourse.org](https://meta.discourse.org). Most are small but cumulatively shift perception from "promising 0.x" to "stable, take it seriously."
 
-- [ ] **Bump to 1.0.0** with a written back-compat policy. State: "the CLI surface documented in `dsc --help` is stable; flags will not be removed without a deprecation cycle." The current 0.x signal undersells the project's maturity (125 tests, 5-target prebuilt distribution, 9 months of consistent shipping).
+- [ ] **Bump to 1.0.0** with a written back-compat policy. State: "the CLI surface documented in `dsc --help` is stable; flags will not be removed without a deprecation cycle." The current 0.x signal undersells the project's maturity (181 lib tests + e2e suites, 5-target prebuilt distribution, 9 months of consistent shipping).
 - [x] **Generate `CHANGELOG.md`** - [git-cliff](https://github.com/orhun/git-cliff) configured via [cliff.toml](../cliff.toml); full history (back to first conventional commit) backfilled into [CHANGELOG.md](../CHANGELOG.md). `s/version++` now refreshes it automatically on each bump. `cargo-dist` picks it up for the GitHub Release body.
 - [x] **CLI consistency audit** against [spec/spec.md](spec.md):
   - Format baseline: all 20 list commands accept `--format text|json|yaml` (fully compliant).
