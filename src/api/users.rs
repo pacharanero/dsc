@@ -104,6 +104,41 @@ impl DiscourseClient {
         Ok(detail)
     }
 
+    /// Fetch the full admin view of a user (`GET /admin/users/{id}.json`) as
+    /// raw JSON. This carries the complete PII surface - all emails,
+    /// registration/last IP addresses, custom fields, associated accounts -
+    /// that the public `/u/{username}.json` (used by `fetch_user_detail`)
+    /// omits. The cornerstone of a Subject Access Request export.
+    pub fn fetch_admin_user_detail(&self, user_id: i64) -> Result<Value> {
+        let path = format!("/admin/users/{}.json", user_id);
+        let response = self.get(&path)?;
+        let status = response.status();
+        let text = response
+            .text()
+            .context("reading admin user detail response")?;
+        if !status.is_success() {
+            return Err(http_error("admin user detail request", status, &text));
+        }
+        serde_json::from_str(&text).context("parsing admin user detail response")
+    }
+
+    /// Search users by a free-text filter (username, name, or email) via
+    /// `GET /admin/users/list/all.json?filter=…`. Used to resolve an email
+    /// address to an account.
+    pub fn admin_search_users(&self, query: &str) -> Result<Vec<UserSummary>> {
+        let path = format!(
+            "/admin/users/list/all.json?show_emails=true&filter={}",
+            encode_query_value(query)
+        );
+        let response = self.get(&path)?;
+        let status = response.status();
+        let text = response.text().context("reading user search response")?;
+        if !status.is_success() {
+            return Err(http_error("admin user search request", status, &text));
+        }
+        serde_json::from_str(&text).context("parsing user search response")
+    }
+
     /// Suspend a user by ID. `until` is an ISO-8601 timestamp (or any string
     /// Discourse accepts, like "forever"); `reason` is mandatory from the UI
     /// but Discourse accepts empty via the API.
@@ -275,9 +310,34 @@ impl DiscourseClient {
     }
 }
 
+/// Percent-encode a query-string value per RFC 3986 (unreserved set passes
+/// through). Keeps an email's `@` / `+` from being mangled when used as a
+/// `filter=` value.
+fn encode_query_value(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{UserDetail, UserSummary};
+    use super::{UserDetail, UserSummary, encode_query_value};
+
+    #[test]
+    fn encode_query_value_escapes_email_specials() {
+        assert_eq!(
+            encode_query_value("jane+tag@example.com"),
+            "jane%2Btag%40example.com"
+        );
+        assert_eq!(encode_query_value("simple-name_1"), "simple-name_1");
+    }
 
     /// Regression test for the bug captured in
     /// `spec/user-list-negative-ids.md`: Discourse uses negative IDs for

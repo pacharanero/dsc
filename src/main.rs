@@ -815,6 +815,20 @@ fn main() -> Result<()> {
                 },
         } => commands::setting::audit_site_setting(&config, &setting, tags.as_deref(), format),
 
+        Commands::Sar {
+            discourse,
+            user,
+            output,
+            messages,
+        } => commands::sar::sar(
+            &config,
+            &discourse,
+            &user,
+            output.as_deref(),
+            messages,
+            dry_run,
+        ),
+
         Commands::Open { discourse } => commands::open::open_discourse(&config, &discourse),
 
         Commands::Harden {

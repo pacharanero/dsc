@@ -21,6 +21,7 @@ pub mod palette;
 pub mod plugin;
 pub mod pm;
 pub mod post;
+pub mod sar;
 pub mod setting;
 pub mod theme;
 pub mod topic;

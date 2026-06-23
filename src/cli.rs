@@ -152,6 +152,22 @@ pub enum Commands {
         #[command(subcommand)]
         command: SettingCommand,
     },
+    /// Export everything a forum holds about one person into a reviewable
+    /// Subject Access Request (SAR / GDPR Art. 15) bundle. Single forum.
+    Sar {
+        /// Discourse name.
+        discourse: String,
+        /// Subject: a username or an email address.
+        user: String,
+        /// Output directory (default `sar-<username>-<date>/`).
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+        /// Also collect the subject's private messages. Off by default: PMs
+        /// contain third-party personal data and need a disclose/redact
+        /// judgement. Written with a REVIEW REQUIRED banner when included.
+        #[arg(long)]
+        messages: bool,
+    },
     /// Manage the tag taxonomy: list/pull/push tags and tag groups.
     #[command(visible_alias = "tg")]
     Tag {

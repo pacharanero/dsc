@@ -1,5 +1,11 @@
 # `dsc sar` - one-shot Subject Access Request export
 
+> **Status: Phase 1 implemented (unreleased).** `dsc sar <discourse> <user>`
+> writes the bundle (profile/PII, authored posts, likes, groups, README cover
+> sheet + manifest), with private messages opt-in via `--messages` and a
+> working `--dry-run`. Phase 2 (`--zip`, combined document, staff notes) is
+> on-demand; multi-forum fan-out is out of scope by decision.
+
 Spec for a new `dsc sar` command that gathers everything a Discourse holds
 about one person into a single, organised, portable bundle suitable for
 answering a **Subject Access Request** (SAR / DSAR under UK GDPR Art. 15 and
@@ -61,11 +67,16 @@ dsc sar <DISCOURSE> <USER> [OPTIONS]
 - Options:
   - `--output <DIR>` - destination directory (default
     `sar-<username>-<YYYY-MM-DD>/` in the cwd).
-  - `--include <parts>` / `--exclude <parts>` - comma list of sections
-    (`profile,posts,messages,activity,groups`); default is everything.
-  - `--zip` - also produce `<DIR>.zip` for secure transfer.
-  - global `-n` / `--dry-run` - list what would be collected and written,
-    making no files and (ideally) only the read calls needed to count.
+  - `--messages` - **opt-in**: also collect the subject's private messages.
+    Off by default because PMs necessarily contain other people's personal
+    data; a full SAR may require them, but only after the controller makes the
+    third-party disclose/redact judgement. When set, `messages/` is written
+    with a prominent REVIEW REQUIRED banner and flagged in the manifest.
+  - global `-n` / `--dry-run` - resolve the subject and report what would be
+    collected and written, making no files.
+
+Everything else (profile/PII, authored posts, activity, group memberships) is
+collected by default; only private messages are gated behind `--messages`.
 
 ### Output bundle
 
@@ -83,7 +94,7 @@ sar-jane-doe-2026-06-23/
   posts/               # every post the subject authored, as Markdown
     <topic-slug>-<post-id>.md
   posts.json           # same, structured (ids, timestamps, urls, raw)
-  messages/            # private messages -- REVIEW REQUIRED banner in README
+  messages/            # ONLY when --messages; REVIEW REQUIRED banner in README
     <thread-slug>-<topic-id>.md
   activity.json        # likes given/received and other user actions
 ```
@@ -141,13 +152,13 @@ admin API is not formally versioned. Endpoints `dsc` already uses are marked.)
 - [ ] `fetch_admin_user_detail(user_id)` -> `/admin/users/{id}.json` (full PII).
 - [ ] Resolve `<USER>` as username or email to a user id.
 - [ ] Write the bundle: `profile.json`, `groups.json`, `posts/` + `posts.json`,
-      `messages/`, `activity.json`.
+      `activity.json`. `messages/` only when `--messages` is set.
 - [ ] `README.md` cover sheet (subject, forum, generated-at, controller
       checklist, Article 15 template) + `manifest.json` with counts and
-      `review_required` flags (always flag `messages/` and IP data).
-- [ ] `--output`, `--include`/`--exclude`, `--dry-run`.
+      `review_required` flags (IP data always; `messages/` when included).
+- [ ] `--output`, `--messages`, `--dry-run`.
 
-### Phase 2 - iteration ergonomics
+### Phase 2 - iteration ergonomics (build on demand)
 
 - [ ] `--zip` for secure transfer.
 - [ ] A single combined human-readable `sar-<username>.md` (some controllers
@@ -155,12 +166,6 @@ admin API is not formally versioned. Endpoints `dsc` already uses are marked.)
 - [ ] Staff/admin notes about the subject (if the Staff Notes plugin is
       present) - these are disclosable personal data.
 - [ ] Bookmarks, drafts, preferences, screened-email/IP history where exposed.
-
-### Phase 3 - multi-forum
-
-- [ ] `dsc sar <user> --tags <tags>` / `dsc sar all <user>` - fan out across
-      every configured forum the subject appears on, merged into one bundle
-      with per-forum subdirectories. Ties into `dsc user find <email>`.
 
 ## Backward compatibility
 
@@ -174,6 +179,10 @@ possible and adds `fetch_admin_user_detail`.
   "Compliance scope").
 - Erasure / "right to be forgotten" (`dsc user anonymize`/delete) - a different
   GDPR right, deliberately not bundled here.
+- **Multi-forum fan-out** - deliberately not built. A subject who appears on
+  several of one org's forums is rare enough that running `dsc sar` once per
+  forum is fine; the per-forum command already removes the bulk of the labour.
+  No `dsc sar all` / `--tags` aggregation.
 - Holding or transmitting the bundle securely after generation - the output is
   sensitive personal data; transport and retention are the operator's job. The
   tool should print a reminder to that effect.
