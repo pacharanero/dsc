@@ -47,7 +47,7 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 - [x] **Surface analytics v1 status more prominently** in [docs/analytics.md](../docs/analytics.md). The Sections heading now carries a v1-status callout pointing at the implementation matrix and the spec's "Implementation follow-ups". Stale `.marcus/queries.md` reference fixed.
 - [x] **Rename `spec/dsc-tag-sync-spec.md`** → [spec/tag-sync.md](tag-sync.md) for consistency with the post-`-spec.md` convention. References updated.
 - [ ] **Record an asciinema** (~30s) of the pull → edit → push → diff loop on a real Discourse. Embed in README. Visual proof beats prose.
-- [ ] **"What works / what's coming" matrix in README** so readers can self-sort whether `dsc` covers their use case before installing.
+- [x] **"What works / what's coming" matrix in README** - a per-area table (works now / on the roadmap) lands under a "What works today" heading in [README.md](../README.md), so readers can self-sort before installing.
 - [x] **GitHub issue templates** - [bug_report.md](../.github/ISSUE_TEMPLATE/bug_report.md), [feature_request.md](../.github/ISSUE_TEMPLATE/feature_request.md), [spec_request.md](../.github/ISSUE_TEMPLATE/spec_request.md), plus [config.yml](../.github/ISSUE_TEMPLATE/config.yml) pointing general Discourse questions at Meta.
 - [x] **CONTRIBUTING.md** - lands at [CONTRIBUTING.md](../CONTRIBUTING.md), references AGENTS.md, spec/spec.md, and spec/implementation.md.
 - [x] **Support stance written down** - in CONTRIBUTING.md: "best-effort, community-driven, no SLA; field-driven specs prioritised over speculative ones."

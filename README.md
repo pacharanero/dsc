@@ -15,6 +15,25 @@ Most functionality uses the Discourse REST API. `dsc update` runs remote rebuild
 - List, install, and remove themes and plugins.
 - Create, list, and restore backups.
 
+## What works today
+
+A glance at where `dsc` is, so you can tell whether it covers your use case before installing. Almost everything below works over the Discourse REST API; server lifecycle uses SSH.
+
+| Area | Works now | On the roadmap |
+|---|---|---|
+| **Topics & posts** | pull / push / sync as Markdown, reply, create, rename (`topic title`), set tags, full-thread export; per-post edit / delete / move | — |
+| **Categories** | list; pull / push a whole category as Markdown with durable `topic_id` binding, a reviewable dry-run plan, `--updates-only` and `--no-bump`; copy | MkDocs ↔ Discourse admonition & link conversion |
+| **Tags** | pull / push the taxonomy, rename, per-topic tag / untag | — |
+| **Site settings** | get / set / list, pull / push snapshots, diff two sources, **audit one setting across every forum** | — |
+| **Themes & palettes** | list / install / remove / pull / push / duplicate / show; component settings; enable / disable; attach / detach; colour palettes | per-field SCSS editing, asset upload + bind, remote component update |
+| **Users & access** | list / info, suspend / silence, promote / demote, group membership, activity export, create, password reset, email change; invites; private messages; API keys; **one-shot SAR / GDPR export** | scoped API keys, find-user-by-email |
+| **Backups, emoji, uploads** | backup create / list / pull / push / restore, bulk emoji, file upload | backup-all |
+| **Fleet (multi-install)** | one config for N forums, tag filtering, write a setting across matching installs, audit a setting across all, update-all over SSH | cross-forum search & aggregate reports |
+| **Server lifecycle** | `harden` a fresh box (firewall, SSH, Docker, swap, fail2ban); `update` over SSH with skip-if-current | one-shot `dsc install` provisioning; `harden` stage-3 finishing |
+| **Reporting** | analytics snapshot (growth / activity / health) | dashboard reports, staff-action log, webhooks, notifications |
+
+Exploratory (not committed): `dsc chat`, a TUI, and an MCP server mode. See [spec/roadmap.md](spec/roadmap.md) for the full picture.
+
 ## Installation
 
 ### Shell installer — Linux and macOS
