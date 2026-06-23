@@ -95,7 +95,7 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 
 - [ ] **`dsc search all <query>`** - fan out search across every configured forum, merged results.
 - [ ] **`dsc report all <name>`** - aggregate a given report across forums (e.g. total signups last 30 days across N installs).
-- [ ] **`dsc setting audit <key>`** - show the current value of a given setting across every forum, diff-friendly. Distinct from `dsc setting diff` (two specific sources, all keys).
+- [x] **`dsc setting audit <key>`** - shows one setting's value across every configured forum (optional `--tags` filter), with an aligned table + agreement summary in text mode and per-forum objects in json/yaml. Unreachable forums reported inline, not fatal. Shared `matches_tag_filter()` with `setting set --tags`.
 - [ ] **`dsc user find <email>`** - locate a user across every configured forum (GDPR / "which of my forums has this person" workflows).
 - [ ] **`dsc backup create --all`** - reuse the parallel-ops pattern established by `dsc update all`.
 

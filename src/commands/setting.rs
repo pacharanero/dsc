@@ -35,26 +35,13 @@ pub fn set_site_setting(
 
     // No specific discourse - use tag filter across all discourses.
     let filter = tags.map(parse_tags).unwrap_or_default();
-    let matches_filter = |disc: &DiscourseConfig| {
-        if filter.is_empty() {
-            return true;
-        }
-        let disc_tags = disc.tags.as_ref().map(|t| {
-            t.iter()
-                .map(|tag| tag.to_ascii_lowercase())
-                .collect::<Vec<_>>()
-        });
-        let Some(disc_tags) = disc_tags else {
-            return false;
-        };
-        filter.iter().any(|tag| {
-            let tag = tag.to_ascii_lowercase();
-            disc_tags.iter().any(|t| t == &tag)
-        })
-    };
 
     let mut matched = 0;
-    for discourse in config.discourse.iter().filter(|d| matches_filter(d)) {
+    for discourse in config
+        .discourse
+        .iter()
+        .filter(|d| matches_tag_filter(d, &filter))
+    {
         matched += 1;
         ensure_api_credentials(discourse)?;
         if dry_run {
@@ -92,6 +79,104 @@ pub fn get_site_setting(
         &serde_json::json!({ "setting": setting, "value": value }),
         &value,
     )
+}
+
+/// Does a discourse carry at least one of the tags in `filter`? An empty
+/// filter matches every discourse. Shared by `setting set --tags` and
+/// `setting audit --tags`.
+fn matches_tag_filter(disc: &DiscourseConfig, filter: &[String]) -> bool {
+    if filter.is_empty() {
+        return true;
+    }
+    let Some(disc_tags) = disc.tags.as_ref() else {
+        return false;
+    };
+    let disc_tags: Vec<String> = disc_tags.iter().map(|t| t.to_ascii_lowercase()).collect();
+    filter.iter().any(|tag| {
+        let tag = tag.to_ascii_lowercase();
+        disc_tags.iter().any(|t| t == &tag)
+    })
+}
+
+#[derive(Debug, Serialize)]
+struct AuditRow {
+    discourse: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+/// Show the value of one setting across every configured forum (filtered by
+/// `tags`). One unreachable or unauthenticated forum is reported inline rather
+/// than aborting the whole audit. Distinct from `setting diff`, which compares
+/// two specific sources across all settings.
+pub fn audit_site_setting(
+    config: &Config,
+    setting: &str,
+    tags: Option<&str>,
+    format: ListFormat,
+) -> Result<()> {
+    let filter = tags.map(parse_tags).unwrap_or_default();
+    let rows: Vec<AuditRow> = config
+        .discourse
+        .iter()
+        .filter(|d| matches_tag_filter(d, &filter))
+        .map(|d| match fetch_one_setting(d, setting) {
+            Ok(value) => AuditRow {
+                discourse: d.name.clone(),
+                value: Some(value),
+                error: None,
+            },
+            Err(e) => AuditRow {
+                discourse: d.name.clone(),
+                value: None,
+                error: Some(e.to_string()),
+            },
+        })
+        .collect();
+
+    match format {
+        ListFormat::Text => print!("{}", render_audit_text(setting, &rows)),
+        ListFormat::Json => println!("{}", serde_json::to_string_pretty(&rows)?),
+        ListFormat::Yaml => println!("{}", serde_yaml::to_string(&rows)?),
+    }
+    Ok(())
+}
+
+fn fetch_one_setting(discourse: &DiscourseConfig, setting: &str) -> Result<String> {
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    client.fetch_site_setting(setting)
+}
+
+/// Render an audit as an aligned `name  value` table followed by an agreement
+/// summary (all agree / N distinct values / none returned). Pure, so it is
+/// unit-tested without touching the network.
+fn render_audit_text(setting: &str, rows: &[AuditRow]) -> String {
+    if rows.is_empty() {
+        return format!("No forums matched for setting '{}'.\n", setting);
+    }
+    let width = rows.iter().map(|r| r.discourse.len()).max().unwrap_or(0);
+    let mut out = String::new();
+    for row in rows {
+        let cell = match (&row.value, &row.error) {
+            (Some(v), _) => v.clone(),
+            (None, Some(e)) => format!("<error: {}>", e),
+            (None, None) => String::new(),
+        };
+        out.push_str(&format!("{:width$}  {}\n", row.discourse, cell, width = width));
+    }
+    let values: Vec<&String> = rows.iter().filter_map(|r| r.value.as_ref()).collect();
+    let distinct: std::collections::BTreeSet<&str> =
+        values.iter().map(|v| v.as_str()).collect();
+    let summary = match (values.len(), distinct.len()) {
+        (0, _) => format!("no forum returned a value for '{}'", setting),
+        (n, 1) => format!("all {} forum(s) agree on '{}'", n, setting),
+        (n, d) => format!("{} distinct values for '{}' across {} forum(s)", d, setting, n),
+    };
+    out.push_str(&format!("\n{}\n", summary));
+    out
 }
 
 #[derive(Debug, Serialize)]
@@ -718,5 +803,75 @@ fn fmt_diff_value(v: &Option<String>) -> String {
         Some(s) if s.is_empty() => "\"\"".to_string(),
         Some(s) => format!("\"{}\"", s),
         None => "(absent)".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn disc(name: &str, tags: Option<Vec<&str>>) -> DiscourseConfig {
+        DiscourseConfig {
+            name: name.to_string(),
+            tags: tags.map(|t| t.into_iter().map(String::from).collect()),
+            ..DiscourseConfig::default()
+        }
+    }
+
+    fn row(name: &str, value: Option<&str>, error: Option<&str>) -> AuditRow {
+        AuditRow {
+            discourse: name.to_string(),
+            value: value.map(String::from),
+            error: error.map(String::from),
+        }
+    }
+
+    #[test]
+    fn tag_filter_empty_matches_all() {
+        assert!(matches_tag_filter(&disc("a", None), &[]));
+        assert!(matches_tag_filter(&disc("a", Some(vec!["prod"])), &[]));
+    }
+
+    #[test]
+    fn tag_filter_matches_case_insensitively() {
+        let filter = vec!["Prod".to_string()];
+        assert!(matches_tag_filter(&disc("a", Some(vec!["prod", "eu"])), &filter));
+    }
+
+    #[test]
+    fn tag_filter_rejects_untagged_or_nonmatching() {
+        let filter = vec!["prod".to_string()];
+        assert!(!matches_tag_filter(&disc("a", None), &filter));
+        assert!(!matches_tag_filter(&disc("a", Some(vec!["staging"])), &filter));
+    }
+
+    #[test]
+    fn audit_text_reports_agreement() {
+        let rows = vec![row("forum-a", Some("My Forum"), None), row("forum-b", Some("My Forum"), None)];
+        let out = render_audit_text("title", &rows);
+        assert!(out.contains("forum-a  My Forum"));
+        assert!(out.contains("all 2 forum(s) agree on 'title'"), "got: {out}");
+    }
+
+    #[test]
+    fn audit_text_reports_distinct_values() {
+        let rows = vec![row("a", Some("X"), None), row("b", Some("Y"), None)];
+        let out = render_audit_text("title", &rows);
+        assert!(out.contains("2 distinct values for 'title' across 2 forum(s)"), "got: {out}");
+    }
+
+    #[test]
+    fn audit_text_renders_errors_and_excludes_them_from_agreement() {
+        let rows = vec![row("a", Some("X"), None), row("b", None, Some("auth failed"))];
+        let out = render_audit_text("title", &rows);
+        assert!(out.contains("<error: auth failed>"));
+        // Only one forum returned a value, so they trivially "agree".
+        assert!(out.contains("all 1 forum(s) agree"), "got: {out}");
+    }
+
+    #[test]
+    fn audit_text_empty_when_no_forums_match() {
+        let out = render_audit_text("title", &[]);
+        assert!(out.contains("No forums matched"));
     }
 }

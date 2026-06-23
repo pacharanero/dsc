@@ -94,3 +94,26 @@ Flags:
 - `--format` (`-f`): `text` (default), `json`, or `yaml`. JSON/YAML output is pipe-friendly for further tooling.
 
 The text output lists each differing setting with both values quoted, or `(absent)` when one side does not have the setting at all.
+
+## dsc setting audit
+
+```
+dsc setting audit <setting> [--tags tag1,tag2] [--format text|json|yaml]
+```
+
+Shows the value of **one** setting across **every** configured forum, so you can spot drift at a glance. Unlike `setting diff` (two specific sources, all settings), `audit` is one setting across all installs.
+
+Optionally filter with `--tags` to audit only forums carrying one of the given tags (e.g. `--tags production`). A forum that can't be reached or authenticated is reported inline as `<error: …>` rather than aborting the whole audit.
+
+Text output is an aligned table plus an agreement summary; `--format json` (or `yaml`) emits one object per forum (`{discourse, value}` or `{discourse, error}`).
+
+```bash
+dsc setting audit title
+# forum-a    Alpha Community
+# forum-b    Alpha Community
+# forum-c    <error: api auth failed>
+#
+# 1 distinct values for 'title' across 2 forum(s)
+
+dsc setting audit login_required --tags production --format json
+```

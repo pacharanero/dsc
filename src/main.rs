@@ -806,6 +806,15 @@ fn main() -> Result<()> {
             format,
         ),
 
+        Commands::Setting {
+            command:
+                SettingCommand::Audit {
+                    setting,
+                    tags,
+                    format,
+                },
+        } => commands::setting::audit_site_setting(&config, &setting, tags.as_deref(), format),
+
         Commands::Open { discourse } => commands::open::open_discourse(&config, &discourse),
 
         Commands::Harden {

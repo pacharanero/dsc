@@ -186,3 +186,32 @@ fn setting_set() {
         &config_path,
     );
 }
+
+#[test]
+fn setting_audit_json() {
+    let Some(test) = test_discourse() else {
+        return;
+    };
+    vprintln("e2e_setting_audit_json: audit a setting across configured forums");
+    let dir = TempDir::new().expect("tempdir");
+    let config_path = make_config(&dir, &test);
+    // No discourse positional: audit runs across every configured forum (here, one).
+    let output = run_dsc(
+        &["setting", "audit", "title", "--format", "json"],
+        &config_path,
+    );
+    assert!(
+        output.status.success(),
+        "setting audit failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("setting audit --format json should emit JSON");
+    let rows = parsed.as_array().expect("audit output should be a JSON array");
+    assert_eq!(rows.len(), 1, "expected one row for the single configured forum");
+    assert_eq!(
+        rows[0].get("discourse").and_then(|v| v.as_str()),
+        Some(test.name.as_str())
+    );
+}

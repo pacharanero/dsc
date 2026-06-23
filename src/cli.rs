@@ -1428,6 +1428,21 @@ pub enum SettingCommand {
         #[arg(long, short = 'f', value_enum, default_value = "text")]
         format: ListFormat,
     },
+
+    /// Show the value of one setting across every configured forum
+    /// (optionally filtered by `--tags`). Diff-friendly; distinct from `diff`,
+    /// which compares two specific sources across all settings.
+    Audit {
+        /// Setting key.
+        setting: String,
+        /// Only audit forums carrying at least one of these tags
+        /// (comma/semicolon-separated). Omit to audit every configured forum.
+        #[arg(long, value_name = "tag1,tag2")]
+        tags: Option<String>,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy)]
