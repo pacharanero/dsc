@@ -36,7 +36,7 @@ impl DiscourseClient {
             ));
         }
         let path = format!("/admin/site_settings/{}.json", setting);
-        let payload = [("value", value)];
+        let payload = site_setting_form(setting, value);
         let response = self.send_retrying(|| Ok(self.put(&path)?.form(&payload)))?;
         let status = response.status();
         let text = response
@@ -114,5 +114,32 @@ impl DiscourseClient {
             }
         }
         Err(anyhow!("setting not found: {}", setting))
+    }
+}
+
+/// Build the form body for `PUT /admin/site_settings/{name}.json`.
+///
+/// Discourse expects the new value under a field **named after the setting**
+/// (e.g. `title=My+Forum`), not a generic `value=...`. Sending `value=`
+/// silently no-ops - and blanks string settings, since the real field is
+/// then absent. Regression guard for
+/// <https://github.com/pacharanero/dsc/issues/19>.
+fn site_setting_form<'a>(setting: &'a str, value: &'a str) -> [(&'a str, &'a str); 1] {
+    [(setting, value)]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::site_setting_form;
+
+    #[test]
+    fn form_field_is_named_after_the_setting_not_value() {
+        // The bug: this used to be `[("value", value)]`, which Discourse
+        // ignores - blanking string settings and no-op'ing booleans.
+        assert_eq!(site_setting_form("title", "My Forum"), [("title", "My Forum")]);
+        assert_eq!(
+            site_setting_form("manual_polling_enabled", "true"),
+            [("manual_polling_enabled", "true")]
+        );
     }
 }
