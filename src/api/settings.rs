@@ -136,7 +136,10 @@ mod tests {
     fn form_field_is_named_after_the_setting_not_value() {
         // The bug: this used to be `[("value", value)]`, which Discourse
         // ignores - blanking string settings and no-op'ing booleans.
-        assert_eq!(site_setting_form("title", "My Forum"), [("title", "My Forum")]);
+        assert_eq!(
+            site_setting_form("title", "My Forum"),
+            [("title", "My Forum")]
+        );
         assert_eq!(
             site_setting_form("manual_polling_enabled", "true"),
             [("manual_polling_enabled", "true")]
