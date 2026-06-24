@@ -5,6 +5,12 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.21] - 2026-06-24
+
+### Features
+
+- **version**: `dsc version <forum>` reports a forum's Discourse version + commit ([6176d38](https://github.com/pacharanero/dsc/commit/6176d387a9544550c27b81848d3ce9bc091891c3))
+
 ## [0.10.20] - 2026-06-24
 
 ### Bug fixes
