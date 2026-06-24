@@ -964,9 +964,12 @@ fn main() -> Result<()> {
 
         Commands::Man { dir } => commands::manpages::write_manpages(&dir),
 
-        Commands::Version => {
-            println!("{}", env!("CARGO_PKG_VERSION"));
-            Ok(())
-        }
+        Commands::Version { discourse } => match discourse {
+            Some(name) => commands::version::forum_version(&config, &name),
+            None => {
+                println!("{}", env!("CARGO_PKG_VERSION"));
+                Ok(())
+            }
+        },
     }
 }

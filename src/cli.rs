@@ -405,7 +405,16 @@ pub enum Commands {
     },
     /// Print the dsc version.
     #[command(visible_alias = "ver")]
-    Version,
+    /// Print dsc's own version, or a configured forum's Discourse version + commit.
+    #[command(after_help = "Examples:
+  dsc version         # dsc's own version
+  dsc version accm    # the forum's live Discourse version + git commit")]
+    Version {
+        /// Forum name. When given, print that forum's live Discourse version
+        /// and git commit (from /about.json, via the configured API key)
+        /// instead of dsc's own version.
+        discourse: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]

@@ -147,6 +147,7 @@ dsc update myforum
   - [setting](docs/setting.md) — get, set, pull, push, and diff site settings
   - [tag](docs/tag.md) — list, pull, push, and rename the tag taxonomy (per-topic tagging lives under `dsc topic tag`/`untag`)
   - [config](docs/config.md) — inspect and validate the dsc config itself
+  - [version](docs/version.md) — dsc's own version, or a forum's live Discourse version + commit
   - [harden](docs/harden.md) — provision a fresh Ubuntu server (firewall, SSH hardening, Docker, swap, journald, fail2ban)
 - [Shell completions](docs/completions.md) — bash, zsh, and fish
 - [Man pages](docs/manpages.md) — generate Unix man pages for `dsc` and every subcommand

@@ -27,3 +27,4 @@ pub mod topic;
 pub mod update;
 pub mod upload;
 pub mod user;
+pub mod version;
