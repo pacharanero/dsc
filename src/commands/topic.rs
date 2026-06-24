@@ -227,6 +227,7 @@ pub fn topic_reply(
     discourse_name: &str,
     topic_id: u64,
     local_path: Option<&Path>,
+    dry_run: bool,
     format: ListFormat,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
@@ -236,6 +237,19 @@ pub fn topic_reply(
     let raw = read_reply_input(local_path)?;
     if raw.trim().is_empty() {
         return Err(anyhow!("reply body is empty"));
+    }
+
+    if dry_run {
+        return emit_result(
+            format,
+            &json!({ "dry_run": true, "topic_id": topic_id, "bytes": raw.len() }),
+            &format!(
+                "[dry-run] {}: would reply to topic {} with {} bytes",
+                discourse.name,
+                topic_id,
+                raw.len()
+            ),
+        );
     }
 
     let post_id = client.create_post(topic_id, &raw)?;

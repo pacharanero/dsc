@@ -77,7 +77,7 @@ Timestamps of both copies are shown before proceeding. Pass `--yes` (or `-y`) to
 dsc topic reply <discourse> <topic-id> [<local-path>] [--format text|json|yaml]
 ```
 
-Posts a new reply at the end of the topic. Reads from `<local-path>` if given, otherwise from stdin (equivalent to passing `-`). `--format json` emits `{"topic_id": ..., "post_id": ...}` for scripting.
+Posts a new reply at the end of the topic. Reads from `<local-path>` if given, otherwise from stdin (equivalent to passing `-`). `--format json` emits `{"topic_id": ..., "post_id": ...}` for scripting. Honours `-n` / `--dry-run`, which prints a `[dry-run] … would reply …` preview without posting.
 
 Examples:
 

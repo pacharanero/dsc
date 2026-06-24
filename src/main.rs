@@ -194,6 +194,7 @@ fn main() -> Result<()> {
                 &discourse,
                 topic_id,
                 local_path.as_deref(),
+                dry_run,
                 format,
             ),
 
