@@ -2,6 +2,7 @@ pub mod add;
 pub mod analytics;
 pub mod api_key;
 pub mod backup;
+pub mod backup_s3;
 pub mod category;
 pub mod common;
 pub mod completions;

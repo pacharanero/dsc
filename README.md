@@ -143,7 +143,7 @@ dsc update myforum
   - [invite](docs/invite.md) — send invites, single or bulk from a file
   - [pm](docs/pm.md) — send and list private messages
   - [api-key](docs/api-key.md) — manage Discourse API keys
-  - [backup](docs/backup.md) — create, list, and restore backups
+  - [backup](docs/backup.md) — create, list, restore, and provision S3 off-site backups
   - [setting](docs/setting.md) — get, set, pull, push, and diff site settings
   - [tag](docs/tag.md) — list, pull, push, and rename the tag taxonomy (per-topic tagging lives under `dsc topic tag`/`untag`)
   - [config](docs/config.md) — inspect and validate the dsc config itself

@@ -1,6 +1,6 @@
 # dsc backup
 
-Create, list, download, and restore backups.
+Create, list, download, restore, and set up off-site (S3) backups.
 
 ## dsc backup create
 
@@ -44,3 +44,31 @@ Restoration is destructive and irreversible. Use `--dry-run` (or `-n`) to previe
 ```bash
 dsc --dry-run backup push myforum discourse-2026-04-17-230000.tar.gz
 ```
+
+## dsc backup setup-s3
+
+```text
+dsc backup setup-s3 <discourse> [--region <r>] [--bucket <name>] [--no-test]
+```
+
+Provisions off-site backups on Amazon S3 in one command, replacing the per-forum AWS-console runbook: it creates a private bucket, a dedicated **single-bucket** IAM user + least-privilege policy, mints an access key, and points Discourse's S3 backup settings at it - then (unless `--no-test`) triggers a backup and confirms it lands in the bucket.
+
+Defaults derive from the forum's config name:
+
+- bucket `<name>-discourse-backups`, policy `s3-single-bucket-<name>-discourse-backups`, user `<name>-discourse-backup-user`
+- region `eu-west-2` (override with `--region`); bucket override with `--bucket`
+
+**Requirements & safety:**
+
+- The [`aws` CLI](https://docs.aws.amazon.com/cli/) must be installed and configured with a profile that has IAM + S3 admin rights. Those provisioning credentials are used only by `aws` and are **never stored by `dsc`**. The minted least-privilege key is written straight into the Discourse setting (not into `dsc.toml`) and is **never printed**.
+- This creates real AWS resources and writes production settings. **Always preview with `-n` / `--dry-run` first** - it prints the resolved names, the full IAM policy JSON, the exact `aws` commands, and the settings diff, and touches nothing.
+
+```bash
+# 1) Review the complete plan (creates nothing)
+dsc backup setup-s3 -n myforum
+
+# 2) Provision for real (eu-west-2 by default)
+dsc backup setup-s3 myforum --region eu-west-1
+```
+
+> Phase 1 covers the create-everything flow. `--reuse-user` (idempotent re-runs / key rotation), `--use-iam-profile` (EC2 instance role, no static keys), and `--all`/`--tags` (fleet-wide) are planned - see [spec/backup-s3-setup.md](../spec/backup-s3-setup.md).

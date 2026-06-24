@@ -557,6 +557,20 @@ fn main() -> Result<()> {
                 discourse,
                 backup_path,
             } => commands::backup::backup_restore(&config, &discourse, &backup_path, dry_run),
+
+            BackupCommand::SetupS3 {
+                discourse,
+                region,
+                bucket,
+                no_test,
+            } => commands::backup_s3::setup_s3(
+                &config,
+                &discourse,
+                &region,
+                bucket.as_deref(),
+                no_test,
+                dry_run,
+            ),
         },
 
         Commands::Palette { command } => {

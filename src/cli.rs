@@ -767,6 +767,27 @@ pub enum BackupCommand {
         /// Backup filename/path on the target system.
         backup_path: String,
     },
+    /// Provision an S3 backup bucket + a scoped IAM user and point Discourse at
+    /// it (one command for the per-forum AWS backup runbook). Requires the
+    /// `aws` CLI configured with IAM + S3 admin rights. Always preview with
+    /// `-n` / `--dry-run` first.
+    #[command(after_help = "Examples:
+  dsc backup setup-s3 -n myforum                  # preview the full plan (review gate)
+  dsc backup setup-s3 myforum --region eu-west-1
+  dsc backup setup-s3 myforum --no-test")]
+    SetupS3 {
+        /// Discourse name.
+        discourse: String,
+        /// AWS region for the bucket.
+        #[arg(long, default_value = "eu-west-2")]
+        region: String,
+        /// Bucket name (default: `<name>-discourse-backups`).
+        #[arg(long)]
+        bucket: Option<String>,
+        /// Skip the verification backup after provisioning.
+        #[arg(long)]
+        no_test: bool,
+    },
 }
 
 #[derive(Subcommand)]

@@ -1,5 +1,12 @@
 # `dsc backup setup-s3` - provision an S3 backup bucket + scoped IAM user and point Discourse at it
 
+> **Status: Phase 1 implemented (unreleased).** `dsc backup setup-s3 <discourse>`
+> ships: derive names, create bucket + single-bucket policy + user + key (via
+> `aws` CLI), set the Discourse S3 settings (using the fixed `update_site_setting`
+> path), optional verification backup, and a complete offline `--dry-run`.
+> Phase 2 (`--reuse-user`, `--use-iam-profile`, `--all`/`--tags`) and Phase 3
+> (native SDK, `--retention`, `backup status`) remain planned.
+
 Spec for one-command setup of off-site Discourse backups on Amazon S3. Goal: replace a ~15-step AWS-console + Discourse-settings runbook with a single `dsc` command. Driver: the Koloki / Baw Medical fleet - every self-hosted forum needs off-site backups, and the secure pattern (one bucket + one dedicated single-bucket IAM user per forum) is set up by hand in the AWS console for each one. Production runbook in use since 2023-01.
 
 ## Motivation
@@ -108,9 +115,9 @@ Caveat (2026-06-24): `dsc setting set` does not persist site settings reliably (
 
 ### Phase 1 - blocking (the PITA being removed)
 
-- [ ] `dsc backup setup-s3 <discourse>` end-to-end via `aws` CLI shell-out: derive names, create bucket + policy + user + key, set the Discourse S3 settings, optional test backup.
-- [ ] `--dry-run` prints resolved names, the policy JSON, the `aws` commands, and the settings diff; touches nothing.
-- [ ] Pre-flight: `aws` present + `aws sts get-caller-identity` works; bucket-name availability; forum reachable.
+- [x] `dsc backup setup-s3 <discourse>` end-to-end via `aws` CLI shell-out: derive names, create bucket + policy + user + key, set the Discourse S3 settings, optional test backup (polls `aws s3 ls` for the dump).
+- [x] `--dry-run` prints resolved names, the policy JSON, the `aws` commands, and the settings diff; touches nothing (offline - no `aws`/network needed).
+- [x] Pre-flight: `aws sts get-caller-identity` works + forum reachable (`/about.json`). (Bucket-name availability is left to `create-bucket`, which errors if taken.)
 
 ### Phase 2 - iteration ergonomics
 
