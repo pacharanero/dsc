@@ -4,10 +4,11 @@ This file is for agents in **other sessions** who are using `dsc` as a tool to m
 
 ## Get oriented fast
 
-- `dsc --help` lists every top-level command. Each command has its own `--help`.
+- `dsc --help` lists every top-level command (sorted alphabetically). Each command has its own `--help`, which ends with an `Examples:` block.
 - [README.md](README.md) has the command index linking to per-command docs in [docs/](docs/).
 - [docs/configuration.md](docs/configuration.md) covers `dsc.toml` and the env vars (`$DSC_CONFIG`, `$DSC_CONFIG_HOME`).
 - `dsc config` shows the active config and where it came from. `dsc config check` probes every configured Discourse for API auth and SSH reachability - run it first on any new machine.
+- **To discover site settings**, `dsc setting pull <discourse> <file>` writes a self-documenting catalog of *every* setting (value, default, type, category, and Discourse's own description) - the reference for what is available and adjustable. `dsc setting audit <key>` compares one setting's value across every configured forum.
 - Every destructive command honours global `-n` / `--dry-run`. Use it before any push/set/install/restore.
 
 ## Pattern: pull → edit → push

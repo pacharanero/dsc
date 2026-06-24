@@ -5,6 +5,7 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(name = "dsc")]
 #[command(about = "Discourse CLI", long_about = None)]
+#[command(next_display_order = None)]
 pub struct Cli {
     /// Path to the config file. If omitted, `dsc` consults `$DSC_CONFIG`,
     /// then searches `./dsc.toml`, `$DSC_CONFIG_HOME/dsc.toml`
@@ -22,9 +23,13 @@ pub struct Cli {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum Commands {
     /// List configured Discourses.
     #[command(visible_alias = "ls")]
+    #[command(after_help = "Examples:
+  dsc list
+  dsc list --tags production -f json")]
     List {
         /// Output format for the listing.
         #[arg(long, short = 'f', value_enum, default_value = "text")]
@@ -43,6 +48,9 @@ pub enum Commands {
     },
     /// Add one or more Discourses to the config.
     #[command(visible_alias = "a")]
+    #[command(after_help = "Examples:
+  dsc add myforum
+  dsc add forum-a,forum-b -i")]
     Add {
         /// Comma-separated discourse names to add.
         names: String,
@@ -52,12 +60,18 @@ pub enum Commands {
     },
     /// Import Discourses from a file or stdin.
     #[command(visible_alias = "imp")]
+    #[command(after_help = "Examples:
+  dsc import forums.csv
+  cat forums.txt | dsc import")]
     Import {
         /// Path to import input (text/CSV). Reads stdin when omitted.
         path: Option<PathBuf>,
     },
     /// Run remote OS + Discourse update workflow for one or all Discourses.
     #[command(visible_alias = "up")]
+    #[command(after_help = "Examples:
+  dsc update myforum
+  dsc update all -p   # update every forum in parallel")]
     Update {
         /// Discourse name, or 'all' to update every configured Discourse.
         name: String,
@@ -76,84 +90,136 @@ pub enum Commands {
     },
     /// Manage custom emoji.
     #[command(visible_alias = "em")]
+    #[command(after_help = "Examples:
+  dsc emoji push myforum ./emoji/    # bulk-upload a folder
+  dsc emoji list myforum")]
     Emoji {
         #[command(subcommand)]
         command: EmojiCommand,
     },
     /// Pull/push/sync topics as local Markdown.
     #[command(visible_alias = "t")]
+    #[command(after_help = "Examples:
+  dsc topic pull myforum 123 topic.md
+  dsc topic push myforum 123 topic.md
+  dsc topic title myforum 123 \"A clearer title\"")]
     Topic {
         #[command(subcommand)]
         command: TopicCommand,
     },
     /// List/copy/pull/push categories.
     #[command(visible_alias = "cat")]
+    #[command(after_help = "Examples:
+  dsc category pull myforum 34 ./playbook/
+  dsc category push -n myforum 34 ./playbook/   # -n previews the plan")]
     Category {
         #[command(subcommand)]
         command: CategoryCommand,
     },
     /// List/inspect/copy groups.
     #[command(visible_alias = "grp")]
+    #[command(after_help = "Examples:
+  dsc group list myforum
+  dsc group info myforum staff")]
     Group {
         #[command(subcommand)]
         command: GroupCommand,
     },
     /// Operations that act from a user's perspective.
     #[command(visible_alias = "usr")]
+    #[command(after_help = "Examples:
+  dsc user list myforum -f json
+  dsc user info myforum alice
+  dsc user activity myforum alice")]
     User {
         #[command(subcommand)]
         command: UserCommand,
     },
     /// Send invites — single or bulk from a file.
     #[command(visible_alias = "inv")]
+    #[command(after_help = "Examples:
+  dsc invite send myforum newuser@example.com
+  dsc invite bulk myforum emails.txt")]
     Invite {
         #[command(subcommand)]
         command: InviteCommand,
     },
     /// Manage API keys (admin scope).
     #[command(visible_alias = "ak")]
+    #[command(after_help = "Examples:
+  dsc api-key list myforum
+  dsc api-key create myforum ci-bot")]
     ApiKey {
         #[command(subcommand)]
         command: ApiKeyCommand,
     },
     /// Send and list private messages.
     #[command(visible_alias = "msg")]
+    #[command(after_help = "Examples:
+  dsc pm list myforum alice
+  dsc pm send myforum alice -t Greetings body.md")]
     Pm {
         #[command(subcommand)]
         command: PmCommand,
     },
     /// Create/list/restore backups.
     #[command(visible_alias = "bk")]
+    #[command(after_help = "Examples:
+  dsc backup create myforum
+  dsc backup pull myforum backup.tar.gz")]
     Backup {
         #[command(subcommand)]
         command: BackupCommand,
     },
     /// List/pull/push color palettes.
     #[command(visible_alias = "pal")]
+    #[command(after_help = "Examples (now lives under `dsc theme palette`):
+  dsc theme palette list myforum
+  dsc theme palette pull myforum 2 palette.json")]
     Palette {
         #[command(subcommand)]
         command: PaletteCommand,
     },
     /// List/install/remove plugins.
     #[command(visible_alias = "plg")]
+    #[command(after_help = "Examples:
+  dsc plugin list myforum
+  dsc plugin install myforum https://github.com/org/plugin")]
     Plugin {
         #[command(subcommand)]
         command: PluginCommand,
     },
     /// List/install/remove/pull/push/duplicate themes.
     #[command(visible_alias = "th")]
+    #[command(after_help = "Examples:
+  dsc theme list myforum
+  dsc theme show myforum 11
+  dsc theme setting set myforum 14 links_position left")]
     Theme {
         #[command(subcommand)]
         command: ThemeCommand,
     },
-    /// Update site settings.
+    /// Get, set, list, diff, audit, and snapshot site settings.
+    ///
+    /// To discover what settings exist, `dsc setting pull` writes a
+    /// self-documenting catalog of every setting (value, default, type,
+    /// category, and Discourse's own description) - the reference guide for
+    /// what is available and adjustable.
     #[command(visible_alias = "set")]
+    #[command(after_help = "Examples:
+  dsc setting pull myforum settings.yaml   # catalog EVERY setting + descriptions (start here)
+  dsc setting get myforum title
+  dsc setting set myforum login_required true
+  dsc setting audit login_required         # compare one setting across all forums")]
     Setting {
         #[command(subcommand)]
         command: SettingCommand,
     },
     /// Export everything a forum holds about one person into a reviewable
     /// Subject Access Request (SAR / GDPR Art. 15) bundle. Single forum.
+    #[command(after_help = "Examples:
+  dsc sar myforum jane@example.com
+  dsc sar myforum jane-doe --messages   # include private messages")]
     Sar {
         /// Discourse name.
         discourse: String,
@@ -170,18 +236,26 @@ pub enum Commands {
     },
     /// Manage the tag taxonomy: list/pull/push tags and tag groups.
     #[command(visible_alias = "tg")]
+    #[command(after_help = "Examples:
+  dsc tag pull myforum tags.yaml
+  dsc tag rename myforum old-tag new-tag")]
     Tag {
         #[command(subcommand)]
         command: TagCommand,
     },
     /// Post-level operations: edit / delete / move.
     #[command(visible_alias = "po")]
+    #[command(after_help = "Examples:
+  dsc post edit myforum 456 body.md
+  dsc post move myforum 456 789")]
     Post {
         #[command(subcommand)]
         command: PostCommand,
     },
     /// Open a Discourse in the default browser.
     #[command(visible_alias = "o")]
+    #[command(after_help = "Examples:
+  dsc open myforum")]
     Open {
         /// Discourse name.
         discourse: String,
@@ -196,6 +270,8 @@ pub enum Commands {
     /// Defaults can be overridden in the `[harden]` block of dsc.toml;
     /// the flags below override that block on a per-run basis.
     #[command(visible_alias = "hd")]
+    #[command(after_help = "Examples:
+  dsc harden 203.0.113.10 --new-user discourse --pubkey-file ~/.ssh/id_ed25519.pub")]
     Harden {
         /// Target hostname or IP (reachable via SSH).
         host: String,
@@ -227,6 +303,9 @@ pub enum Commands {
     /// derivation-heavy ones (e.g. lost regulars, top-10 share) print
     /// `— (n/i)` until follow-up implementation lands.
     #[command(visible_alias = "stats")]
+    #[command(after_help = "Examples:
+  dsc analytics myforum
+  dsc analytics myforum --section growth --since 30d")]
     Analytics {
         /// Discourse name.
         discourse: String,
@@ -257,6 +336,9 @@ pub enum Commands {
     },
     /// Search topics on a Discourse.
     #[command(visible_alias = "s")]
+    #[command(after_help = "Examples:
+  dsc search myforum \"status:open category:bugs\"
+  dsc search myforum @alice -f json")]
     Search {
         /// Discourse name.
         discourse: String,
@@ -269,6 +351,8 @@ pub enum Commands {
     },
     /// Upload a file. Prints the resulting upload:// short URL by default.
     #[command(visible_alias = "u")]
+    #[command(after_help = "Examples:
+  dsc upload myforum ./diagram.png")]
     Upload {
         /// Discourse name.
         discourse: String,
@@ -285,12 +369,18 @@ pub enum Commands {
     },
     /// Inspect and validate configuration.
     #[command(visible_alias = "cfg")]
+    #[command(after_help = "Examples:
+  dsc config         # show active config + search order
+  dsc config check   # probe API auth + SSH for every forum")]
     Config {
         #[command(subcommand)]
         command: Option<ConfigCommand>,
     },
     /// Generate shell completion scripts.
     #[command(visible_alias = "comp")]
+    #[command(after_help = "Examples:
+  dsc completions zsh > _dsc
+  dsc completions bash > dsc.bash")]
     Completions {
         /// Target shell.
         #[arg(value_enum)]
@@ -306,6 +396,8 @@ pub enum Commands {
     /// install these into section 1 of the man path. Run `gzip -9` on
     /// the output if your packaging convention expects compressed pages.
     #[command(visible_alias = "manpages")]
+    #[command(after_help = "Examples:
+  dsc man --dir ./man")]
     Man {
         /// Output directory. Required - this command always writes to disk.
         #[arg(long, short = 'd')]
@@ -317,6 +409,7 @@ pub enum Commands {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum ConfigCommand {
     /// Probe each configured Discourse: API auth and (optionally) SSH reachability.
     #[command(visible_alias = "ck")]
@@ -331,6 +424,7 @@ pub enum ConfigCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum ListCommand {
     /// Sort discourse entries by name and rewrite config in-place.
     /// Also inserts placeholder values for unset template keys.
@@ -339,6 +433,7 @@ pub enum ListCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum EmojiCommand {
     /// Pull all custom emoji from a Discourse into a local directory.
     #[command(visible_alias = "pl")]
@@ -377,6 +472,7 @@ pub enum EmojiCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum TopicCommand {
     /// Pull a topic to a local Markdown file.
     #[command(visible_alias = "pl")]
@@ -495,6 +591,7 @@ pub enum TopicCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum CategoryCommand {
     /// List categories.
     #[command(visible_alias = "ls")]
@@ -558,6 +655,7 @@ pub enum CategoryCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum GroupCommand {
     /// List groups.
     #[command(visible_alias = "ls")]
@@ -622,6 +720,7 @@ pub enum GroupCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum BackupCommand {
     /// Create a new backup.
     #[command(visible_alias = "cr")]
@@ -662,6 +761,7 @@ pub enum BackupCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum PaletteCommand {
     /// List color palettes.
     #[command(visible_alias = "ls")]
@@ -698,6 +798,7 @@ pub enum PaletteCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum PluginCommand {
     /// List installed plugins.
     #[command(visible_alias = "ls")]
@@ -730,6 +831,7 @@ pub enum PluginCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum ThemeCommand {
     /// List installed themes.
     #[command(visible_alias = "ls")]
@@ -846,6 +948,7 @@ pub enum ThemeCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum ThemeSettingCommand {
     /// List a theme/component's settings.
     #[command(visible_alias = "ls")]
@@ -885,6 +988,7 @@ pub enum ThemeSettingCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum PmCommand {
     /// Send a private message.
     #[command(visible_alias = "s")]
@@ -916,6 +1020,7 @@ pub enum PmCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum ApiKeyCommand {
     /// List API keys.
     #[command(visible_alias = "ls")]
@@ -952,6 +1057,7 @@ pub enum ApiKeyCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum InviteCommand {
     /// Invite a single email address.
     #[command(visible_alias = "s")]
@@ -991,6 +1097,7 @@ pub enum InviteCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum UserCommand {
     /// List users via the admin users endpoint.
     #[command(visible_alias = "ls")]
@@ -1207,6 +1314,7 @@ pub enum RoleArg {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum UserGroupsCommand {
     /// List the groups a user belongs to.
     #[command(visible_alias = "ls")]
@@ -1245,6 +1353,7 @@ pub enum UserGroupsCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum PostCommand {
     /// Pull a post's raw Markdown to a local file.
     #[command(visible_alias = "pl")]
@@ -1288,6 +1397,7 @@ pub enum PostCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum TagCommand {
     /// List every tag on the Discourse.
     #[command(visible_alias = "ls")]
@@ -1334,6 +1444,7 @@ pub enum TagCommand {
 }
 
 #[derive(Subcommand)]
+#[command(next_display_order = None)]
 pub enum SettingCommand {
     /// Set a site setting on a Discourse (or all tagged Discourses).
     ///
@@ -1380,11 +1491,12 @@ pub enum SettingCommand {
         verbose: bool,
     },
 
-    /// Snapshot all site settings (with metadata) to a local file.
+    /// Snapshot every site setting to a file - the reference for what settings exist.
     ///
     /// See spec/setting-sync.md for the full schema and workflow. The
     /// generated file is a self-documenting YAML (or JSON) including each
-    /// setting's default, type, category, and description.
+    /// setting's value, default, type, category, and Discourse's own
+    /// description - so it doubles as a catalog of available settings.
     #[command(visible_alias = "pl")]
     Pull {
         /// Discourse name.

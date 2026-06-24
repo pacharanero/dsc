@@ -21,5 +21,8 @@ testdsc.toml
 ### Private notes
 .marcus/
 
+### Reference PDFs / third-party copyrighted material (keep out of the repo)
+*.pdf
+
 ### Zensical docs build output
 /site/
