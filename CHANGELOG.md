@@ -5,6 +5,22 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.20] - 2026-06-24
+
+### Bug fixes
+
+- **topic**: Honour --dry-run on `topic reply` (preview, never post) ([e972d25](https://github.com/pacharanero/dsc/commit/e972d255a05044a91fa7b09e8c63c1dd76291ace))
+
+- **setting**: Persist site-setting writes (form field named after the setting) ([51b8727](https://github.com/pacharanero/dsc/commit/51b8727fb1f8105a72e6bf1502a44eb76b66fe5c))
+
+### Features
+
+- **cli**: Sort help alphabetically, add Examples to every command, surface `setting pull` ([995a8dc](https://github.com/pacharanero/dsc/commit/995a8dc69b18502d5c2e2902001754cee7ff7fbb))
+
+### Styling
+
+- Cargo fmt the new site-setting regression test ([3661db8](https://github.com/pacharanero/dsc/commit/3661db8b448a51ba7a187deccf4704112f419f5e))
+
 ## [0.10.19] - 2026-06-23
 
 ### Documentation
