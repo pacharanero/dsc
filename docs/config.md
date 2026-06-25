@@ -25,7 +25,7 @@ When `--config` or `$DSC_CONFIG` is in effect, the source line shows which selec
 ## dsc config check
 
 ```text
-dsc config check [--format text|json|yaml] [--skip-ssh]
+dsc config check [--format text|json|yaml] [--skip-ssh] [--parallel] [--max <n>]
 ```
 
 Probes each configured Discourse and reports two things per install:
@@ -33,7 +33,10 @@ Probes each configured Discourse and reports two things per install:
 - **API** — sends `GET /about.json` with the configured `apikey`/`api_username`. Reports `ok` on 2xx, flags 401/403 with a hint to check credentials, and surfaces other HTTP errors verbatim.
 - **SSH** (only when `ssh_host` is set on the entry, and `--skip-ssh` is not passed) — runs `ssh -o BatchMode=yes -o ConnectTimeout=5 <host> true`. Reports the first stderr line on failure so problems are diagnosable at a glance.
 
-It contacts every configured forum over the network (and SSH), so a large fleet can take a while - it prints a signpost up front and, in text mode, **streams each forum's result the moment it lands** (with a `N ok, M failed` summary at the end) rather than buffering the whole table to the end of the run. The signpost and summary go to stderr, so piping the text output (or `--format json`/`yaml`) gives clean, machine-readable results. `--skip-ssh` skips the (often slowest) SSH probes.
+It contacts every configured forum over the network (and SSH), so a large fleet can take a while - it prints a signpost up front and, in text mode, **streams each forum's result the moment it lands** (with a `N ok, M failed` summary at the end) rather than buffering the whole table to the end of the run. The signpost and summary go to stderr, so piping the text output (or `--format json`/`yaml`) gives clean, machine-readable results.
+
+- `--parallel` / `-p` probes forums concurrently across a worker pool (default 8, `--max`/`-m` to change), streaming results **fastest-first**. On a large fleet this turns a ~30s sequential sweep into a few seconds.
+- `--skip-ssh` skips the (often slowest) SSH probes.
 
 Exits non-zero if any install fails any check, making it suitable for CI or pre-deploy gates.
 
@@ -41,6 +44,7 @@ Examples:
 
 ```bash
 dsc config check
+dsc config check -p               # probe all forums in parallel (fastest-first)
 dsc config check --format json
 dsc config check --skip-ssh       # API-only check, much faster
 ```

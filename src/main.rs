@@ -915,8 +915,14 @@ fn main() -> Result<()> {
         },
 
         Commands::Config {
-            command: Some(ConfigCommand::Check { format, skip_ssh }),
-        } => commands::config::config_check(&config, format, skip_ssh),
+            command:
+                Some(ConfigCommand::Check {
+                    format,
+                    skip_ssh,
+                    parallel,
+                    max,
+                }),
+        } => commands::config::config_check(&config, format, skip_ssh, parallel, max),
 
         Commands::Config { command: None } => {
             let candidates = config_search_paths();

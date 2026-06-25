@@ -429,6 +429,13 @@ pub enum ConfigCommand {
         /// Skip the SSH reachability probe.
         #[arg(long)]
         skip_ssh: bool,
+        /// Probe forums concurrently (results stream fastest-first). Much
+        /// faster on a large fleet.
+        #[arg(long, short = 'p')]
+        parallel: bool,
+        /// Maximum workers when --parallel is set (default: 8).
+        #[arg(long, short = 'm')]
+        max: Option<usize>,
     },
 }
 

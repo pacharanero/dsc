@@ -3,8 +3,15 @@ use crate::cli::ListFormat;
 use crate::config::{Config, DiscourseConfig};
 use anyhow::{Result, anyhow};
 use serde::Serialize;
+use std::collections::{HashMap, VecDeque};
 use std::io::Write;
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex, mpsc};
+use std::thread;
+
+/// Default concurrent workers for `config check --parallel`. Higher than the
+/// update default (3) because these probes are short and I/O-bound.
+const DEFAULT_PARALLEL_CHECK_WORKERS: usize = 8;
 
 #[derive(Serialize)]
 struct CheckReport {
@@ -20,7 +27,13 @@ struct CheckStatus {
     detail: String,
 }
 
-pub fn config_check(config: &Config, format: ListFormat, skip_ssh: bool) -> Result<()> {
+pub fn config_check(
+    config: &Config,
+    format: ListFormat,
+    skip_ssh: bool,
+    parallel: bool,
+    max: Option<usize>,
+) -> Result<()> {
     if config.discourse.is_empty() {
         return Err(anyhow!("no discourses configured"));
     }
@@ -37,37 +50,51 @@ pub fn config_check(config: &Config, format: ListFormat, skip_ssh: bool) -> Resu
 
     // Signpost on stderr: this contacts every forum over the network (and SSH),
     // so it can take a while. stderr keeps json/yaml stdout clean.
+    let workers = if parallel {
+        check_worker_count(max, config.discourse.len())
+    } else {
+        1
+    };
     eprintln!(
-        "Checking {} discourse(s) via API{}... contacts each over the network and can take a while.",
+        "Checking {} discourse(s) via API{}{}... contacts each over the network and can take a while.",
         config.discourse.len(),
-        if skip_ssh { "" } else { " + SSH" }
+        if skip_ssh { "" } else { " + SSH" },
+        if workers > 1 {
+            format!(" ({workers} parallel)")
+        } else {
+            String::new()
+        }
     );
 
-    let mut reports: Vec<CheckReport> = Vec::with_capacity(config.discourse.len());
-    for discourse in &config.discourse {
-        let api = check_api(discourse);
-        let ssh = if skip_ssh {
-            None
-        } else {
-            discourse
-                .ssh_host
-                .as_deref()
-                .filter(|h| !h.trim().is_empty())
-                .map(check_ssh)
-        };
-        let report = CheckReport {
-            name: discourse.name.clone(),
-            baseurl: discourse.baseurl.clone(),
-            api,
-            ssh,
-        };
-        // Text mode: stream each result the moment it lands, rather than
-        // buffering the whole table to the end of a 30s run.
+    // Print each report as it lands (text mode). Returns the collected set.
+    let on_done = |report: &CheckReport| {
         if text {
-            print_report_text(&report, name_width);
+            print_report_text(report, name_width);
             let _ = std::io::stdout().flush();
         }
-        reports.push(report);
+    };
+    let mut reports = if parallel && workers > 1 {
+        check_parallel(&config.discourse, skip_ssh, workers, on_done)
+    } else {
+        let mut out = Vec::with_capacity(config.discourse.len());
+        for discourse in &config.discourse {
+            let report = check_one(discourse, skip_ssh);
+            on_done(&report);
+            out.push(report);
+        }
+        out
+    };
+
+    // Parallel results arrive fastest-first; restore config order for the
+    // (buffered) json/yaml output so it's deterministic.
+    if !text {
+        let order: HashMap<&str, usize> = config
+            .discourse
+            .iter()
+            .enumerate()
+            .map(|(i, d)| (d.name.as_str(), i))
+            .collect();
+        reports.sort_by_key(|r| order.get(r.name.as_str()).copied().unwrap_or(usize::MAX));
     }
 
     let failed = reports
@@ -91,6 +118,73 @@ pub fn config_check(config: &Config, format: ListFormat, skip_ssh: bool) -> Resu
     } else {
         Err(anyhow!("{failed} discourse(s) failed checks"))
     }
+}
+
+/// Run the API (+ optional SSH) probes for one forum.
+fn check_one(discourse: &DiscourseConfig, skip_ssh: bool) -> CheckReport {
+    let api = check_api(discourse);
+    let ssh = if skip_ssh {
+        None
+    } else {
+        discourse
+            .ssh_host
+            .as_deref()
+            .filter(|h| !h.trim().is_empty())
+            .map(check_ssh)
+    };
+    CheckReport {
+        name: discourse.name.clone(),
+        baseurl: discourse.baseurl.clone(),
+        api,
+        ssh,
+    }
+}
+
+/// Probe forums across a fixed worker pool, invoking `on_done` (on this thread)
+/// for each result as it completes - fastest-first - and returning the full
+/// set. Workers pull from a shared queue, so a slow forum never blocks others.
+fn check_parallel(
+    discourses: &[DiscourseConfig],
+    skip_ssh: bool,
+    workers: usize,
+    mut on_done: impl FnMut(&CheckReport),
+) -> Vec<CheckReport> {
+    let queue: Arc<Mutex<VecDeque<DiscourseConfig>>> =
+        Arc::new(Mutex::new(discourses.iter().cloned().collect()));
+    let (tx, rx) = mpsc::channel::<CheckReport>();
+    let mut handles = Vec::with_capacity(workers);
+    for _ in 0..workers {
+        let queue = Arc::clone(&queue);
+        let tx = tx.clone();
+        handles.push(thread::spawn(move || {
+            loop {
+                let next = queue.lock().unwrap().pop_front();
+                let Some(discourse) = next else { break };
+                if tx.send(check_one(&discourse, skip_ssh)).is_err() {
+                    break;
+                }
+            }
+        }));
+    }
+    drop(tx); // rx closes once every worker's sender is dropped
+
+    let mut reports = Vec::with_capacity(discourses.len());
+    for report in rx {
+        on_done(&report);
+        reports.push(report);
+    }
+    for handle in handles {
+        let _ = handle.join();
+    }
+    reports
+}
+
+/// Workers for `--parallel`: the requested max (default 8), never more than
+/// the number of forums.
+fn check_worker_count(max: Option<usize>, count: usize) -> usize {
+    max.unwrap_or(DEFAULT_PARALLEL_CHECK_WORKERS)
+        .max(1)
+        .min(count.max(1))
 }
 
 fn check_api(discourse: &DiscourseConfig) -> CheckStatus {
@@ -180,8 +274,24 @@ fn check_ssh(host: &str) -> CheckStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::check_api;
+    use super::{check_api, check_worker_count};
     use crate::config::DiscourseConfig;
+
+    #[test]
+    fn default_check_workers_is_eight() {
+        assert_eq!(check_worker_count(None, 20), 8);
+    }
+
+    #[test]
+    fn check_workers_capped_by_forum_count() {
+        assert_eq!(check_worker_count(Some(8), 3), 3);
+        assert_eq!(check_worker_count(None, 2), 2);
+    }
+
+    #[test]
+    fn check_workers_floor_of_one() {
+        assert_eq!(check_worker_count(Some(0), 5), 1);
+    }
 
     #[test]
     fn check_api_flags_empty_baseurl() {
