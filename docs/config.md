@@ -33,6 +33,8 @@ Probes each configured Discourse and reports two things per install:
 - **API** — sends `GET /about.json` with the configured `apikey`/`api_username`. Reports `ok` on 2xx, flags 401/403 with a hint to check credentials, and surfaces other HTTP errors verbatim.
 - **SSH** (only when `ssh_host` is set on the entry, and `--skip-ssh` is not passed) — runs `ssh -o BatchMode=yes -o ConnectTimeout=5 <host> true`. Reports the first stderr line on failure so problems are diagnosable at a glance.
 
+It contacts every configured forum over the network (and SSH), so a large fleet can take a while - it prints a signpost up front and, in text mode, **streams each forum's result the moment it lands** (with a `N ok, M failed` summary at the end) rather than buffering the whole table to the end of the run. The signpost and summary go to stderr, so piping the text output (or `--format json`/`yaml`) gives clean, machine-readable results. `--skip-ssh` skips the (often slowest) SSH probes.
+
 Exits non-zero if any install fails any check, making it suitable for CI or pre-deploy gates.
 
 Examples:

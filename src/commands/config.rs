@@ -3,6 +3,7 @@ use crate::cli::ListFormat;
 use crate::config::{Config, DiscourseConfig};
 use anyhow::{Result, anyhow};
 use serde::Serialize;
+use std::io::Write;
 use std::process::{Command, Stdio};
 
 #[derive(Serialize)]
@@ -24,6 +25,24 @@ pub fn config_check(config: &Config, format: ListFormat, skip_ssh: bool) -> Resu
         return Err(anyhow!("no discourses configured"));
     }
 
+    let text = matches!(format, ListFormat::Text);
+    // Column width known up front (from the config) so streamed rows align.
+    let name_width = config
+        .discourse
+        .iter()
+        .map(|d| d.name.len())
+        .max()
+        .unwrap_or(0)
+        .max(4);
+
+    // Signpost on stderr: this contacts every forum over the network (and SSH),
+    // so it can take a while. stderr keeps json/yaml stdout clean.
+    eprintln!(
+        "Checking {} discourse(s) via API{}... contacts each over the network and can take a while.",
+        config.discourse.len(),
+        if skip_ssh { "" } else { " + SSH" }
+    );
+
     let mut reports: Vec<CheckReport> = Vec::with_capacity(config.discourse.len());
     for discourse in &config.discourse {
         let api = check_api(discourse);
@@ -36,28 +55,41 @@ pub fn config_check(config: &Config, format: ListFormat, skip_ssh: bool) -> Resu
                 .filter(|h| !h.trim().is_empty())
                 .map(check_ssh)
         };
-        reports.push(CheckReport {
+        let report = CheckReport {
             name: discourse.name.clone(),
             baseurl: discourse.baseurl.clone(),
             api,
             ssh,
-        });
+        };
+        // Text mode: stream each result the moment it lands, rather than
+        // buffering the whole table to the end of a 30s run.
+        if text {
+            print_report_text(&report, name_width);
+            let _ = std::io::stdout().flush();
+        }
+        reports.push(report);
     }
 
-    let all_ok = reports
+    let failed = reports
         .iter()
-        .all(|r| r.api.ok && r.ssh.as_ref().map(|s| s.ok).unwrap_or(true));
+        .filter(|r| !(r.api.ok && r.ssh.as_ref().map(|s| s.ok).unwrap_or(true)))
+        .count();
 
     match format {
-        ListFormat::Text => print_text(&reports),
+        ListFormat::Text => eprintln!(
+            "Done: {} ok, {} failed (of {}).",
+            reports.len() - failed,
+            failed,
+            reports.len()
+        ),
         ListFormat::Json => println!("{}", serde_json::to_string_pretty(&reports)?),
         ListFormat::Yaml => println!("{}", serde_yaml::to_string(&reports)?),
     }
 
-    if all_ok {
+    if failed == 0 {
         Ok(())
     } else {
-        Err(anyhow!("one or more discourses failed checks"))
+        Err(anyhow!("{failed} discourse(s) failed checks"))
     }
 }
 
@@ -180,31 +212,23 @@ mod tests {
     }
 }
 
-fn print_text(reports: &[CheckReport]) {
-    let name_width = reports
-        .iter()
-        .map(|r| r.name.len())
-        .max()
-        .unwrap_or(0)
-        .max(4);
-    for r in reports {
-        let api_mark = if r.api.ok { "ok " } else { "FAIL" };
+fn print_report_text(r: &CheckReport, name_width: usize) {
+    let api_mark = if r.api.ok { "ok " } else { "FAIL" };
+    println!(
+        "{:<width$}  api  {:<4}  {}",
+        r.name,
+        api_mark,
+        r.api.detail,
+        width = name_width
+    );
+    if let Some(ssh) = &r.ssh {
+        let mark = if ssh.ok { "ok " } else { "FAIL" };
         println!(
-            "{:<width$}  api  {:<4}  {}",
+            "{:<width$}  ssh  {:<4}  {}",
             r.name,
-            api_mark,
-            r.api.detail,
+            mark,
+            ssh.detail,
             width = name_width
         );
-        if let Some(ssh) = &r.ssh {
-            let mark = if ssh.ok { "ok " } else { "FAIL" };
-            println!(
-                "{:<width$}  ssh  {:<4}  {}",
-                r.name,
-                mark,
-                ssh.detail,
-                width = name_width
-            );
-        }
     }
 }
