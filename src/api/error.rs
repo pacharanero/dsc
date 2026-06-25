@@ -3,7 +3,7 @@ use reqwest::StatusCode;
 
 pub fn http_error(action: &str, status: StatusCode, text: &str) -> anyhow::Error {
     let trimmed = text.trim();
-    let hint = status_hint(status);
+    let hint = hint_for(status, trimmed);
     match (trimmed.is_empty(), hint) {
         (true, Some(h)) => anyhow!("{action} failed with {} — {}", status, h),
         (true, None) => anyhow!("{action} failed with {} (empty response)", status),
@@ -12,14 +12,39 @@ pub fn http_error(action: &str, status: StatusCode, text: &str) -> anyhow::Error
     }
 }
 
+/// Pick a hint from the status, sharpened by the response body. Discourse's
+/// `invalid_access` / "the API username or key is invalid" can arrive as a 403
+/// (on content) or a 404 (admin routes are hidden from non-staff), so detect
+/// that signature directly rather than guessing from the status alone.
+fn hint_for(status: StatusCode, body: &str) -> Option<&'static str> {
+    if looks_like_invalid_credentials(body) {
+        return Some(
+            "the api_username/key for this forum is invalid or not a staff member — \
+             verify this forum's entry in your config (run `dsc config check`)",
+        );
+    }
+    status_hint(status)
+}
+
+/// Does the body carry Discourse's "you're not authorised / your key is bad"
+/// signature? (Returned on a 403 for content, and behind the 404 that hides
+/// `/admin/*` from non-staff.)
+fn looks_like_invalid_credentials(body: &str) -> bool {
+    let b = body.to_ascii_lowercase();
+    b.contains("invalid_access") || b.contains("api username or key is invalid")
+}
+
 pub(crate) fn status_hint(status: StatusCode) -> Option<&'static str> {
     match status {
         StatusCode::NOT_FOUND => Some(
-            "not found (check the resource ID and that the endpoint exists on this Discourse version)",
+            "not found — check the resource ID and that the endpoint exists; for an admin \
+             action this can also mean the api_username is not a staff member (Discourse \
+             hides /admin routes behind 404)",
         ),
-        StatusCode::FORBIDDEN => {
-            Some("forbidden (the API key's user likely lacks admin scope for this action)")
-        }
+        StatusCode::FORBIDDEN => Some(
+            "forbidden — the api_username/key may be invalid, not a staff member, or lack \
+             the scope for this action; verify this forum's config (`dsc config check`)",
+        ),
         StatusCode::UNAUTHORIZED => {
             Some("unauthorized (check apikey and api_username in your config)")
         }
@@ -49,12 +74,32 @@ mod tests {
     }
 
     #[test]
-    fn hint_maps_forbidden_to_scope_message() {
+    fn hint_maps_forbidden_to_credentials_and_scope_message() {
         let h = status_hint(StatusCode::FORBIDDEN).unwrap();
         assert!(
-            h.contains("admin scope"),
-            "expected admin-scope hint, got {h:?}"
+            h.contains("api_username/key") && h.contains("config"),
+            "expected a credentials+config hint, got {h:?}"
         );
+    }
+
+    #[test]
+    fn invalid_access_body_yields_credentials_hint_even_on_404() {
+        // Discourse hides /admin behind a 404 for non-staff; a 403 on content
+        // carries the same invalid_access signature. Both must point at config.
+        let body = r#"{"errors":["You are not permitted to view the requested resource. The API username or key is invalid."],"error_type":"invalid_access"}"#;
+        for status in [StatusCode::FORBIDDEN, StatusCode::NOT_FOUND] {
+            let s = http_error("topic request", status, body).to_string();
+            assert!(
+                s.contains("invalid or not a staff member") && s.contains("dsc config check"),
+                "expected credentials hint for {status}, got {s:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn plain_404_hint_mentions_non_staff_admin_case() {
+        let h = status_hint(StatusCode::NOT_FOUND).unwrap();
+        assert!(h.contains("staff member"), "got {h:?}");
     }
 
     #[test]
