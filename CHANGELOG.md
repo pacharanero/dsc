@@ -5,6 +5,24 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.22] - 2026-06-25
+
+### Bug fixes
+
+- **error**: Accurate hint for invalid/non-staff API credentials ([ea75f7b](https://github.com/pacharanero/dsc/commit/ea75f7b7bef71ead4911021bfa35488970126871))
+
+### Features
+
+- **config**: `config check --parallel` probes forums concurrently ([4cff576](https://github.com/pacharanero/dsc/commit/4cff57611b7ad6ddb157a74b8f72191615a1edca))
+
+- **config**: Stream `config check` results with a progress signpost ([1b11f7d](https://github.com/pacharanero/dsc/commit/1b11f7d8d89b634412a546a447f036ce458d6a9d))
+
+- **backup**: `dsc backup setup-s3` - provision S3 backups in one command (Phase 1) ([9eca042](https://github.com/pacharanero/dsc/commit/9eca042aed01f866b010f10fe8e3051165c584bc))
+
+### Spec
+
+- **backup**: Add `dsc backup setup-s3` field spec (S3 bucket + scoped IAM provisioning) ([20197b4](https://github.com/pacharanero/dsc/commit/20197b49dfaf7090c9dbe7a38976a258a7692ee0))
+
 ## [0.10.21] - 2026-06-24
 
 ### Features
