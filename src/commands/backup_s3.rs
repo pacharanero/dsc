@@ -214,11 +214,16 @@ pub fn setup_s3(
 
     // 4. Point Discourse at the bucket (the secret goes straight into the
     //    setting, never into dsc.toml and never printed).
-    client.update_site_setting("backup_location", "s3")?;
+    // "Enable last": Discourse validates `backup_location=s3` against the S3
+    // settings being present, so set the bucket/region/credentials FIRST and
+    // flip `backup_location` to s3 only once they're in place. Doing it the
+    // other way round can 422 - leaving AWS provisioned but Discourse
+    // half-configured. (Same pattern as enabling reply-by-email.)
     client.update_site_setting("s3_backup_bucket", &names.bucket)?;
     client.update_site_setting("s3_region", region)?;
     client.update_site_setting("s3_access_key_id", &access_key_id)?;
     client.update_site_setting("s3_secret_access_key", &secret_access_key)?;
+    client.update_site_setting("backup_location", "s3")?;
     println!("  set Discourse S3 backup settings (secret written to the setting, not stored)");
 
     // 5. Optional verification backup.
@@ -301,12 +306,12 @@ fn print_plan(forum: &str, names: &Names, region: &str, policy_pretty: &str, no_
     );
     println!("  aws iam create-access-key --user-name {}\n", names.user);
 
-    println!("Discourse settings to set:");
-    println!("  backup_location      = s3");
+    println!("Discourse settings to set (in this order):");
     println!("  s3_backup_bucket     = {}", names.bucket);
     println!("  s3_region            = {region}");
     println!("  s3_access_key_id     = <minted at run time>");
-    println!("  s3_secret_access_key = <minted at run time; never printed>\n");
+    println!("  s3_secret_access_key = <minted at run time; never printed>");
+    println!("  backup_location      = s3   (enabled LAST, once the above are set)\n");
 
     if no_test {
         println!("Test backup: skipped (--no-test).");

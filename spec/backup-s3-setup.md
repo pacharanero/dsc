@@ -96,14 +96,18 @@ aws iam attach-user-policy --user-name <NAME>-discourse-backup-user --policy-arn
 aws iam create-access-key --user-name <NAME>-discourse-backup-user
 ```
 
-**Discourse side (admin API):**
+**Discourse side (admin API).** Order matters: set the bucket/region/credentials
+first and flip `backup_location` to `s3` **last** ("enable last"). Discourse
+validates `backup_location=s3` against the S3 settings being present, so writing
+it first can `422` - leaving AWS provisioned but Discourse half-configured.
+(Same pattern as enabling reply-by-email.)
 
 ```text
-PUT /admin/site_settings/backup_location        backup_location=s3
 PUT /admin/site_settings/s3_backup_bucket       s3_backup_bucket=<NAME>-discourse-backups
 PUT /admin/site_settings/s3_region              s3_region=eu-west-2
 PUT /admin/site_settings/s3_access_key_id       s3_access_key_id=<minted>
 PUT /admin/site_settings/s3_secret_access_key   s3_secret_access_key=<minted>
+PUT /admin/site_settings/backup_location        backup_location=s3    # LAST
 # OR, on an instance role:  s3_use_iam_profile=true   (omit the two key settings)
 ```
 
