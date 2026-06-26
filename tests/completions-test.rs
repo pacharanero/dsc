@@ -28,4 +28,46 @@ fn completions_generate() {
         .filter_map(|entry| entry.ok())
         .collect();
     assert!(entries.len() >= 3, "unexpected completions count");
+
+    // Completions are generated from the clap CLI, so newly-added commands
+    // appear automatically - guard that a representative sample is present
+    // (catches a command silently dropping out of the surface).
+    let zsh = fs::read_to_string(out_dir.join("_dsc")).expect("read _dsc");
+    for cmd in ["setup-s3", "sar", "audit", "version", "title"] {
+        assert!(zsh.contains(cmd), "zsh completions missing `{cmd}`");
+    }
+
+    // The zsh post-processing rewrites every `<discourse>` positional to the
+    // dynamic `_dsc_discourse_names` completer. That injection is a fragile
+    // string match against clap_complete's output format, so assert it took:
+    // the helper is present, and no `:discourse` arg was left on `:_default`.
+    assert!(
+        zsh.contains("_dsc_discourse_names"),
+        "dynamic discourse-name completion was not injected"
+    );
+    let mut discourse_args = 0;
+    let mut idx = 0;
+    while let Some(p) = zsh[idx..].find("':discourse") {
+        let start = idx + p;
+        let rest = &zsh[start..];
+        // Whichever completer closes this arg must be the dynamic one.
+        let dynamic = rest.find(":_dsc_discourse_names'");
+        let default = rest.find(":_default'");
+        match (dynamic, default) {
+            (Some(dy), Some(de)) => assert!(
+                dy < de,
+                "a `:discourse` arg still falls through to :_default (injection broke)"
+            ),
+            (None, Some(_)) => {
+                panic!("a `:discourse` arg still uses :_default (injection broke)")
+            }
+            _ => {}
+        }
+        discourse_args += 1;
+        idx = start + "':discourse".len();
+    }
+    assert!(
+        discourse_args > 5,
+        "expected many `:discourse` positionals, found {discourse_args}"
+    );
 }
