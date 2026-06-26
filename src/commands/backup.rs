@@ -25,25 +25,22 @@ pub fn backup_list(
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
     let response = client.list_backups()?;
-    let mut backups = response
-        .get("backups")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let mut backups = extract_backups(&response);
     backups.sort_by(|a, b| backup_created_at(b).cmp(&backup_created_at(a)));
-    let global_location = backup_location_response(&response);
-    let backup_size = |backup: &serde_json::Value| -> String {
-        backup
-            .get("size")
-            .and_then(|v| v.as_str())
-            .map(|v| v.to_string())
-            .or_else(|| {
-                backup
-                    .get("size_bytes")
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v.to_string())
-            })
-            .unwrap_or_else(|| "unknown".to_string())
+    // The list endpoint doesn't report where backups live; that's the global
+    // `backup_location` site setting (local vs s3). Best-effort and only when
+    // there's something to label - a read failure just blanks the column
+    // rather than failing the listing, and we skip the (heavy) settings fetch
+    // entirely when there are no backups.
+    let global_location = if backups.is_empty() {
+        None
+    } else {
+        client
+            .fetch_site_setting("backup_location")
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+            .or_else(|| backup_location_response(&response))
     };
 
     match format {
@@ -115,15 +112,17 @@ pub fn backup_list(
             for backup in &backups {
                 let filename = backup_filename(backup);
                 let created_at = backup_created_at(backup).unwrap_or("");
+                // Raw byte count for machine consumption.
                 let size = backup
                     .get("size")
-                    .and_then(|v| v.as_str())
+                    .and_then(|v| v.as_u64())
+                    .or_else(|| backup.get("size_bytes").and_then(|v| v.as_u64()))
                     .map(|v| v.to_string())
                     .or_else(|| {
                         backup
-                            .get("size_bytes")
-                            .and_then(|v| v.as_u64())
-                            .map(|v| v.to_string())
+                            .get("size")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
                     })
                     .unwrap_or_default();
                 let location = backup_location(backup, global_location.as_deref());
@@ -203,6 +202,18 @@ pub fn backup_pull(
     Ok(())
 }
 
+/// Pull the backup array out of the list response. `GET /admin/backups.json`
+/// renders a bare array of backup files (`render_serialized(store.files,
+/// BackupFileSerializer)`); an earlier assumption of a `{ "backups": [...] }`
+/// wrapper meant the list was always empty against a real forum. Accept both.
+fn extract_backups(response: &serde_json::Value) -> Vec<serde_json::Value> {
+    response
+        .as_array()
+        .or_else(|| response.get("backups").and_then(|v| v.as_array()))
+        .cloned()
+        .unwrap_or_default()
+}
+
 fn backup_filename(backup: &serde_json::Value) -> &str {
     backup
         .get("filename")
@@ -211,7 +222,46 @@ fn backup_filename(backup: &serde_json::Value) -> &str {
 }
 
 fn backup_created_at(backup: &serde_json::Value) -> Option<&str> {
-    backup.get("created_at").and_then(|v| v.as_str())
+    // Discourse's BackupFileSerializer exposes `last_modified`; tolerate a
+    // `created_at` shape too.
+    backup
+        .get("last_modified")
+        .and_then(|v| v.as_str())
+        .or_else(|| backup.get("created_at").and_then(|v| v.as_str()))
+}
+
+/// Human-readable backup size. The serializer gives `size` as an integer byte
+/// count; tolerate a pre-formatted string and a `size_bytes` alias.
+fn backup_size(backup: &serde_json::Value) -> String {
+    if let Some(bytes) = backup
+        .get("size")
+        .and_then(|v| v.as_u64())
+        .or_else(|| backup.get("size_bytes").and_then(|v| v.as_u64()))
+    {
+        return format_bytes(bytes);
+    }
+    backup
+        .get("size")
+        .and_then(|v| v.as_str())
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Format a byte count as B / KB / MB / GB / TB (base-1024, one decimal place
+/// above a kilobyte).
+fn format_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+    let mut value = bytes as f64;
+    let mut unit = 0;
+    while value >= 1024.0 && unit < UNITS.len() - 1 {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{} {}", bytes, UNITS[unit])
+    } else {
+        format!("{:.1} {}", value, UNITS[unit])
+    }
 }
 
 fn backup_location_response(response: &serde_json::Value) -> Option<String> {
@@ -265,4 +315,71 @@ fn location_from_url(url: &str) -> String {
         return rest.split('/').next().unwrap_or(trimmed).to_string();
     }
     trimmed.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // The authoritative shape: `GET /admin/backups.json` returns a bare array
+    // of `{ filename, size, last_modified }` (BackupFileSerializer).
+    fn discourse_response() -> serde_json::Value {
+        json!([
+            {
+                "filename": "accm-2026-06-26-120005-v20260601000000.tar.gz",
+                "size": 2_147_483_648u64,
+                "last_modified": "2026-06-26T12:00:05.000Z"
+            }
+        ])
+    }
+
+    #[test]
+    fn extracts_bare_array_response() {
+        let backups = extract_backups(&discourse_response());
+        assert_eq!(backups.len(), 1, "bare array must yield the backup");
+        let b = &backups[0];
+        assert_eq!(
+            backup_filename(b),
+            "accm-2026-06-26-120005-v20260601000000.tar.gz"
+        );
+        assert_eq!(backup_created_at(b), Some("2026-06-26T12:00:05.000Z"));
+        assert_eq!(backup_size(b), "2.0 GB");
+    }
+
+    #[test]
+    fn extracts_wrapped_array_response() {
+        // Defensive: tolerate a `{ "backups": [...] }` wrapper too.
+        let wrapped = json!({ "backups": discourse_response() });
+        assert_eq!(extract_backups(&wrapped).len(), 1);
+    }
+
+    #[test]
+    fn empty_response_yields_no_backups() {
+        assert!(extract_backups(&json!([])).is_empty());
+        assert!(extract_backups(&json!({})).is_empty());
+    }
+
+    #[test]
+    fn created_at_is_used_when_last_modified_absent() {
+        let b = json!({ "filename": "x.tar.gz", "created_at": "2026-01-01T00:00:00Z" });
+        assert_eq!(backup_created_at(&b), Some("2026-01-01T00:00:00Z"));
+    }
+
+    #[test]
+    fn size_tolerates_string_and_alias() {
+        assert_eq!(backup_size(&json!({ "size_bytes": 1024u64 })), "1.0 KB");
+        assert_eq!(backup_size(&json!({ "size": "42 MB" })), "42 MB");
+        assert_eq!(backup_size(&json!({})), "unknown");
+    }
+
+    #[test]
+    fn format_bytes_scales_units() {
+        assert_eq!(format_bytes(0), "0 B");
+        assert_eq!(format_bytes(512), "512 B");
+        assert_eq!(format_bytes(2048), "2.0 KB");
+        assert_eq!(format_bytes(5 * 1024 * 1024), "5.0 MB");
+        assert_eq!(format_bytes(2_147_483_648), "2.0 GB");
+        assert_eq!(format_bytes(3 * 1024u64.pow(4)), "3.0 TB");
+    }
 }
