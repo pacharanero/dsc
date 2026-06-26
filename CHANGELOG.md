@@ -5,6 +5,16 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.24] - 2026-06-26
+
+### Bug fixes
+
+- **backup**: List real backups from the bare-array API response ([4e8b079](https://github.com/pacharanero/dsc/commit/4e8b0794352e569c81559c6cbc39d981545d9282))
+
+### Tests
+
+- **completions**: Assert command coverage and dynamic-name injection ([67b8d79](https://github.com/pacharanero/dsc/commit/67b8d791a3fcdf1ab1bbec2221cf47f932a4afc6))
+
 ## [0.10.23] - 2026-06-26
 
 ### Bug fixes
