@@ -5,6 +5,16 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.23] - 2026-06-26
+
+### Bug fixes
+
+- **backup**: Enable backup_location=s3 LAST in setup-s3 ([b9fc608](https://github.com/pacharanero/dsc/commit/b9fc608355d804d118ce26bb3af87fc009ddff76))
+
+### Chores
+
+- **s/docs**: Bind the first free port in 8000-8030 ([ad9cef5](https://github.com/pacharanero/dsc/commit/ad9cef5c0afd6a270c3ea6b508dc708fd0d2d80b))
+
 ## [0.10.22] - 2026-06-25
 
 ### Bug fixes
