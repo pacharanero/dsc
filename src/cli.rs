@@ -376,15 +376,18 @@ pub enum Commands {
         #[command(subcommand)]
         command: Option<ConfigCommand>,
     },
-    /// Generate shell completion scripts.
+    /// Generate or install shell completion scripts.
     #[command(visible_alias = "comp")]
     #[command(after_help = "Examples:
-  dsc completions zsh > _dsc
+  dsc completions install
+  dsc completions zsh --dir ~/.zsh/completions
   dsc completions bash > dsc.bash")]
     Completions {
+        #[command(subcommand)]
+        command: Option<CompletionCommand>,
         /// Target shell.
         #[arg(value_enum)]
-        shell: CompletionShell,
+        shell: Option<CompletionShell>,
         /// Output directory. Prints to stdout when omitted.
         #[arg(long, short = 'd')]
         dir: Option<PathBuf>,
@@ -1635,6 +1638,19 @@ pub enum SettingCommand {
     },
 }
 
+#[derive(Subcommand, Clone)]
+pub enum CompletionCommand {
+    /// Install completions for the current user.
+    Install {
+        /// Shell to install completions for. Detected from $SHELL when omitted.
+        #[arg(long)]
+        shell: Option<CompletionShell>,
+        /// Completion directory to write to.
+        #[arg(long, short = 'd')]
+        dir: Option<PathBuf>,
+    },
+}
+
 #[derive(ValueEnum, Clone, Copy)]
 pub enum CompletionShell {
     /// Bash shell.
@@ -1643,6 +1659,8 @@ pub enum CompletionShell {
     Zsh,
     /// Fish shell.
     Fish,
+    /// PowerShell.
+    PowerShell,
 }
 
 impl From<CompletionShell> for Shell {
@@ -1651,6 +1669,7 @@ impl From<CompletionShell> for Shell {
             CompletionShell::Bash => Shell::Bash,
             CompletionShell::Zsh => Shell::Zsh,
             CompletionShell::Fish => Shell::Fish,
+            CompletionShell::PowerShell => Shell::PowerShell,
         }
     }
 }

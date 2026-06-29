@@ -13,7 +13,7 @@ fn completions_generate() {
 
     let output = run_dsc(&["completions", "bash", "--dir", out_dir_str], &config_path);
     assert!(output.status.success(), "bash completions failed");
-    assert!(out_dir.join("dsc.bash").exists(), "missing dsc.bash");
+    assert!(out_dir.join("dsc").exists(), "missing dsc");
 
     let output = run_dsc(&["completions", "zsh", "--dir", out_dir_str], &config_path);
     assert!(output.status.success(), "zsh completions failed");
@@ -22,6 +22,20 @@ fn completions_generate() {
     let output = run_dsc(&["completions", "fish", "--dir", out_dir_str], &config_path);
     assert!(output.status.success(), "fish completions failed");
     assert!(out_dir.join("dsc.fish").exists(), "missing dsc.fish");
+
+    let output = run_dsc(
+        &[
+            "completions",
+            "install",
+            "--shell",
+            "zsh",
+            "--dir",
+            out_dir_str,
+        ],
+        &config_path,
+    );
+    assert!(output.status.success(), "zsh install completions failed");
+    assert!(out_dir.join("_dsc").exists(), "missing installed _dsc");
 
     let entries: Vec<_> = fs::read_dir(&out_dir)
         .expect("read completions dir")

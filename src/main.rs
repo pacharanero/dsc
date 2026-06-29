@@ -999,9 +999,11 @@ fn main() -> Result<()> {
             Ok(())
         }
 
-        Commands::Completions { shell, dir } => {
-            commands::completions::write_completions(shell, dir.as_deref())
-        }
+        Commands::Completions {
+            command,
+            shell,
+            dir,
+        } => commands::completions::run(command, shell, dir.as_deref()),
 
         Commands::Man { dir } => commands::manpages::write_manpages(&dir),
 
