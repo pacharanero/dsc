@@ -1,11 +1,37 @@
-use crate::cli::{Cli, CompletionShell};
+use crate::cli::{Cli, CompletionCommand, CompletionShell};
 use crate::utils::ensure_dir;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};
+use std::env;
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+pub fn run(
+    command: Option<CompletionCommand>,
+    shell: Option<CompletionShell>,
+    dir: Option<&Path>,
+) -> Result<()> {
+    match command {
+        Some(CompletionCommand::Install { shell, dir }) => {
+            let shell = shell.or_else(detect_shell).ok_or_else(|| {
+                anyhow!("could not detect shell; pass --shell bash|zsh|fish|powershell")
+            })?;
+            let dir = dir
+                .map(Ok)
+                .unwrap_or_else(|| default_completion_dir(shell))?;
+            write_completions(shell, Some(&dir))?;
+            print_install_note(shell, &dir);
+            Ok(())
+        }
+        None => {
+            let shell =
+                shell.ok_or_else(|| anyhow!("missing shell; try `dsc completions install`"))?;
+            write_completions(shell, dir)
+        }
+    }
+}
 
 pub fn write_completions(shell: CompletionShell, dir: Option<&Path>) -> Result<()> {
     let mut cmd = Cli::command();
@@ -13,11 +39,7 @@ pub fn write_completions(shell: CompletionShell, dir: Option<&Path>) -> Result<(
     match dir {
         Some(dir) => {
             ensure_dir(dir)?;
-            let filename = match shell {
-                CompletionShell::Bash => "dsc.bash",
-                CompletionShell::Zsh => "_dsc",
-                CompletionShell::Fish => "dsc.fish",
-            };
+            let filename = completion_filename(shell);
             let path = dir.join(filename);
             let generator: Shell = shell.into();
             if matches!(shell, CompletionShell::Zsh) {
@@ -50,6 +72,63 @@ pub fn write_completions(shell: CompletionShell, dir: Option<&Path>) -> Result<(
         }
     }
     Ok(())
+}
+
+fn completion_filename(shell: CompletionShell) -> &'static str {
+    match shell {
+        CompletionShell::Bash => "dsc",
+        CompletionShell::Zsh => "_dsc",
+        CompletionShell::Fish => "dsc.fish",
+        CompletionShell::PowerShell => "dsc.ps1",
+    }
+}
+
+fn detect_shell() -> Option<CompletionShell> {
+    let shell = env::var("SHELL").ok()?;
+    let name = Path::new(&shell).file_name()?.to_string_lossy();
+    match name.as_ref() {
+        "bash" => Some(CompletionShell::Bash),
+        "zsh" => Some(CompletionShell::Zsh),
+        "fish" => Some(CompletionShell::Fish),
+        _ => None,
+    }
+}
+
+fn default_completion_dir(shell: CompletionShell) -> Result<PathBuf> {
+    let home = home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
+    Ok(match shell {
+        CompletionShell::Bash => env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join(".local/share"))
+            .join("bash-completion/completions"),
+        CompletionShell::Zsh => home.join(".zsh/completions"),
+        CompletionShell::Fish => env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join(".config"))
+            .join("fish/completions"),
+        CompletionShell::PowerShell => home.join(".config/powershell/completions"),
+    })
+}
+
+fn home_dir() -> Option<PathBuf> {
+    env::var_os("HOME")
+        .or_else(|| env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+}
+
+fn print_install_note(shell: CompletionShell, dir: &Path) {
+    match shell {
+        CompletionShell::Zsh => {
+            println!("Add this before `compinit` in ~/.zshrc if it is not already there:");
+            println!("  fpath=({} $fpath)", dir.display());
+            println!("Then restart zsh or run `autoload -Uz compinit && compinit`.");
+        }
+        CompletionShell::PowerShell => {
+            println!("Add this to your PowerShell profile if it is not already there:");
+            println!("  . {}/dsc.ps1", dir.display());
+        }
+        _ => println!("Restart your shell to load the updated completions."),
+    }
 }
 
 fn inject_zsh_sort_style(mut content: String) -> String {
