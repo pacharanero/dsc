@@ -649,6 +649,27 @@ fn main() -> Result<()> {
                 } => commands::theme::theme_setting_set(
                     &config, &discourse, theme_id, &key, &value, dry_run,
                 ),
+                ThemeSettingCommand::Pull {
+                    discourse,
+                    theme_id,
+                    local_path,
+                } => commands::theme::theme_setting_pull(
+                    &config,
+                    &discourse,
+                    theme_id,
+                    local_path.as_deref(),
+                ),
+                ThemeSettingCommand::Push {
+                    discourse,
+                    theme_id,
+                    local_path,
+                } => commands::theme::theme_setting_push(
+                    &config,
+                    &discourse,
+                    theme_id,
+                    &local_path,
+                    dry_run,
+                ),
             },
             ThemeCommand::Enable {
                 discourse,

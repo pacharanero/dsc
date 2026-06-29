@@ -1,12 +1,14 @@
 # `dsc theme` - management gaps spec
 
-> **Status: Phase 1 + `theme show` implemented (unreleased).**
-> `dsc theme setting list/get/set`, `theme enable/disable`, `theme attach/detach`,
-> and `theme show` ship. Phase 2 (`theme field`, `theme asset`) and the
-> `theme update` half of Phase 3 remain planned. Note for Phase 2: the
-> `theme_fields` JSON shape was not captured in the field reference below;
-> confirm it against a live theme (`dsc theme pull`) before implementing
-> `theme field`/`asset`.
+> **Status: Phase 1 + `theme show` + `theme setting pull/push` implemented (unreleased, v0.10.25).**
+> `dsc theme setting list/get/set/pull/push`, `theme enable/disable`,
+> `theme attach/detach`, and `theme show` ship - including the field-required
+> **`theme setting pull/push`** (JSON-list settings like `header_links` expand
+> to editable arrays; push PUTs only changed keys, compared semantically).
+> The rest of Phase 2 (`theme field`, `theme asset`) and the `theme update`
+> half of Phase 3 remain planned. Note for those: the `theme_fields` JSON shape
+> was not captured in the field reference below; confirm it against a live theme
+> (`dsc theme pull`) before implementing `theme field`/`asset`.
 
 Spec for extending `dsc theme` to cover component configuration, enable/disable, per-field editing, and asset binding. Goal: drive a Discourse theme/component setup end-to-end from the CLI, without dropping into the Admin UI. Motivated by the ACCM (kitchen.culinarymedicine.org) header customisation work, where configuring header-nav components and iterating on theme SCSS from `dsc` is currently impossible.
 
@@ -50,7 +52,7 @@ dsc theme setting set  <discourse> <theme-id> <key> <value>   [--dry-run]
 - `set` -> `PUT /admin/themes/:id/setting.json` with `name=<key>`, `value=<value>`. Honour `--dry-run`/`-n` like `dsc setting set`.
 - Many nav components encode lists as a single delimited string (e.g. Header Submenus uses `|`-separated rows). `set` writes the raw string as given; documenting the per-component encoding is the user's job, not `dsc`'s.
 
-Optional later: `dsc theme setting pull/push <theme-id> [file]` to snapshot a component's settings to YAML, mirroring `dsc setting pull/push`. Not required for the immediate work.
+`dsc theme setting pull/push` is **now field-required** (bumped 2026-06-28) - promoted from "optional later" to **Phase 2** below, after repeatedly hand-editing JSON-list settings via the raw admin API. `set` alone forces a read-modify-write of the entire JSON array just to change one field.
 
 ### `dsc theme enable` / `disable` (and component attachment)
 
@@ -66,6 +68,21 @@ dsc theme detach   <discourse> <parent-id> <component-id>     [--dry-run]
 - Confirm during implementation whether "retiring" a component is best modelled as disable, or detach-from-parent. The ACCM case (Header Submenus showing unwanted demo content) is satisfied by either.
 
 ## Phase 2 - iteration ergonomics
+
+### `dsc theme setting pull/push` (field-required) — implemented (unreleased)
+
+Snapshot a component's settings to a local file, edit, push back - the pull -> edit -> push pattern `dsc setting pull/push` already gives site settings.
+
+```
+dsc theme setting pull <discourse> <theme-id> [file]
+dsc theme setting push <discourse> <theme-id> <file>   [--dry-run]
+```
+
+- `pull` writes the `settings` array to YAML/JSON, **pretty-printing the JSON-list values** (`header_links`, `dropdown_links`) as real arrays - editable by hand, not one escaped string.
+- `push` re-serialises each list back to its JSON-string form and `PUT`s only the changed settings (`PUT /admin/themes/:id/setting.json` per key); `--dry-run` shows the diff.
+- **Why field-required:** editing Dropdown Header's `header_links` / `dropdown_links` on kitchen.culinarymedicine.org has repeatedly meant a hand-written *read-whole-array -> change one field -> PUT it back* script via the raw admin API - the My Account dropdown build, the parent-URL fix, and the Conference / Agenda "2026 -> 2027" renames (2026-06-28). `pull -> edit -> push` collapses each to a one-file edit.
+
+**Confirmed shape (2026-06-29, against Dropdown Header id 17 on ACCM, Discourse 2026.6.0):** the JSON-list settings report `"type": "string"` - same as plain string settings like `main_link_color` - and carry their value as a string of escaped JSON (`"[{\"id\": 1, ...}]"`). So `type` can't flag them; detection is "parse the string; if it yields an array/object, expand it." Push serialises the edited array back to compact JSON text (NOT the site-settings pipe-join, which would corrupt it) and compares **semantically** (parsed JSON, not raw strings) so the compact-vs-spaced and key-order differences between file and server don't register as spurious edits - an untouched `pull -> push` is a verified no-op. `--dry-run` summarises long list values by length rather than dumping the whole array.
 
 ### `dsc theme field`
 

@@ -5,7 +5,7 @@ use crate::commands::update::run_ssh_command;
 use crate::config::{Config, DiscourseConfig};
 use crate::utils::slugify;
 use anyhow::{Context, Result, anyhow};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -340,6 +340,108 @@ fn theme_setting_entries(theme: &Value) -> Vec<ThemeSettingEntry> {
         .unwrap_or_default()
 }
 
+// ─── theme setting pull/push file format ───────────────────────────────────
+
+/// On-disk snapshot of a theme/component's settings. `version` gates the
+/// schema; the rest is a header plus the editable settings list.
+#[derive(Debug, Serialize, Deserialize)]
+struct ThemeSettingsFile {
+    version: u32,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    discourse_version: Option<String>,
+    theme_id: u64,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    theme_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pulled_at: Option<String>,
+    settings: Vec<ThemeSettingsFileEntry>,
+}
+
+/// One setting in the snapshot. `type`/`default` are informational context for
+/// the human editor and are ignored on push; only `setting` + `value` matter.
+#[derive(Debug, Serialize, Deserialize)]
+struct ThemeSettingsFileEntry {
+    setting: String,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none", default)]
+    kind: Option<String>,
+    value: Value,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    default: Option<Value>,
+}
+
+/// JSON-schema list settings (e.g. `header_links`) arrive as a string whose
+/// content is a JSON array/object. Expand that to the real structure so it is
+/// editable as a list, not one escaped line. Anything else passes through
+/// unchanged (plain strings like `var(--primary)` are left alone).
+fn expand_json_list(v: &Value) -> Value {
+    if let Value::String(s) = v
+        && matches!(s.trim_start().as_bytes().first(), Some(b'[') | Some(b'{'))
+        && let Ok(parsed) = serde_json::from_str::<Value>(s)
+        && (parsed.is_array() || parsed.is_object())
+    {
+        return parsed;
+    }
+    v.clone()
+}
+
+/// Serialise a snapshot value to the string Discourse expects on
+/// `PUT /admin/themes/:id/setting.json`. Arrays/objects (JSON-schema list
+/// settings) become compact JSON text; scalars become their plain form. This
+/// is deliberately NOT the site-settings `value_to_send_string`, which
+/// pipe-joins arrays - theme list settings are JSON, not pipe-delimited.
+fn theme_value_to_send(v: &Value) -> String {
+    match v {
+        Value::Null => String::new(),
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
+}
+
+/// Compare two wire-strings for equality. A JSON-list setting round-trips as
+/// compact JSON from the file but the server stores it spaced, so compare the
+/// parsed JSON when both sides parse; otherwise compare literally.
+fn json_equal(a: &str, b: &str) -> bool {
+    match (
+        serde_json::from_str::<Value>(a),
+        serde_json::from_str::<Value>(b),
+    ) {
+        (Ok(va), Ok(vb)) => va == vb,
+        _ => a == b,
+    }
+}
+
+/// Render a change for the `--dry-run` plan: short values inline, long ones
+/// (the big link lists) summarised by length so the terminal isn't flooded.
+/// Both sides are normalised first so a list's size delta reflects the real
+/// edit, not the compact-vs-spaced JSON serialisation difference between the
+/// file and the server.
+fn describe_change(from: &str, to: &str) -> String {
+    const MAX: usize = 80;
+    let from = normalize_for_display(from);
+    let to = normalize_for_display(to);
+    if from.chars().count() <= MAX && to.chars().count() <= MAX {
+        format!("{} -> {}", from, to)
+    } else {
+        format!("changed ({} -> {} chars)", from.len(), to.len())
+    }
+}
+
+/// Re-serialise JSON arrays/objects to a canonical compact form so two sides
+/// of a diff are measured alike; leave everything else untouched.
+fn normalize_for_display(s: &str) -> String {
+    match serde_json::from_str::<Value>(s) {
+        Ok(v) if v.is_array() || v.is_object() => v.to_string(),
+        _ => s.to_string(),
+    }
+}
+
+fn is_json_path(p: &Path) -> bool {
+    p.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("json"))
+        .unwrap_or(false)
+}
+
 /// List a theme/component's settings (distinct from site settings).
 pub fn theme_setting_list(
     config: &Config,
@@ -420,6 +522,185 @@ pub fn theme_setting_set(
     }
     client.set_theme_setting(theme_id, key, value)?;
     println!("{}: set theme {} setting {}", discourse.name, theme_id, key);
+    Ok(())
+}
+
+/// Pull a theme/component's settings to a local file for offline editing.
+///
+/// JSON-schema list settings (e.g. `header_links`, `dropdown_links`) arrive
+/// from Discourse as a single string of escaped JSON; this expands them to
+/// real arrays so they can be edited by hand rather than as one escaped line.
+/// YAML by default; a `.json` destination writes JSON.
+pub fn theme_setting_pull(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    local_path: Option<&Path>,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let theme_name = theme
+        .get("name")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+
+    let settings: Vec<ThemeSettingsFileEntry> = theme_setting_entries(theme)
+        .into_iter()
+        .map(|e| ThemeSettingsFileEntry {
+            setting: e.setting,
+            kind: if e.kind.is_empty() {
+                None
+            } else {
+                Some(e.kind)
+            },
+            value: expand_json_list(&e.value),
+            default: match &e.default {
+                Value::Null => None,
+                Value::String(s) if s.is_empty() => None,
+                other => Some(expand_json_list(other)),
+            },
+        })
+        .collect();
+
+    let path = match local_path {
+        Some(p) => p.to_path_buf(),
+        None => {
+            let slug = theme_name
+                .as_deref()
+                .map(slugify)
+                .unwrap_or_else(|| format!("theme-{}", theme_id));
+            std::env::current_dir()
+                .context("getting current directory")?
+                .join(format!("{}-settings.yml", slug))
+        }
+    };
+
+    let file = ThemeSettingsFile {
+        version: 1,
+        discourse_version: client.fetch_version().ok().flatten(),
+        theme_id,
+        theme_name,
+        pulled_at: Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        settings,
+    };
+
+    let content = if is_json_path(&path) {
+        serde_json::to_string_pretty(&file).context("serializing theme settings as JSON")?
+    } else {
+        serde_yaml::to_string(&file).context("serializing theme settings as YAML")?
+    };
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+    }
+    std::fs::write(&path, &content).with_context(|| format!("writing {}", path.display()))?;
+
+    let n = file.settings.len();
+    println!(
+        "Wrote {} setting{} to {}",
+        n,
+        if n == 1 { "" } else { "s" },
+        path.display()
+    );
+    Ok(())
+}
+
+/// Push a settings file back to a theme/component, PUTting only the settings
+/// whose value differs from the server (idempotent). Re-serialises expanded
+/// JSON-list settings back to the escaped-string form Discourse expects.
+/// Honours `--dry-run`.
+pub fn theme_setting_push(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    local_path: &Path,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+
+    let raw =
+        std::fs::read_to_string(local_path).with_context(|| format!("reading {}", local_path.display()))?;
+    let file: ThemeSettingsFile = if is_json_path(local_path) {
+        serde_json::from_str(&raw).context("parsing theme settings file as JSON")?
+    } else {
+        serde_yaml::from_str(&raw).context("parsing theme settings file as YAML")?
+    };
+    if file.version != 1 {
+        return Err(anyhow!(
+            "unsupported theme settings file schema version {} (expected 1)",
+            file.version
+        ));
+    }
+
+    // Current server values, to PUT only what actually changed.
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let server = theme_setting_entries(theme);
+    let current_by_name: std::collections::HashMap<&str, &Value> =
+        server.iter().map(|e| (e.setting.as_str(), &e.value)).collect();
+
+    let mut changes: Vec<(String, String, String)> = Vec::new();
+    let mut unchanged = 0usize;
+    for entry in &file.settings {
+        let desired = theme_value_to_send(&entry.value);
+        match current_by_name.get(entry.setting.as_str()) {
+            None => eprintln!(
+                "warning: setting `{}` not found on theme {}; skipping",
+                entry.setting, theme_id
+            ),
+            Some(current_value) => {
+                let current = theme_value_to_send(current_value);
+                if json_equal(&desired, &current) {
+                    unchanged += 1;
+                } else {
+                    changes.push((entry.setting.clone(), current, desired));
+                }
+            }
+        }
+    }
+
+    if changes.is_empty() {
+        println!(
+            "{}: theme {} already up to date ({} setting{} checked)",
+            discourse.name,
+            theme_id,
+            unchanged,
+            if unchanged == 1 { "" } else { "s" }
+        );
+        return Ok(());
+    }
+
+    if dry_run {
+        println!(
+            "[dry-run] {}: would update {} setting{} on theme {}:",
+            discourse.name,
+            changes.len(),
+            if changes.len() == 1 { "" } else { "s" },
+            theme_id
+        );
+        for (name, from, to) in &changes {
+            println!("  {}: {}", name, describe_change(from, to));
+        }
+        return Ok(());
+    }
+
+    for (name, _from, to) in &changes {
+        client.set_theme_setting(theme_id, name, to)?;
+        println!("  set {}", name);
+    }
+    println!(
+        "{}: updated {} setting{} on theme {}",
+        discourse.name,
+        changes.len(),
+        if changes.len() == 1 { "" } else { "s" },
+        theme_id
+    );
     Ok(())
 }
 
@@ -723,6 +1004,95 @@ mod tests {
     #[test]
     fn theme_setting_entries_empty_when_absent() {
         assert!(theme_setting_entries(&json!({ "name": "no settings" })).is_empty());
+    }
+
+    #[test]
+    fn expand_json_list_expands_only_json_arrays_and_objects() {
+        // The header_links shape: a string holding a JSON array -> real array.
+        let v = expand_json_list(&json!("[{\"id\": 1, \"title\": \"A\"}]"));
+        assert!(v.is_array());
+        assert_eq!(v[0]["title"], json!("A"));
+        // A JSON object string -> object.
+        assert!(expand_json_list(&json!("{\"a\": 1}")).is_object());
+        // Plain strings (CSS vars, enums) are left alone.
+        assert_eq!(
+            expand_json_list(&json!("var(--primary)")),
+            json!("var(--primary)")
+        );
+        assert_eq!(expand_json_list(&json!("left")), json!("left"));
+        // Non-strings pass through.
+        assert_eq!(expand_json_list(&json!(true)), json!(true));
+        // Starts with '[' but isn't valid JSON -> stays a string.
+        assert_eq!(expand_json_list(&json!("[not json")), json!("[not json"));
+    }
+
+    #[test]
+    fn theme_value_to_send_serialises_lists_as_json_text() {
+        assert_eq!(theme_value_to_send(&json!([{"id": 1}])), "[{\"id\":1}]");
+        assert_eq!(theme_value_to_send(&json!("left")), "left");
+        assert_eq!(theme_value_to_send(&json!(true)), "true");
+        assert_eq!(theme_value_to_send(&Value::Null), "");
+    }
+
+    #[test]
+    fn json_equal_ignores_whitespace_for_lists() {
+        // Server stores spaced JSON; the file round-trips to compact JSON.
+        assert!(json_equal("[{\"id\": 1}]", "[{\"id\":1}]"));
+        assert!(json_equal("left", "left"));
+        assert!(!json_equal("[{\"id\": 1}]", "[{\"id\":2}]"));
+        assert!(!json_equal("split", "left"));
+    }
+
+    #[test]
+    fn header_links_round_trips_idempotently() {
+        // A realistic server value: a spaced JSON string, as Discourse returns it.
+        let server = json!("[{\"id\": 1, \"title\": \"Conference\", \"newTab\": true}]");
+        // pull: expand to an editable array.
+        let expanded = expand_json_list(&server);
+        assert!(expanded.is_array());
+        // push (unedited): the array serialises back and compares equal to the
+        // server's spaced form, so an untouched list is never needlessly PUT.
+        let current = theme_value_to_send(&server);
+        assert!(
+            json_equal(&theme_value_to_send(&expanded), &current),
+            "an untouched list must be a no-op on push"
+        );
+        // Edit one title -> it now differs and would be pushed.
+        let mut edited = expanded.clone();
+        edited[0]["title"] = json!("Conference 2027");
+        assert!(!json_equal(&theme_value_to_send(&edited), &current));
+    }
+
+    #[test]
+    fn theme_settings_file_round_trips_through_yaml() {
+        let file = ThemeSettingsFile {
+            version: 1,
+            discourse_version: Some("3.x".into()),
+            theme_id: 17,
+            theme_name: Some("Dropdown Header".into()),
+            pulled_at: None,
+            settings: vec![ThemeSettingsFileEntry {
+                setting: "header_links".into(),
+                kind: Some("string".into()),
+                value: json!([{"id": 1, "title": "A"}]),
+                default: None,
+            }],
+        };
+        let yaml = serde_yaml::to_string(&file).unwrap();
+        let back: ThemeSettingsFile = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(back.version, 1);
+        assert_eq!(back.theme_id, 17);
+        assert_eq!(back.settings.len(), 1);
+        assert_eq!(back.settings[0].setting, "header_links");
+        assert!(back.settings[0].value.is_array());
+        assert_eq!(back.settings[0].value[0]["title"], json!("A"));
+    }
+
+    #[test]
+    fn describe_change_summarises_long_values() {
+        assert_eq!(describe_change("split", "left"), "split -> left");
+        let long = "x".repeat(200);
+        assert!(describe_change(&long, &long).starts_with("changed ("));
     }
 
     #[test]

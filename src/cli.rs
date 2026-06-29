@@ -940,6 +940,10 @@ pub enum ThemeCommand {
         format: ListFormat,
     },
     /// Read and write a theme/component's settings (not site settings).
+    #[command(after_help = "Examples:
+  dsc theme setting list myforum 17
+  dsc theme setting pull myforum 17 header.yml   # header_links expands to a real list
+  dsc theme setting push myforum 17 header.yml --dry-run")]
     Setting {
         #[command(subcommand)]
         command: ThemeSettingCommand,
@@ -1021,6 +1025,27 @@ pub enum ThemeSettingCommand {
         key: String,
         /// New value (verbatim).
         value: String,
+    },
+    /// Pull a component's settings to a file for offline editing. JSON-list
+    /// settings (`header_links`, `dropdown_links`) are expanded to real,
+    /// editable arrays. YAML by default; a `.json` path writes JSON.
+    Pull {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Destination file (auto-derived from the theme name when omitted).
+        local_path: Option<PathBuf>,
+    },
+    /// Push a settings file back, PUTting only the changed settings. Honours
+    /// global `--dry-run`.
+    Push {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Settings file to apply.
+        local_path: PathBuf,
     },
 }
 
