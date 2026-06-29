@@ -23,6 +23,15 @@ fn completions_generate() {
     assert!(output.status.success(), "fish completions failed");
     assert!(out_dir.join("dsc.fish").exists(), "missing dsc.fish");
 
+    // `powershell` must be accepted verbatim (the value enum derives to
+    // `power-shell`, so the canonical spelling the docs use is a named alias).
+    let output = run_dsc(
+        &["completions", "powershell", "--dir", out_dir_str],
+        &config_path,
+    );
+    assert!(output.status.success(), "powershell completions failed");
+    assert!(out_dir.join("dsc.ps1").exists(), "missing dsc.ps1");
+
     let output = run_dsc(
         &[
             "completions",

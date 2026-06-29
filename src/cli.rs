@@ -1660,6 +1660,7 @@ pub enum CompletionShell {
     /// Fish shell.
     Fish,
     /// PowerShell.
+    #[value(name = "powershell", alias = "power-shell")]
     PowerShell,
 }
 
