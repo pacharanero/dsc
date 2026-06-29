@@ -5,6 +5,12 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.25] - 2026-06-29
+
+### Features
+
+- **theme**: `theme setting pull/push` for file-based component config ([c4879f3](https://github.com/pacharanero/dsc/commit/c4879f3c8d6ee93264a585cd084a42b10c63c1dd))
+
 ## [0.10.24] - 2026-06-26
 
 ### Bug fixes
