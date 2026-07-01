@@ -239,7 +239,7 @@ These don't need the user-walk and could ship as an early follow-up patch:
 
 The `flag_response_time` report ID returns 500 on at least one tested forum. May have been renamed (`time_to_resolution`?) or removed. Currently rendered as `—`. Reconfirm against a current Discourse before wiring in.
 
-`time_to_first_response.average` is exposed by Discourse; the spec calls for **median**. The daily `data` array could be re-aggregated to a real median, but this requires raw post timestamps rather than the report's pre-aggregated daily averages. v1 uses Discourse's `average` and documents the caveat in [docs/analytics.md](../docs/analytics.md). Promote to a real median if a forum operator complains.
+`time_to_first_response.average` is exposed by Discourse; the spec calls for **median**. The daily `data` array could be re-aggregated to a real median, but this requires raw post timestamps rather than the report's pre-aggregated daily averages. v1 uses Discourse's `average` and documents the caveat in [docs/analytics.md](../../docs/analytics.md). Promote to a real median if a forum operator complains.
 
 ### Schema versioning is a public contract
 

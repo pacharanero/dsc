@@ -71,4 +71,4 @@ dsc backup setup-s3 -n myforum
 dsc backup setup-s3 myforum --region eu-west-1
 ```
 
-> Phase 1 covers the create-everything flow. `--reuse-user` (idempotent re-runs / key rotation), `--use-iam-profile` (EC2 instance role, no static keys), and `--all`/`--tags` (fleet-wide) are planned - see [spec/backup-s3-setup.md](../spec/backup-s3-setup.md).
+> Phase 1 covers the create-everything flow. `--reuse-user` (idempotent re-runs / key rotation), `--use-iam-profile` (EC2 instance role, no static keys), and `--all`/`--tags` (fleet-wide) are planned - see [spec/commands/backup-s3-setup.md](../spec/commands/backup-s3-setup.md).

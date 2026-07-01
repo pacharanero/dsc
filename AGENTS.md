@@ -27,7 +27,7 @@ This is the most useful thing you can do. `dsc`'s author is actively shaping the
 
 ### Where to put it
 
-Add a markdown file under [spec/](spec/), name slug-case, descriptive: `spec/theme-management.md`, `spec/config-path-resolution.md`. Don't suffix with `-spec.md` for new ones (legacy filenames have it; new ones don't need to). Reference it from [spec/roadmap.md](spec/roadmap.md) under **Planned** if appropriate.
+Specs are two-tier (see [spec/README.md](spec/README.md)). A spec for a command or a discrete feature goes under [spec/commands/](spec/commands/), named slug-case after the command surface, mirroring `src/commands/` and [docs/](docs/): `spec/commands/theme-management.md`, `spec/commands/config-path-resolution.md`. Overarching, cross-cutting specs (config schema, CLI design, roadmap) stay at the [spec/](spec/) root. Don't suffix with `-spec.md` for new ones (legacy filenames have it; new ones don't need to). Reference it from [spec/roadmap.md](spec/roadmap.md) under **Planned** if appropriate.
 
 ### What makes a spec land fast
 
@@ -97,9 +97,9 @@ redacted. Note the Discourse version you tested against.>
 
 ### Good examples to copy
 
-- [spec/setting-sync.md](spec/setting-sync.md) - clear phasing, file schema, dry-run output shown
-- [spec/theme-management.md](spec/theme-management.md) - phased by what is blocking, names the real driver
-- [spec/config-path-resolution.md](spec/config-path-resolution.md) - precedence chain table, explicit-selector safety section, tests list, non-goals
+- [spec/commands/setting-sync.md](spec/commands/setting-sync.md) - clear phasing, file schema, dry-run output shown
+- [spec/commands/theme-management.md](spec/commands/theme-management.md) - phased by what is blocking, names the real driver
+- [spec/commands/config-path-resolution.md](spec/commands/config-path-resolution.md) - precedence chain table, explicit-selector safety section, tests list, non-goals
 
 ## What `dsc` will not do (and you should not file specs for)
 

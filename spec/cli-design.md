@@ -17,7 +17,7 @@ Six principles, in rough priority order. When they conflict, the earlier one win
 
 ### Global options
 
-- `dsc --config <path> <command>` (`-c`) selects a config file. Without it, `dsc` searches common local/user/system paths and falls back to `./dsc.toml`. See [config-path-resolution.md](config-path-resolution.md).
+- `dsc --config <path> <command>` (`-c`) selects a config file. Without it, `dsc` searches common local/user/system paths and falls back to `./dsc.toml`. See [config-path-resolution.md](commands/config-path-resolution.md).
 - `dsc --dry-run <command>` (`-n`) is global - see [`--dry-run`](#--dry-run--n) below.
 - Every command, subcommand, argument, and flag carries concise `--help` text. `dsc --help` is the authoritative, complete surface; the README showcases and indexes into [docs/](../docs/).
 

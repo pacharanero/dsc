@@ -8,7 +8,7 @@ Spec for the unstarted `dsc install` command and the not-yet-shipped finishing i
 
 ## Current state (as of 2026-06-09)
 
-- `dsc harden` ships stages 1 + 2 (preflight, non-root sudo user, key-only sshd on a non-default port, self-lockout guard). Stage 3 (timezone, swap, journald, unattended upgrades, fail2ban, rootless Docker, ufw) has its config keys wired in [src/commands/harden.rs](../src/commands/harden.rs) `HardenOpts` but the SSH-side execution and tests are pending.
+- `dsc harden` ships stages 1 + 2 (preflight, non-root sudo user, key-only sshd on a non-default port, self-lockout guard). Stage 3 (timezone, swap, journald, unattended upgrades, fail2ban, rootless Docker, ufw) has its config keys wired in [src/commands/harden.rs](../../src/commands/harden.rs) `HardenOpts` but the SSH-side execution and tests are pending.
 - `dsc install` does not exist.
 - `DiscourseConfig` lacks `ssh_user`/`ssh_port` fields. Today `dsc update` finds the SSH host by name only (relies on `~/.ssh/config`); `dsc install` needs to write these on success.
 
@@ -73,7 +73,7 @@ Yes. Print the rendered `app.yml`, the launcher commands, and the `[[discourse]]
 
 ## Config schema additions
 
-Add to `DiscourseConfig` in [src/config.rs](../src/config.rs):
+Add to `DiscourseConfig` in [src/config.rs](../../src/config.rs):
 
 ```rust
 #[serde(default, deserialize_with = "deserialize_opt_string_empty_as_none")]
