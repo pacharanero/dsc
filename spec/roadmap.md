@@ -1,35 +1,17 @@
 # Roadmap
 
-Tracks planned, in-progress, and completed work items for `dsc`.
+Planned and in-progress work for `dsc`. Shipped history lives in [CHANGELOG.md](../CHANGELOG.md); field-driven specs (⭐) are indexed in [from-the-field.md](from-the-field.md) and should generally outrank speculative items.
 
-Specs marked ⭐ are **field-driven** - they came from real-world use and are indexed in [from-the-field.md](from-the-field.md). They carry captured API call signatures and should generally outrank speculative items.
+## Shipped (highlights)
 
-## Completed
+The built surface, grouped - see CHANGELOG for the full per-release detail.
 
-- [x] `dsc tag pull/push` - declarative tag taxonomy management. Spec: [spec/tag-sync.md](tag-sync.md)
-- [x] `dsc topic tag/untag` - moved topic-level tagging from `dsc tag apply/remove`
-- [x] `dsc post pull/push` - harmonised with pull/push pattern
-- [x] `dsc backup pull/push` - harmonised with pull/push pattern
-- [x] `dsc emoji pull/push` - harmonised with pull/push pattern
-- [x] `dsc config` (bare) - print active config path and search order
-- [x] `dsc update` rootless Docker support - `docker_rootless` config flag
-- [x] `dsc update` skip-if-current - check GitHub for latest stable commit before rebuild
-- [x] `dsc harden` PQ-hybrid SSH - policy overlay approach for KEX/ciphers/MACs
-- [x] Pin GitHub Actions to commit SHAs
-- [x] Dependabot cooldown configuration
-- [x] **Setting sync (bulk site settings pull/push)** - declarative settings management. Spec: [spec/setting-sync.md](setting-sync.md)
-  - [x] Phase 1: `dsc setting pull` - snapshot to YAML/JSON with metadata
-  - [x] Phase 2: `dsc setting push` - idempotent apply with `--dry-run` and `--reset-unlisted`
-  - [x] Phase 3: `dsc setting diff` - cross-source comparison (live or snapshot)
-  - [x] Phase 4: `setting set --tags` reachable from CLI
-- [x] ⭐ **Config-path resolution** - `$DSC_CONFIG` and `$DSC_CONFIG_HOME` env vars, explicit-selector error semantics, `dsc config` source labelling. Spec: [spec/config-path-resolution.md](config-path-resolution.md)
-- [x] `dsc tag rename <discourse> <old> <new>` - in-place rename preserving every topic association; pre-flight validates existence, name collisions, and slug shape
-- [x] Fix `dsc harden` test - `drop_in_uses_modern_algorithm_pins` rewritten to verify the overlay model (commit `979c3d1`)
-- [x] ⭐ **`dsc topic pull --full`** - full-thread Markdown snapshot with YAML frontmatter and per-post headings; batch-fetches via `/t/{id}/posts.json?post_ids[]=…`. Spec: [spec/topic-pull-full-thread.md](topic-pull-full-thread.md). Phase 2 (`--since`, `--format json`) still planned.
-- [x] ⭐ **Fix `dsc user list` parse failure on negative IDs** - Discourse's built-in `system`/`discobot` accounts use IDs `-1`/`-2`, which broke deserialisation on any listing page that contained them. Widened `UserSummary.id`, `UserDetail.id`, and every user-action helper signature from `u64` to `i64`. Spec: [spec/user-list-negative-ids.md](user-list-negative-ids.md). Regression-tested.
-
-- [x] **`dsc completions install`** (v0.10.26) - detects the shell, writes the correctly-named completion file to the standard user dir, and prints any one-time setup; adds PowerShell alongside bash/zsh/fish. `dsc completions <shell>` (stdout) and `--dir` (packaging) retained.
-- [x] ⭐ **`dsc topic title` + `dsc topic tags`** - rename a topic and set its full tag list atomically (both `PUT /t/{id}.json`). Field-driven by the `forum.rcpch.tech/c/playbook` migration, where 15 bulk-created topics had slug-derived titles. Reserved-slug `403` surfaced clearly; both honour `--dry-run`. Spec: [spec/topic-title-and-tags.md](topic-title-and-tags.md). (Note: the spec's "title from front matter on `category push` create" is already satisfied - `category push` prefers the front-matter `title` when creating.)
+- **Declarative sync** - `setting pull/push/diff`, `tag pull/push`/`rename`, `category pull/push` (front-matter routing, `--dry-run`, `--updates-only`, `--no-bump`/`--skip-revision`), plus `post`/`backup`/`emoji`/`topic` pull/push. Specs: [setting-sync](setting-sync.md), [tag-sync](tag-sync.md), [category-workflow](category-workflow.md).
+- **Theme management (complete)** - settings (incl. `pull/push`), fields (SCSS/HTML), assets (`set/unset`), enable/disable, attach/detach, palettes, `show`, remote `update`, API `install`/`delete`. Spec: [theme-management](theme-management.md).
+- **Compliance / cross-forum** - ⭐ `sar` (GDPR SAR export), `setting audit` (one setting across the fleet). Spec: [subject-access-request](subject-access-request.md).
+- **Content** - ⭐ `topic pull --full`, ⭐ `topic title`/`tags`, negative-ID user-list fix. Specs: [topic-pull-full-thread](topic-pull-full-thread.md), [topic-title-and-tags](topic-title-and-tags.md), [user-list-negative-ids](user-list-negative-ids.md).
+- **Ops** - `update` (skip-if-current, rootless Docker, parallel), `harden` (PQ-hybrid SSH), ⭐ `backup setup-s3` Phase 1. Spec: [backup-s3-setup](backup-s3-setup.md).
+- **CLI / distribution** - universal `--format`, `completions install` (+ PowerShell), `man` pages, `version --format`, SIGPIPE-safe piping, config-path resolution, cargo-dist release + git-cliff changelog, `s/version++` one-command release, push/PR CI gate. Specs: [config-path-resolution](config-path-resolution.md), [cli-design](cli-design.md).
 
 ## In progress
 
@@ -37,95 +19,57 @@ _(nothing currently in progress)_
 
 ## Pre-1.0 launch checklist
 
-Polish items to land before announcing on [meta.discourse.org](https://meta.discourse.org). Most are small but cumulatively shift perception from "promising 0.x" to "stable, take it seriously."
+Polish before announcing on [meta.discourse.org](https://meta.discourse.org).
 
-- [ ] **Bump to 1.0.0** with a written back-compat policy. State: "the CLI surface documented in `dsc --help` is stable; flags will not be removed without a deprecation cycle." The current 0.x signal undersells the project's maturity (213 lib tests + e2e suites, 5-target prebuilt distribution, 9 months of consistent shipping).
-- [x] **Generate `CHANGELOG.md`** - [git-cliff](https://github.com/orhun/git-cliff) configured via [cliff.toml](../cliff.toml); full history (back to first conventional commit) backfilled into [CHANGELOG.md](../CHANGELOG.md). `s/version++` now refreshes it automatically on each bump. `cargo-dist` picks it up for the GitHub Release body.
-- [x] **CLI consistency audit** against [spec/cli-design.md](cli-design.md):
-  - Format baseline: all 20 list commands accept `--format text|json|yaml` (fully compliant).
-  - Empty-list text mode: 5 commands fixed to the `No <resource> found.` shape (`api-key list`, `emoji pull`, `pm list`, `search`, `tag list`). Context preserved where useful (e.g. `No PMs found in {direction}.`).
-  - Error messages: `dsc tag rename` switched from `"tag 'foo' not found on 'bar'"` to the shared `not_found("tag", &old_norm)` helper, matching the `{resource} not found: {identifier}` shape used elsewhere.
-- [x] **Surface analytics v1 status more prominently** in [docs/analytics.md](../docs/analytics.md). The Sections heading now carries a v1-status callout pointing at the implementation matrix and the spec's "Implementation follow-ups". Stale `.marcus/queries.md` reference fixed.
-- [x] **Rename `spec/dsc-tag-sync-spec.md`** → [spec/tag-sync.md](tag-sync.md) for consistency with the post-`-spec.md` convention. References updated.
-- [ ] **Record an asciinema** (~30s) of the pull → edit → push → diff loop on a real Discourse. Embed in README. Visual proof beats prose.
-- [x] **"What works / what's coming" matrix in README** - a per-area table (works now / on the roadmap) lands under a "What works today" heading in [README.md](../README.md), so readers can self-sort before installing.
-- [x] **GitHub issue templates** - [bug_report.md](../.github/ISSUE_TEMPLATE/bug_report.md), [feature_request.md](../.github/ISSUE_TEMPLATE/feature_request.md), [spec_request.md](../.github/ISSUE_TEMPLATE/spec_request.md), plus [config.yml](../.github/ISSUE_TEMPLATE/config.yml) pointing general Discourse questions at Meta.
-- [x] **CONTRIBUTING.md** - lands at [CONTRIBUTING.md](../CONTRIBUTING.md), references AGENTS.md, spec/cli-design.md, and spec/implementation.md.
-- [x] **Support stance written down** - in CONTRIBUTING.md: "best-effort, community-driven, no SLA; field-driven specs prioritised over speculative ones."
-- [ ] **`s/` script directory naming** - either rename to `scripts/` (conventional) or document its purpose prominently in [docs/development.md](../docs/development.md). Same for `wix/` (MSI build artefacts - obvious from contents but not from name).
-- [ ] **Pre-circulate the Meta post** to one or two Discourse community regulars before posting publicly. Sanity-check framing.
-- [x] **Man page generation** via [`clap_mangen`](https://docs.rs/clap_mangen) - new `dsc man --dir <path>` subcommand emits 103 ROFF pages (root + every nested subcommand), `git`/`cargo`-style hyphen-joined filenames. Recommended workflow for distro packagers documented at [docs/manpages.md](../docs/manpages.md).
-- [ ] **Evaluate `dsc open` and `dsc import`** - keep, deprecate, or document why they earn their keep before locking the CLI surface.
+- [ ] **Bump to 1.0.0** with a written back-compat policy ("the `dsc --help` surface is stable; flags won't be removed without a deprecation cycle"). 0.x undersells the maturity (213 lib tests + e2e + CI gate, 5-target distribution, 9 months shipping).
+- [ ] **Record an asciinema** (~30s) of the pull → edit → push → diff loop; embed in README.
+- [ ] **`s/` and `wix/` naming** - keep `s/` (house style) but document it in [docs/development.md](../docs/development.md); note `wix/` holds MSI build artefacts.
+- [ ] **Pre-circulate the Meta post** to a couple of Discourse regulars before posting.
+- [ ] **Evaluate `dsc open` and `dsc import`** - keep, deprecate, or justify before locking the surface.
 
 ## Planned
 
-- [ ] ⭐ **`category pull/push` workflow gaps + silent push** — five gaps; phases 1–4 + 6 shipped. Only Phase 5 (MkDocs↔Discourse content conversion) remains. Spec: [spec/category-workflow.md](category-workflow.md)
-  - [x] Phase 1: `category pull` writes YAML front matter (`title`, `topic_id`, `url`, `pulled_at`) + `strip_frontmatter()` in `utils.rs`
-  - [x] Phase 2: `category push` routes by front-matter `topic_id`; strips front matter before sending body (also `topic push`)
-  - [x] Phase 3: working `--dry-run` for `category push` with `~`/`+`/`=` output
-  - [x] Phase 4: `--updates-only` flag errors instead of silently creating on mismatch
-  - [ ] Phase 5: `--convert-admonitions` and `--rewrite-links` flags on push/pull (MkDocs↔Discourse portability)
-  - [x] Phase 6: `--no-bump` (suppress activity-feed bump on edit) and `--skip-revision` on `topic push` / `category push`; `PostEditOptions` threaded through `update_post()`
+### `dsc update` refinements ⭐
 
-### CLI papercuts and finishing touches
+Spec: [update-concurrency](update-concurrency.md).
 
-- [x] **Universal JSON output** - `setting get`, `theme setting get`, `theme duplicate`, `topic reply`, and `topic new` now accept `--format text|json|yaml` via a shared `emit_result()` helper in `commands/common.rs`. Single-value commands emit a small structured object (e.g. `{"topic_id":…,"post_id":…}`) for scripting.
-- [x] **`palette` → `theme palette`** - palettes now live under `dsc theme palette` (shared `run_palette()` dispatch). The top-level `dsc palette …` still works as a deprecated alias and prints a one-line migration notice to stderr.
-- [x] **Emoji filename preservation** - `dsc emoji push <dir>` now derives the emoji name as `slugify(stem)` (hyphens preserved), so `google-drive.svg` uploads as `google-drive` instead of the previous `google_drive`. Discourse's custom-emoji charset accepts hyphens.
+- [ ] **Leaner `-p [N]`** - fold `-p`/`--parallel` + `-m`/`--max` into one optional-value flag (`-p` = default width, `-p N` = N workers); drop `-m`.
+- [ ] **Rebuild-lock pre-flight** - skip a forum that already has a `./launcher rebuild` in flight (`pgrep -f 'launcher rebuild'`), *before* the reboot, so a re-run never stomps a supervised rebuild. `--force` to override.
+
+### Content sync
+
+- [ ] ⭐ **`category` Phase 5** - `--convert-admonitions` / `--rewrite-links` for MkDocs↔Discourse portability (the only remaining gap; phases 1-4, 6 shipped). Spec: [category-workflow](category-workflow.md).
 
 ### New command surfaces
 
-- [x] ⭐ **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Phases 1-3 implemented; only small API-parity gaps left (delete/install by API). Spec: [spec/theme-management.md](theme-management.md)
-  - [x] Phase 1: `dsc theme setting` (get/set/list) + `dsc theme enable|disable|attach|detach`
-  - [x] Phase 2 (field-required): `dsc theme setting pull/push` - file-based edit of component settings; JSON-list `header_links`/`dropdown_links` expand to editable arrays, push PUTs only changed keys (semantic compare). Shipped v0.10.25; verified against ACCM Dropdown Header
-  - [x] Phase 2: `dsc theme field list/pull/push` (raw SCSS/HTML fields; git-backed remotes refused on push) + `dsc theme asset list/set` (upload + bind `theme_upload_var`). Shipped v0.10.26; shapes confirmed live on koloki-demo
-  - [x] Phase 3: `dsc theme show` + `dsc theme update` (git-backed remote refresh via `remote_check`/`remote_update`, `--check` to preview). Both shipped
-  - [x] API `theme install` (git URL incl. private-via-URL creds, or local `.tar.gz`/zip bundle), `theme delete <id>` (refuses site default), and `theme asset unset`. Shipped v0.10.26; verified live on koloki-demo. Theme tooling now feature-complete bar a cross-instance settings diff
-- [x] **`dsc sar <discourse> <user>`** - one-shot Subject Access Request export (Phase 1, single forum). Gathers admin PII, authored posts (full raw), likes, and group memberships into a reviewable bundle with a `README.md` cover sheet (controller checklist + Article 15 template) and `manifest.json` flagging what needs human review. Private messages are opt-in (`--messages`) with a REVIEW REQUIRED banner. `<user>` is a username or email. Honest scope: automates data-gathering, not the legal judgement. Driver: NHS/medical-adjacent forums with real SAR obligations. Spec: [spec/subject-access-request.md](subject-access-request.md). Phase 2 (zip, combined doc, staff notes) on demand; multi-forum deliberately out of scope.
-- [ ] **`dsc chat`** - Discourse Chat is core now and the API is there. Subcommands: `chat channels`, `chat send <discourse> <channel> [<file>]`, `chat fetch <channel> [--since …]`. Mirrors the existing `dsc topic`/`pm` split.
-- [ ] ⭐ **`dsc backup setup-s3 <discourse>`** - provision an S3 backup bucket + a dedicated single-bucket IAM user/policy and point Discourse at it, replacing a ~15-step AWS-console runbook done per-forum across the fleet since 2023. Field-driven; carries the policy JSON + `aws s3api`/`aws iam` signatures. Spec: [spec/backup-s3-setup.md](backup-s3-setup.md)
-  - [x] Phase 1: end-to-end create flow via the `aws` CLI + complete offline `--dry-run` + pre-flight (shipped; enable-last ordering verified on ACCM)
-  - [ ] Phase 2: `--reuse-user` (idempotent re-run / key rotation), `--use-iam-profile`, `--all`/`--tags`
-  - [ ] Phase 3: native AWS SDK backend, `--retention` lifecycle, `dsc backup status`
-- [ ] **`dsc install <name> --host <host>`** - declarative Discourse provisioning on a `dsc harden`-prepared box. Spec: [spec/install.md](install.md). Includes: templated `app.yml`, `launcher bootstrap + start`, polls `/about.json` until ready, appends the new install to `dsc.toml`. Companion to `dsc harden` (the substrate) and `dsc update` (the steady-state).
-- [ ] **`dsc harden` stage 3 finishing items** - timezone/swap/journald/unattended-upgrades/fail2ban/rootless-Docker/ufw. Config keys are already wired in [src/commands/harden.rs](../src/commands/harden.rs); remaining work is the SSH-side execution and tests. See [spec/install.md](install.md) for gotchas (rootlesskit `cap_net_bind_service`, `loginctl enable-linger`, cloud firewall caveat).
-- [ ] **Config schema additions for `dsc install`** - add `ssh_user: Option<String>` and `ssh_port: Option<u16>` to `DiscourseConfig`, written by `dsc install` on success. Today only `HardenConfig` carries `ssh_port`; the per-Discourse field is missing.
+- [ ] **`dsc chat`** - `chat channels` / `chat send <discourse> <channel> [<file>]` / `chat fetch <channel> [--since …]`. Mirrors the `topic`/`pm` split.
+- [ ] ⭐ **`backup setup-s3` Phase 2/3** - `--reuse-user` (key rotation), `--use-iam-profile`, `--all`/`--tags`; then a native AWS SDK backend, `--retention` lifecycle, `backup status`. Spec: [backup-s3-setup](backup-s3-setup.md).
+- [ ] **`dsc install <name> --host <host>`** - declarative provisioning on a `dsc harden`-prepared box (templated `app.yml`, launcher bootstrap, poll `/about.json`, append to `dsc.toml`). Spec: [install](install.md). Includes the remaining `harden` stage-3 items (timezone/swap/journald/unattended-upgrades/fail2ban/rootless-Docker/ufw - config keys wired, SSH execution + tests remain) and the `ssh_user`/`ssh_port` per-Discourse config fields `install` writes on success.
 
-### Admin depth (release driven by demand)
+### Admin depth (demand-driven)
 
-- [ ] **`dsc log staff <discourse> [--since 7d] [--format json]`** - the staff action log.
-- [ ] **`dsc report <discourse> <report-name> [--period 30d]`** - dashboard reports (signups, DAU, posts, likes). Scriptable admin dashboard. Distinct from `dsc analytics` (curated multi-metric snapshot).
-- [ ] **`dsc webhook list|create|delete|ping`** - manage the plumbing automation depends on.
-- [ ] **`dsc notification list|read <discourse>`** - your own notifications as the API user.
+- [ ] **`dsc log staff`** (staff action log), **`dsc report <name> [--period]`** (dashboard reports - signups/DAU/posts/likes, distinct from `analytics`), **`dsc webhook list|create|delete|ping`**, **`dsc notification list|read`**.
 
-### Cross-forum specialties (the multi-install headline)
+### Cross-forum (the multi-install headline)
 
-- [ ] **`dsc search all <query>`** - fan out search across every configured forum, merged results.
-- [ ] **`dsc report all <name>`** - aggregate a given report across forums (e.g. total signups last 30 days across N installs).
-- [x] **`dsc setting audit <key>`** - shows one setting's value across every configured forum (optional `--tags` filter), with an aligned table + agreement summary in text mode and per-forum objects in json/yaml. Unreachable forums reported inline, not fatal. Shared `matches_tag_filter()` with `setting set --tags`.
-- [ ] **`dsc user find <email>`** - locate a user across every configured forum (GDPR / "which of my forums has this person" workflows).
-- [ ] **`dsc backup create --all`** - reuse the parallel-ops pattern established by `dsc update all`.
+- [ ] **`dsc search all <query>`** (merged fan-out search), **`dsc report all <name>`** (aggregate a report across forums), **`dsc user find <email>`** (GDPR "which forum has this person"), **`dsc backup create --all`** (reuse the `update all` parallel pattern).
 
 ### Doc accuracy
 
-- [ ] Doc accuracy pass - verify remaining docs match CLI reality.
+- [ ] Pass to verify remaining docs match CLI reality.
 
 ## Stretch / exploratory
 
-Speculative ideas. Build only if real demand surfaces; none are required for 1.0.
+Speculative; build only on real demand. None are required for 1.0.
 
-- [ ] **MCP server mode** - `dsc mcp serve` exposing every command as an MCP tool, letting LLM agents drive Discourse via this CLI. Overlaps with the existing `discourse-bawmedical-mcp` - worth a think about consolidation vs coexistence.
-- [ ] **TUI** - `dsc tui` for interactive browsing of forums/topics/users. Big scope.
-- [ ] **Config file federation** - support multiple config files and include-directives, for teams.
-- [ ] **Discourse User API** - alternative auth path for non-admins and scoped bots:
-  - `dsc login <discourse> [--scopes read,write,…]` runs the full key-exchange (RSA keypair, browser to `/user-api-key/new?…`, transient-localhost callback or manual paste, decrypt, write `user_api_key` into `dsc.toml`).
-  - Client emits `User-Api-Key` header when configured, preferring it over `Api-Key`/`Api-Username`.
-  - Likely to require renaming the existing `dsc api-key` to `dsc admin-key` (with deprecation alias) so `dsc user-key` or similar can sit alongside.
-  - **Tradeoff:** widens the *audience* (non-admins, scoped bots) but not the *capability* - most current `dsc` value (suspend, group admin, settings, backups) requires admin scope regardless.
+- [ ] **MCP server mode** - `dsc mcp serve` exposing commands as MCP tools. Overlaps `discourse-bawmedical-mcp` - consolidate vs coexist.
+- [ ] **TUI** - `dsc tui` for interactive browsing. Big scope.
+- [ ] **Config federation** - multiple config files + include-directives, for teams.
+- [ ] **Discourse User API** - `dsc login` key-exchange for non-admin / scoped-bot auth; likely renames `api-key` → `admin-key`. Widens the *audience*, not the *capability* (most value needs admin scope regardless).
 
 ## Out of scope / removed
 
-- ~~Shell completion *regeneration* as a tracked item~~ - `completions/` is gitignored and regenerates on demand. Superseded by a real feature: `dsc completions install` (v0.10.26) detects the shell, writes the correctly-named file, and prints any one-time setup, plus PowerShell support - see the Completed list.
-- ~~`dsc user password change`~~ - dropped. Discourse's API doesn't expose an admin "set this password directly" endpoint on purpose (admins shouldn't know user passwords). `dsc user password-reset` covers the operational need.
-- ~~`dsc user anonymize`~~ - dropped. Rare enough that the Admin UI is fine; not worth the destructive-confirmation UX.
-- ~~`api-key create --scope <scopes>`~~ - **parked 2026-06-29** (not dropped - revisit on demand). Scoped admin keys are low-value *for `dsc`*: nearly everything it does needs admin scope, so a scoped key only helps downstream consumers (a bot, CI) - which can be issued one from the admin UI - and the bootstrap key `dsc` itself uses is full-admin regardless. Also blocked on an unconfirmed scoped-key `POST /admin/api/keys.json` body (nested `key[scopes][][resource_name]` / `[action]`), so building blind risks minting broken keys. The existing full-admin `dsc api-key create` (all-users or single-user) stays - handy for proactive rotation, but a convenience for the already-bootstrapped, never a bootstrap (a key that's already broken still needs the UI/console). Revisit if the field session captures the body and a concrete least-privilege consumer appears.
+- ~~Shell completion *regeneration* as a tracked item~~ - superseded by the shipped `completions install`.
+- ~~`dsc user password change`~~ - Discourse has no admin "set this password" endpoint by design; `user password-reset` covers the need.
+- ~~`dsc user anonymize`~~ - rare enough for the Admin UI; not worth the destructive-confirmation UX.
+- ~~`api-key create --scope`~~ - **parked 2026-06-29**. Scoped keys are low-value for `dsc` (nearly everything needs admin scope anyway) and blocked on an unconfirmed scoped-key `POST /admin/api/keys.json` body. Full-admin `api-key create` stays. Revisit on a concrete least-privilege consumer.
