@@ -172,17 +172,17 @@ fn update_all_parallel_empty_config_succeeds() {
 }
 
 #[test]
-fn update_all_max_zero_is_rejected() {
+fn update_all_parallel_zero_is_rejected() {
     let dir = TempDir::new().expect("tempdir");
     let config_path = write_temp_config(&dir, "");
-    let output = run_dsc(&["update", "all", "--parallel", "--max", "0"], &config_path);
+    let output = run_dsc(&["update", "all", "--parallel", "0"], &config_path);
     assert!(
         !output.status.success(),
-        "update all --parallel --max 0 should fail"
+        "update all --parallel 0 should fail"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("--max must be at least 1"),
+        stderr.contains("width must be at least 1"),
         "unexpected stderr: {stderr}"
     );
 }
