@@ -1,52 +1,80 @@
-#!/bin/bash
-
-# Usage: s/version++ [patch|minor|major]
+#!/usr/bin/env bash
 #
-# Bumps Cargo.toml, refreshes CHANGELOG.md from git-cliff, and tags HEAD.
+# Usage: s/version++ [patch|minor|major]   (default: patch)
 #
-# Workflow: commit your feature first (with a conventional-commit message),
-# THEN run this script. git-cliff reads committed history, so any uncommitted
-# changes won't appear in the new CHANGELOG.md section.
+# The one release action. In order: bumps the version in Cargo.toml,
+# regenerates CHANGELOG.md (git-cliff), commits the release, tags it, and
+# pushes main + the tag. The pushed tag triggers the cargo-dist release
+# workflow (prebuilt binaries + GitHub Release) and the crates.io publish.
+#
+# Commit your feature work FIRST, with a conventional-commit message
+# (`feat(...)`, `fix:`, ...). git-cliff reads *committed* history, so anything
+# uncommitted won't appear in the new CHANGELOG.md section; this script makes
+# only the release commit.
+#
+# Note on tagging (divergence from ~/code/house-style/distribution.md):
+# the house standard is s/version++ commits+pushes and a CI auto-tag.yml
+# creates the tag via `workflow_call`. That needs a workflow_call-able
+# release workflow. dsc's release.yml is cargo-dist-generated and is
+# *tag-driven* (it reads the version from the pushed tag ref and only
+# triggers on `push: tags`), and there's a second tag-triggered workflow
+# (publish-crates.yml). So the cascade doesn't fit here without a PAT
+# secret to push the tag from CI. Until then we tag locally, AFTER the
+# commit (fixing the tag-before-commit hazard the standard warns about);
+# with no auto-tag there's no duplicate-tag race.
 
-# set -v  # Enable verbose mode
-set -e  # Exit on error
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
 
-# scripts may need to be made executable on some platforms before they can be run
-# chmod +x s/<filename> is the command to do this on unixy systems
+bump="${1:-patch}"
+case "$bump" in
+  patch | minor | major) ;;
+  *)
+    echo "Usage: s/version++ [patch|minor|major]" >&2
+    exit 2
+    ;;
+esac
 
-bump="patch"
-if [[ -n "${1-}" ]]; then
-  case "$1" in
-    patch|minor|major)
-      bump="$1"
-      ;;
-    *)
-      echo "Usage: s/version++ [patch|minor|major]" >&2
-      exit 1
-      ;;
-  esac
+# Release from main only.
+branch="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$branch" != "main" ]]; then
+  echo "On '$branch', not 'main'. Releases are cut from main." >&2
+  exit 1
+fi
+
+# The release commit must contain only the bump + changelog, so the tree must
+# be clean (feature work already committed).
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "Working tree not clean. Commit your feature work first, then release." >&2
+  exit 1
+fi
+
+if ! command -v git-cliff >/dev/null 2>&1; then
+  echo "git-cliff is required to refresh CHANGELOG.md but isn't installed." >&2
+  echo "Install with: cargo install git-cliff --locked" >&2
+  exit 1
 fi
 
 cargo set-version --bump "$bump"
-
-version="$(awk -F\" '/^version =/ {print $2; exit}' Cargo.toml)"
+version="$(awk -F\" '/^version = / {print $2; exit}' Cargo.toml)"
 tag="v$version"
+
 if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   echo "Tag $tag already exists." >&2
   exit 1
 fi
 
-# Refresh CHANGELOG.md if git-cliff is on PATH. Renders the in-progress
-# section under the new version + date by passing --tag.
-# Skip silently when git-cliff isn't installed - it's a release-day tool.
-if command -v git-cliff >/dev/null 2>&1; then
-  git-cliff --tag "$tag" -o CHANGELOG.md
-  git add CHANGELOG.md
-  echo "CHANGELOG.md refreshed for $tag"
-else
-  echo "git-cliff not installed; skipping CHANGELOG.md refresh" >&2
-  echo "Install with: cargo install git-cliff --locked" >&2
-fi
+# Render the in-progress changelog section under the new tag + date.
+git-cliff --tag "$tag" -o CHANGELOG.md
 
-git tag "$tag"
+# Commit the release, THEN tag it (so the tag contains the bump). Cargo.lock is
+# gitignored, so only these two files make the commit.
+git add Cargo.toml CHANGELOG.md
+git commit -m "chore(release): $tag"
+git tag -a "$tag" -m "Release $tag"
 
+git push origin main
+git push origin "$tag"
+
+echo
+echo "Released $tag. CI is building binaries + publishing to crates.io."

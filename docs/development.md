@@ -101,14 +101,13 @@ The `s/docs` script warns if the limit is at its stock 128 value.
 
 ## Release
 
-Releases are automated via Git tags and GitHub Actions using cargo-dist.
+Releasing is **one action**: `s/version++`.
 
-1. Update `CHANGELOG.md` with release notes.
-2. Ensure your working tree is clean and tests pass.
-3. Run `s/release <version>` (for example, `s/release 0.2.0`).
-4. The script commits the version bump, tags `v<version>`, and pushes.
-5. The `Release` workflow builds and uploads binaries to GitHub Releases.
-6. The `crates-io` job publishes the crate (requires `CARGO_REGISTRY_TOKEN`).
+1. Commit your feature work first, with a conventional-commit message (`feat(...)`, `fix:`, …) - git-cliff builds the changelog from committed history.
+2. Run `s/version++ [patch|minor|major]` (default `patch`). It bumps the version in `Cargo.toml`, regenerates `CHANGELOG.md` (git-cliff), makes the `chore(release): vX.Y.Z` commit, tags it, and pushes `main` + the tag. It refuses to run off `main` or on a dirty tree.
+3. The pushed `v*` tag triggers the `Release` workflow (cargo-dist: prebuilt binaries + GitHub Release) and the `crates.io` publish (requires `CARGO_REGISTRY_TOKEN`).
+
+There is no separate `s/release` step - `s/version++` does everything, in the correct order (commit before tag, so the tag contains the bump).
 
 ## Project layout
 

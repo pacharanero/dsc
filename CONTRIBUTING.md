@@ -60,7 +60,7 @@ src/
 docs/                 # User-facing per-command docs
 spec/                 # Design specs (one per new surface)
 tests/                # Integration tests (one file per command)
-s/                    # Project scripts: install, test, version++, release
+s/                    # Project scripts: build, test, docs, install, version++
 .marcus/              # Author-private notes (gitignored)
 ```
 
