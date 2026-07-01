@@ -120,16 +120,56 @@ fn main() -> Result<()> {
         }
 
         Commands::Update {
+            command,
             name,
             parallel,
             post_changelog,
             yes,
             force,
-        } => match name.as_str() {
-            "all" if parallel == Some(0) => Err(anyhow!("--parallel width must be at least 1")),
-            "all" => commands::update::update_all(&config, parallel, post_changelog, yes, force),
-            _ if parallel.is_some() => Err(anyhow!("--parallel only applies to 'dsc update all'")),
-            _ => commands::update::update_one(&config, &name, post_changelog, yes, force),
+            skip_recent,
+        } => match command {
+            Some(UpdateCommand::Log {
+                latest,
+                since,
+                format,
+            }) => {
+                let since = since
+                    .map(|s| commands::update_log::parse_duration(&s))
+                    .transpose()?;
+                commands::update_log::render(latest, since, format)
+            }
+            None => {
+                let skip_recent = skip_recent
+                    .map(|s| commands::update_log::parse_duration(&s))
+                    .transpose()?;
+                match name.as_deref() {
+                    None => Err(anyhow!(
+                        "specify a discourse name or 'all' (or `dsc update log`)"
+                    )),
+                    Some("all") if parallel == Some(0) => {
+                        Err(anyhow!("--parallel width must be at least 1"))
+                    }
+                    Some("all") => commands::update::update_all(
+                        &config,
+                        parallel,
+                        post_changelog,
+                        yes,
+                        force,
+                        skip_recent,
+                    ),
+                    Some(_) if parallel.is_some() => {
+                        Err(anyhow!("--parallel only applies to 'dsc update all'"))
+                    }
+                    Some(n) => commands::update::update_one(
+                        &config,
+                        n,
+                        post_changelog,
+                        yes,
+                        force,
+                        skip_recent,
+                    ),
+                }
+            }
         },
 
         Commands::Emoji {

@@ -35,6 +35,7 @@ Spec: [update-concurrency](update-concurrency.md).
 
 - [x] **Leaner `-p [N]`** - folded `-p`/`--parallel` + `-m`/`--max` into one optional-value flag (`-p` = width 3, `-p N` = N workers); `-m` dropped. Implemented (unreleased).
 - [x] **Rebuild-lock pre-flight** - skips a forum that already has a `./launcher rebuild` in flight (`pgrep -f '[l]auncher rebuild'`), *before* the reboot, so a re-run never stomps a supervised rebuild. `--force` overrides. Implemented (unreleased); verified on koloki-demo.
+- [x] ⭐ **Update log + skip-recent** - append-only TSV log of what `dsc update` did to each forum and when (`$XDG_STATE_HOME/dsc/update.log`); `dsc update log [--latest] [--since] [--format]` renders it (incl. the "Servers" checklist view). `--skip-recent [dur]` skips forums updated within a window (default 24h) so fleet re-runs don't repeat the day's work / re-reboot; interactively you're prompted up front instead. Implemented (unreleased); verified on koloki-demo. Stretch: post a summary to a home Discourse. Spec: [update-log](update-log.md)
 
 ### Content sync
 

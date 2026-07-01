@@ -67,14 +67,20 @@ pub enum Commands {
         /// Path to import input (text/CSV). Reads stdin when omitted.
         path: Option<PathBuf>,
     },
-    /// Run remote OS + Discourse update workflow for one or all Discourses.
+    /// Run remote OS + Discourse update workflow, or `dsc update log` to view history.
     #[command(visible_alias = "up")]
+    #[command(args_conflicts_with_subcommands = true)]
     #[command(after_help = "Examples:
   dsc update myforum
-  dsc update all -p   # update every forum in parallel")]
+  dsc update all -p                # update every forum in parallel
+  dsc update all --skip-recent     # skip forums updated in the last 24h
+  dsc update log --latest          # one row per forum, most recent state")]
     Update {
+        /// View the append-only update log instead of updating.
+        #[command(subcommand)]
+        command: Option<UpdateCommand>,
         /// Discourse name, or 'all' to update every configured Discourse.
-        name: String,
+        name: Option<String>,
         /// Parallel mode for `dsc update all`: `-p` runs 3 at once, `-p N`
         /// runs N. Put the forum name before `-p` (e.g. `update all -p 4`).
         #[arg(long, short = 'p', num_args = 0..=1, default_missing_value = "3", value_name = "N")]
@@ -85,10 +91,14 @@ pub enum Commands {
         /// Auto-confirm changelog posting prompt (non-interactive mode).
         #[arg(long, short = 'y')]
         yes: bool,
-        /// Update even if a `./launcher rebuild` is already running on the host
-        /// (by default such a forum is skipped, to avoid colliding).
+        /// Update even if a `./launcher rebuild` is already running on the host,
+        /// or if the forum was updated recently (skips both guards).
         #[arg(long)]
         force: bool,
+        /// Skip forums fully updated within this window (default 24h). For
+        /// unattended re-runs; interactively you're prompted about them instead.
+        #[arg(long, num_args = 0..=1, default_missing_value = "24h", value_name = "DUR")]
+        skip_recent: Option<String>,
     },
     /// Manage custom emoji.
     #[command(visible_alias = "em")]
@@ -424,6 +434,33 @@ pub enum Commands {
         #[arg(long, short = 'f', value_enum, default_value = "text")]
         format: ListFormat,
     },
+}
+
+#[derive(Subcommand)]
+pub enum UpdateCommand {
+    /// Show the update log - the append-only record of what `dsc update` did to
+    /// each forum and when.
+    Log {
+        /// Collapse to one row per forum (its most recent state).
+        #[arg(long)]
+        latest: bool,
+        /// Only entries within this window (e.g. `7d`, `24h`).
+        #[arg(long, value_name = "DUR")]
+        since: Option<String>,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: UpdateLogFormat,
+    },
+}
+
+#[derive(ValueEnum, Clone, Copy)]
+pub enum UpdateLogFormat {
+    /// Aligned columns for humans.
+    Text,
+    /// Markdown table (paste-ready).
+    Md,
+    /// One JSON object per record.
+    Json,
 }
 
 #[derive(Subcommand)]

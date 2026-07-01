@@ -26,6 +26,7 @@ pub mod tag;
 pub mod theme;
 pub mod topic;
 pub mod update;
+pub mod update_log;
 pub mod upload;
 pub mod user;
 pub mod version;

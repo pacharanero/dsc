@@ -1,11 +1,12 @@
 use crate::api::{DiscourseClient, VersionInfo};
 use crate::commands::common::{ensure_api_credentials, missing_config};
+use crate::commands::update_log::{self, LogKind};
 use crate::config::{Config, DiscourseConfig, find_discourse};
 use crate::utils::color_discourse_label;
 use anyhow::{Context, Result, anyhow};
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::blocking::Client;
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::io::{self, Write};
 use std::io::{BufRead, BufReader, IsTerminal};
 use std::process::Stdio;
@@ -14,6 +15,9 @@ use std::thread;
 use std::time::Duration;
 
 const DEFAULT_PARALLEL_UPDATE_WORKERS: usize = 3;
+/// Window for "was this forum updated recently?" when `--skip-recent` is given
+/// without a value, or for the interactive re-update prompt.
+const DEFAULT_RECENT_WINDOW: Duration = Duration::from_secs(24 * 3600);
 
 pub fn update_one(
     config: &Config,
@@ -21,16 +25,21 @@ pub fn update_one(
     post_changelog: bool,
     yes: bool,
     force: bool,
+    skip_recent: Option<Duration>,
 ) -> Result<()> {
     let discourse =
         find_discourse(config, name).ok_or_else(|| anyhow!("discourse not found: {}", name))?;
-    if let UpdateOutcome::Updated(metadata) = run_update(discourse, force)? {
-        let payload = print_update_summary(discourse, &metadata);
-        if post_changelog {
-            handle_changelog_post(discourse, &payload, yes)?;
-        }
+
+    if !force && skip_recent_single(&discourse.name, skip_recent) {
+        update_log::append(&discourse.name, LogKind::SkippedRecent, "-", "-", "-");
+        println!(
+            "{}: fully updated recently - skipping (use --force to update anyway)",
+            discourse.name
+        );
+        return Ok(());
     }
-    Ok(())
+
+    update_and_log(discourse, post_changelog, yes, force)
 }
 
 pub fn update_all(
@@ -39,31 +48,42 @@ pub fn update_all(
     post_changelog: bool,
     yes: bool,
     force: bool,
+    skip_recent: Option<Duration>,
 ) -> Result<()> {
-    let Some(width) = parallel else {
-        for discourse in &config.discourse {
-            if discourse.ssh_host.is_none() {
-                continue;
-            }
-            if let UpdateOutcome::Updated(metadata) = run_update(discourse, force)? {
-                let payload = print_update_summary(discourse, &metadata);
-                if post_changelog {
-                    handle_changelog_post(discourse, &payload, yes)?;
-                }
-            }
-        }
-        return Ok(());
-    };
-
-    let updatable: Vec<_> = config
+    let updatable: Vec<DiscourseConfig> = config
         .discourse
         .iter()
         .filter(|d| d.ssh_host.is_some())
         .cloned()
         .collect();
-    let max_threads = parallel_worker_count(Some(width), updatable.len());
+
+    // Decide (prompting if needed) which recently-updated forums to skip - up
+    // front, before any slow work, so the rest of the run is unattended.
+    let skip_set = recent_skip_set(&updatable, skip_recent, force);
+    for d in &updatable {
+        if skip_set.contains(&d.name) {
+            update_log::append(&d.name, LogKind::SkippedRecent, "-", "-", "-");
+            println!(
+                "{}: updated recently - skipping (--force to override)",
+                d.name
+            );
+        }
+    }
+    let to_update: Vec<DiscourseConfig> = updatable
+        .into_iter()
+        .filter(|d| !skip_set.contains(&d.name))
+        .collect();
+
+    let Some(width) = parallel else {
+        for discourse in &to_update {
+            update_and_log(discourse, post_changelog, yes, force)?;
+        }
+        return Ok(());
+    };
+
+    let max_threads = parallel_worker_count(Some(width), to_update.len());
     let mut handles: Vec<thread::JoinHandle<Result<()>>> = Vec::new();
-    for discourse in updatable {
+    for discourse in to_update {
         if handles.len() >= max_threads
             && let Some(handle) = handles.pop()
         {
@@ -72,13 +92,7 @@ pub fn update_all(
         let do_post = post_changelog;
         let auto_yes = yes;
         handles.push(thread::spawn(move || {
-            if let UpdateOutcome::Updated(metadata) = run_update(&discourse, force)? {
-                let payload = print_update_summary(&discourse, &metadata);
-                if do_post {
-                    handle_changelog_post(&discourse, &payload, auto_yes)?;
-                }
-            }
-            Ok::<_, anyhow::Error>(())
+            update_and_log(&discourse, do_post, auto_yes, force)
         }));
     }
 
@@ -87,6 +101,118 @@ pub fn update_all(
     }
 
     Ok(())
+}
+
+/// Run one forum's update and record the outcome (updated / current /
+/// skipped-rebuild / failed) in the update log.
+fn update_and_log(
+    discourse: &DiscourseConfig,
+    post_changelog: bool,
+    yes: bool,
+    force: bool,
+) -> Result<()> {
+    match run_update(discourse, force) {
+        Ok(UpdateOutcome::Updated(metadata)) => {
+            let kind = if metadata.discourse_rebuilt {
+                LogKind::Updated
+            } else {
+                LogKind::Current
+            };
+            update_log::append(
+                &discourse.name,
+                kind,
+                metadata.before_version.as_deref().unwrap_or("-"),
+                metadata.after_version.as_deref().unwrap_or("-"),
+                "-",
+            );
+            let payload = print_update_summary(discourse, &metadata);
+            if post_changelog {
+                handle_changelog_post(discourse, &payload, yes)?;
+            }
+            Ok(())
+        }
+        Ok(UpdateOutcome::SkippedRebuildInProgress) => {
+            update_log::append(&discourse.name, LogKind::SkippedRebuild, "-", "-", "-");
+            Ok(())
+        }
+        Err(e) => {
+            update_log::append(&discourse.name, LogKind::Failed, "-", "-", &e.to_string());
+            Err(e)
+        }
+    }
+}
+
+/// Single forum: skip it as recently updated? Explicit `--skip-recent` window
+/// skips silently; otherwise (interactive TTY) prompt.
+fn skip_recent_single(name: &str, skip_recent: Option<Duration>) -> bool {
+    match skip_recent {
+        Some(window) => update_log::updated_within(name, window),
+        None => {
+            io::stdin().is_terminal()
+                && update_log::updated_within(name, DEFAULT_RECENT_WINDOW)
+                && !prompt_yes_no(
+                    &format!("{name} was fully updated within the last 24h - update it again?"),
+                    false,
+                )
+        }
+    }
+}
+
+/// `update all`: the set of forum names to skip as recently updated. Any prompt
+/// happens here, once, before the run starts.
+fn recent_skip_set(
+    updatable: &[DiscourseConfig],
+    skip_recent: Option<Duration>,
+    force: bool,
+) -> HashSet<String> {
+    if force {
+        return HashSet::new();
+    }
+    let window = skip_recent.unwrap_or(DEFAULT_RECENT_WINDOW);
+    let recent: Vec<&str> = updatable
+        .iter()
+        .map(|d| d.name.as_str())
+        .filter(|n| update_log::updated_within(n, window))
+        .collect();
+    if recent.is_empty() {
+        return HashSet::new();
+    }
+    // Explicit --skip-recent: skip silently. No flag + interactive: prompt once.
+    // No flag + non-interactive: skip nothing (unchanged behaviour).
+    let skip_them = if skip_recent.is_some() {
+        true
+    } else if io::stdin().is_terminal() {
+        println!(
+            "These {} were fully updated within the last 24h:",
+            recent.len()
+        );
+        for n in &recent {
+            println!("  - {n}");
+        }
+        !prompt_yes_no("Update them again anyway?", false)
+    } else {
+        false
+    };
+    if skip_them {
+        recent.iter().map(|s| s.to_string()).collect()
+    } else {
+        HashSet::new()
+    }
+}
+
+fn prompt_yes_no(question: &str, default_yes: bool) -> bool {
+    let hint = if default_yes { "[Y/n]" } else { "[y/N]" };
+    print!("{question} {hint} ");
+    let _ = io::stdout().flush();
+    let mut input = String::new();
+    if io::stdin().read_line(&mut input).is_err() {
+        return default_yes;
+    }
+    match input.trim().to_ascii_lowercase().as_str() {
+        "y" | "yes" => true,
+        "n" | "no" => false,
+        _ => default_yes,
+    }
 }
 
 fn parallel_worker_count(max: Option<usize>, discourse_count: usize) -> usize {
@@ -129,6 +255,8 @@ struct UpdateMetadata {
     root_disk_usage: Option<String>,
     os_updated: bool,
     server_rebooted: bool,
+    /// Whether the Discourse rebuild actually ran (vs skipped as already current).
+    discourse_rebuilt: bool,
 }
 
 /// The result of one forum's update pass.
@@ -312,6 +440,7 @@ fn run_update(discourse: &DiscourseConfig, force: bool) -> Result<UpdateOutcome>
 
     stage(&discourse_label, "Checking if Discourse update is needed");
     let discourse_up_to_date = is_discourse_up_to_date(before_info.commit.as_deref());
+    let discourse_rebuilt = !discourse_up_to_date;
     if discourse_up_to_date {
         stage(
             &discourse_label,
@@ -390,6 +519,7 @@ fn run_update(discourse: &DiscourseConfig, force: bool) -> Result<UpdateOutcome>
         root_disk_usage,
         os_updated,
         server_rebooted,
+        discourse_rebuilt,
     }))
 }
 
