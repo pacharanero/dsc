@@ -5,6 +5,28 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.26] - 2026-07-01
+
+### Bug fixes
+
+- **completions**: Accept `powershell` as the shell value ([9a202f0](https://github.com/pacharanero/dsc/commit/9a202f03e99c822f7afc853d05020c6f27901e1c))
+
+### Build
+
+- **deps**: Bump actions/checkout from 6.0.3 to 7.0.0 ([a237efd](https://github.com/pacharanero/dsc/commit/a237efd48abb633d0e818cb50f8de48b43e1c9a0))
+
+### Documentation
+
+- **roadmap**: Park `api-key create --scope` (descoped for now) ([b0db32d](https://github.com/pacharanero/dsc/commit/b0db32d719a481d0f349ee8d1a1904aa0b4e6700))
+
+### Features
+
+- **theme**: API install (git/bundle), delete-by-id, and asset unset ([de6c161](https://github.com/pacharanero/dsc/commit/de6c161f52a032c2c450771dc505baaa3790e492))
+
+- **theme**: Field, asset, and update commands (Phase 2 + 3) ([e566363](https://github.com/pacharanero/dsc/commit/e566363677ded95c81cf483fafd30f26f50db35c))
+
+- **cli**: Add completions installer ([d4d6b9e](https://github.com/pacharanero/dsc/commit/d4d6b9e9e4cf72f30c92a623ab5536d4bd2dcb95))
+
 ## [0.10.25] - 2026-06-29
 
 ### Features
