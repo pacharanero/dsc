@@ -5,6 +5,30 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.29] - 2026-07-01
+
+### Bug fixes
+
+- **tag**: Correct delete endpoint and create-via-group ordering ([95c77b3](https://github.com/pacharanero/dsc/commit/95c77b3665d377cdd866c3528dcd16286a41673d))
+
+### Chores
+
+- **scripts**: Extract shared s/test-fmt-clippy gate ([bd4671e](https://github.com/pacharanero/dsc/commit/bd4671e29584108285e96bdb3facea2180bc8d84))
+
+### Documentation
+
+- **roadmap**: Log tag-pull group-permission id-vs-name bug ([182bea1](https://github.com/pacharanero/dsc/commit/182bea11e0c843055e65f6c090e7f595035c8dcc))
+
+- **spec**: Reorganise into two tiers (overarching + spec/commands/) ([53fbb1f](https://github.com/pacharanero/dsc/commit/53fbb1f80cf6ac056e247e2e9705462bb5224287))
+
+### Features
+
+- **category**: Definition sync — def pull/push + show/get/set ([efde940](https://github.com/pacharanero/dsc/commit/efde9408e5e58e4174102972b693715eee6a618c))
+
+- **version**: Make -v/-V/--version/-version all report the version ([aa2cc5e](https://github.com/pacharanero/dsc/commit/aa2cc5e2771c5540304b2b4e33238f5e56e596f7))
+
+- **update**: Append-only update log + skip-recently-updated ([22e977e](https://github.com/pacharanero/dsc/commit/22e977e9073c34269c5972ce8412b53237703e43))
+
 ## [0.10.28] - 2026-07-01
 
 ### Chores
