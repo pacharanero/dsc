@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "dsc-rs"
-version = "0.10.29"
+version = "0.10.30"
 dependencies = [
  "anyhow",
  "base64",

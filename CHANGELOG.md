@@ -5,6 +5,18 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.30] - 2026-07-01
+
+### CI
+
+- Add cargo audit security gate (blocking, own job) ([8a8f2c8](https://github.com/pacharanero/dsc/commit/8a8f2c8096bb9a615b391536c4ef7776062eae59))
+
+### CI / dependencies
+
+- **deps**: Clear remaining RustSec advisories (cargo audit) ([7922727](https://github.com/pacharanero/dsc/commit/7922727b693b5cf1ef1f1ec785152dfe4a39cf5c))
+
+- **deps**: Patch RustSec advisories in the reqwest TLS stack ([a439481](https://github.com/pacharanero/dsc/commit/a4394814b12d5156332cd30b66220a118fec7ee2))
+
 ## [0.10.29] - 2026-07-01
 
 ### Bug fixes
