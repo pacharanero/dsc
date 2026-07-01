@@ -5,6 +5,24 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.28] - 2026-07-01
+
+### Chores
+
+- Gitignore demo-dsc.toml ([dc191fc](https://github.com/pacharanero/dsc/commit/dc191fc386eff2e72b9f40bea196c31717e6b395))
+
+### Features
+
+- **update**: Leaner `-p [N]` + skip a forum that's already rebuilding ([a4d9ce9](https://github.com/pacharanero/dsc/commit/a4d9ce9af99578195833d47cafbbaaad54b65b08))
+
+### Tests
+
+- **update**: Update the parallel-guard test for `-p N` (was `--max`) ([ed121a7](https://github.com/pacharanero/dsc/commit/ed121a74fe7c3cdc8e917dcb34ec0f7f6d5740a2))
+
+### Spec
+
+- Dsc update refinements (leaner -p, rebuild-lock); prune roadmap ([b4fdb38](https://github.com/pacharanero/dsc/commit/b4fdb387f0315c67470dac79105a3b4a0a973ab7))
+
 ## [0.10.27] - 2026-07-01
 
 ### CI
