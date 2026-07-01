@@ -127,7 +127,10 @@ pub fn theme_install(
     };
 
     let theme = extract_theme(&result);
-    let name = theme.get("name").and_then(|v| v.as_str()).unwrap_or("(unknown)");
+    let name = theme
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("(unknown)");
     match theme.get("id").and_then(|v| v.as_u64()) {
         Some(id) => println!("{}: installed \"{}\" (theme {})", discourse.name, name, id),
         None => println!("{}: theme import completed", discourse.name),
@@ -172,7 +175,11 @@ pub fn theme_delete(
         .and_then(|v| v.as_str())
         .unwrap_or("(unknown)")
         .to_string();
-    if theme.get("default").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if theme
+        .get("default")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
         return Err(anyhow!(
             "theme {} (\"{}\") is the site default; set another theme as default before deleting it",
             theme_id,
@@ -187,7 +194,10 @@ pub fn theme_delete(
         return Ok(());
     }
     client.delete_theme(theme_id)?;
-    println!("{}: deleted theme {} (\"{}\")", discourse.name, theme_id, name);
+    println!(
+        "{}: deleted theme {} (\"{}\")",
+        discourse.name, theme_id, name
+    );
     Ok(())
 }
 
@@ -682,7 +692,8 @@ pub fn theme_setting_pull(
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
     {
-        std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating {}", parent.display()))?;
     }
     std::fs::write(&path, &content).with_context(|| format!("writing {}", path.display()))?;
 
@@ -711,8 +722,8 @@ pub fn theme_setting_push(
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
 
-    let raw =
-        std::fs::read_to_string(local_path).with_context(|| format!("reading {}", local_path.display()))?;
+    let raw = std::fs::read_to_string(local_path)
+        .with_context(|| format!("reading {}", local_path.display()))?;
     let file: ThemeSettingsFile = if is_json_path(local_path) {
         serde_json::from_str(&raw).context("parsing theme settings file as JSON")?
     } else {
@@ -729,8 +740,10 @@ pub fn theme_setting_push(
     let response = client.fetch_theme(theme_id)?;
     let theme = extract_theme(&response);
     let server = theme_setting_entries(theme);
-    let current_by_name: std::collections::HashMap<&str, &Value> =
-        server.iter().map(|e| (e.setting.as_str(), &e.value)).collect();
+    let current_by_name: std::collections::HashMap<&str, &Value> = server
+        .iter()
+        .map(|e| (e.setting.as_str(), &e.value))
+        .collect();
 
     let mut changes: Vec<(String, String, String)> = Vec::new();
     let mut unchanged = 0usize;
@@ -986,10 +999,16 @@ pub fn theme_field_pull(
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
     {
-        std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating {}", parent.display()))?;
     }
     std::fs::write(&path, value).with_context(|| format!("writing {}", path.display()))?;
-    println!("Wrote {} ({} bytes) to {}", field_spec, value.len(), path.display());
+    println!(
+        "Wrote {} ({} bytes) to {}",
+        field_spec,
+        value.len(),
+        path.display()
+    );
     Ok(())
 }
 
@@ -1011,7 +1030,10 @@ pub fn theme_field_push(
     let theme = extract_theme(&response);
 
     if let Some(rt) = git_remote_theme(theme) {
-        let url = rt.get("remote_url").and_then(|v| v.as_str()).unwrap_or("its git repo");
+        let url = rt
+            .get("remote_url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("its git repo");
         return Err(anyhow!(
             "theme {} is a git-backed remote component (from {}); its fields are owned by the \
              repo, not the site. Edit upstream and `dsc theme update`, or `dsc theme duplicate` \
@@ -1032,11 +1054,18 @@ pub fn theme_field_push(
         .with_context(|| format!("reading {}", local_path.display()))?;
 
     if new_value == old_value {
-        println!("{}: theme {} field {} unchanged", discourse.name, theme_id, field_spec);
+        println!(
+            "{}: theme {} field {} unchanged",
+            discourse.name, theme_id, field_spec
+        );
         return Ok(());
     }
     if dry_run {
-        let verb = if existing.is_some() { "update" } else { "create" };
+        let verb = if existing.is_some() {
+            "update"
+        } else {
+            "create"
+        };
         println!(
             "[dry-run] {}: would {} theme {} field {} ({} -> {} bytes)",
             discourse.name,
@@ -1165,11 +1194,7 @@ pub fn theme_asset_set(
     client.update_theme(theme_id, &body)?;
     println!(
         "{}: bound ${} on theme {} -> {} (upload {})",
-        discourse.name,
-        var_name,
-        theme_id,
-        info.url,
-        info.id
+        discourse.name, var_name, theme_id, info.url, info.id
     );
     Ok(())
 }
@@ -1213,7 +1238,10 @@ pub fn theme_asset_unset(
         }]
     });
     client.update_theme(theme_id, &body)?;
-    println!("{}: unbound ${} from theme {}", discourse.name, var_name, theme_id);
+    println!(
+        "{}: unbound ${} from theme {}",
+        discourse.name, var_name, theme_id
+    );
     Ok(())
 }
 

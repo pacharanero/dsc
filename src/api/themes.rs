@@ -131,7 +131,8 @@ impl DiscourseClient {
     /// via `POST /admin/themes/import.json` with the `bundle` multipart part.
     pub fn import_theme_bundle(&self, file: &Path) -> Result<Value> {
         let make_form = || -> Result<reqwest::blocking::multipart::Form> {
-            let bytes = std::fs::read(file).with_context(|| format!("reading {}", file.display()))?;
+            let bytes =
+                std::fs::read(file).with_context(|| format!("reading {}", file.display()))?;
             let filename = file
                 .file_name()
                 .and_then(|s| s.to_str())
@@ -140,10 +141,15 @@ impl DiscourseClient {
             let part = reqwest::blocking::multipart::Part::bytes(bytes).file_name(filename);
             Ok(reqwest::blocking::multipart::Form::new().part("bundle", part))
         };
-        let response =
-            self.send_retrying(|| Ok(self.post("/admin/themes/import.json")?.multipart(make_form()?)))?;
+        let response = self.send_retrying(|| {
+            Ok(self
+                .post("/admin/themes/import.json")?
+                .multipart(make_form()?))
+        })?;
         let status = response.status();
-        let text = response.text().context("reading theme bundle import response")?;
+        let text = response
+            .text()
+            .context("reading theme bundle import response")?;
         if !status.is_success() {
             return Err(http_error("theme bundle import request", status, &text));
         }
