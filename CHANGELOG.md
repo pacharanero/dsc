@@ -5,6 +5,28 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.27] - 2026-07-01
+
+### CI
+
+- Add push/PR CI gate; commit Cargo.lock ([2d5402f](https://github.com/pacharanero/dsc/commit/2d5402f30ac3d06c4cf81f98b2e694c6fb5d824b))
+
+### Documentation
+
+- **spec**: Extract CLI design philosophy into spec/cli-design.md ([a2ef16a](https://github.com/pacharanero/dsc/commit/a2ef16a7377b16e08ce80a133e28d594ab217dba))
+
+- **spec**: Refresh roadmap state + document core command patterns ([2dbbdda](https://github.com/pacharanero/dsc/commit/2dbbdda4807fb1679cb81d50ede0f62402738a08))
+
+### Features
+
+- **cli**: Reset SIGPIPE + structured `version --format` ([40e7f58](https://github.com/pacharanero/dsc/commit/40e7f58336b4ee2ca3581d7d98192d87af88ff90))
+
+### Styling
+
+- Clear clippy warnings so `--all-targets -- -D warnings` is clean ([f6732cc](https://github.com/pacharanero/dsc/commit/f6732ccb8a21d2aa29cea973e18b1b7ef6a78849))
+
+- **theme**: Rustfmt the theme install/import code ([b8a5118](https://github.com/pacharanero/dsc/commit/b8a511888c6a2be0047f8a1325d4c101afd864f4))
+
 ## [0.10.26] - 2026-07-01
 
 ### Bug fixes
