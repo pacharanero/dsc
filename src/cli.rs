@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "dsc")]
+#[command(version)]
 #[command(about = "Discourse CLI", long_about = None)]
 #[command(next_display_order = None)]
 pub struct Cli {

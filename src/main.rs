@@ -75,6 +75,15 @@ fn reset_sigpipe() {}
 
 fn main() -> Result<()> {
     reset_sigpipe();
+    // Any obvious attempt to get the version should be helpful. clap wires
+    // `-V` / `--version` (via `#[command(version)]`); also treat a lone
+    // lowercase `-v` / `-version` / `--v` as a version request rather than
+    // letting it fall through to an "unexpected argument" error.
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() == 2 && matches!(args[1].as_str(), "-v" | "-version" | "--v") {
+        println!("dsc {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     let cli = Cli::parse();
     let config_source = resolve_config_source(cli.config)?;
     let config_path = config_source.path().to_path_buf();
