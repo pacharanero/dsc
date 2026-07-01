@@ -1,4 +1,3 @@
-use common::*;
 mod common;
 use common::*;
 use dsc::api::DiscourseClient;

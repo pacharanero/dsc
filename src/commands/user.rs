@@ -670,6 +670,9 @@ mod tests {
     }
 }
 
+// A command handler whose parameters map 1:1 to CLI inputs; bundling them into
+// a struct would just move the list without adding clarity.
+#[allow(clippy::too_many_arguments)]
 pub fn user_create(
     config: &Config,
     discourse_name: &str,

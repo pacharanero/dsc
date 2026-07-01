@@ -1,3 +1,7 @@
+// Shared test helpers - each test binary pulls in the whole module but uses
+// only some helpers, so allow dead code rather than cfg-gate every item.
+#![allow(dead_code)]
+
 use dsc::api::DiscourseClient;
 use dsc::config::DiscourseConfig;
 use serde::Deserialize;

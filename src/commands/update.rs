@@ -767,9 +767,7 @@ fn is_discourse_up_to_date(running_commit: Option<&str>) -> bool {
 }
 
 fn format_commit_link(commit: Option<&str>) -> Option<String> {
-    let Some(commit) = commit else {
-        return None;
-    };
+    let commit = commit?;
     let trimmed = commit.trim();
     if trimmed.is_empty() {
         return None;

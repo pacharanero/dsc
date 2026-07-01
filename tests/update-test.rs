@@ -142,10 +142,10 @@ fn wait_for_marker(client: &DiscourseClient, topic_id: u64, marker: &str) -> boo
 fn wait_for_post_marker(client: &DiscourseClient, post_id: u64, marker: &str) -> bool {
     let max_attempts = 10;
     for _ in 0..max_attempts {
-        if let Ok(Some(raw)) = client.fetch_post_raw(post_id) {
-            if raw.contains(marker) {
-                return true;
-            }
+        if let Ok(Some(raw)) = client.fetch_post_raw(post_id)
+            && raw.contains(marker)
+        {
+            return true;
         }
         std::thread::sleep(Duration::from_secs(1));
     }

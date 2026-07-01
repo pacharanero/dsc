@@ -383,9 +383,7 @@ fn build_report(
 }
 
 fn build_growth(cache: &ReportCache, n: usize) -> Vec<Metric> {
-    let mut out = Vec::new();
-
-    out.push(
+    vec![
         Metric::new(
             "new contributors",
             "new_contributors",
@@ -394,8 +392,6 @@ fn build_growth(cache: &ReportCache, n: usize) -> Vec<Metric> {
             n,
         )
         .with_values(totals_for(cache, "new_contributors", n)),
-    );
-    out.push(
         Metric::new(
             "reactivated users",
             "reactivated_users",
@@ -404,8 +400,6 @@ fn build_growth(cache: &ReportCache, n: usize) -> Vec<Metric> {
             n,
         )
         .stub(),
-    );
-    out.push(
         Metric::new(
             "lost regulars",
             "lost_regulars",
@@ -414,8 +408,6 @@ fn build_growth(cache: &ReportCache, n: usize) -> Vec<Metric> {
             n,
         )
         .stub(),
-    );
-    out.push(
         Metric::new(
             "net active change",
             "net_active_change",
@@ -424,8 +416,6 @@ fn build_growth(cache: &ReportCache, n: usize) -> Vec<Metric> {
             n,
         )
         .stub(),
-    );
-    out.push(
         Metric::new(
             "trust-level promotions",
             "trust_level_promotions",
@@ -434,9 +424,7 @@ fn build_growth(cache: &ReportCache, n: usize) -> Vec<Metric> {
             n,
         )
         .with_values(totals_for(cache, "trust_level_growth", n)),
-    );
-
-    out
+    ]
 }
 
 fn build_activity(cache: &ReportCache, n: usize) -> Vec<Metric> {
@@ -641,13 +629,13 @@ fn render_text(report: &AnalyticsReport) -> Result<()> {
         let val_w = column_widths(metrics, cols);
         for m in metrics {
             print!("  {}", pad_right(&m.label, label_w));
-            for c in 0..cols {
+            for (c, w) in val_w.iter().enumerate() {
                 let s = format_value(
                     m.values.get(c).copied().flatten(),
                     m.unit,
                     m.not_implemented,
                 );
-                print!("  {}", right_align(&s, val_w[c]));
+                print!("  {}", right_align(&s, *w));
             }
             if compare_mode {
                 let pct = m
@@ -712,13 +700,13 @@ fn render_table(report: &AnalyticsReport) -> Result<()> {
 
         for m in metrics {
             print!("│ {} ", pad_right(&m.label, label_w));
-            for c in 0..cols {
+            for (c, w) in col_w.iter().enumerate() {
                 let s = format_value(
                     m.values.get(c).copied().flatten(),
                     m.unit,
                     m.not_implemented,
                 );
-                print!("│ {} ", right_align(&s, col_w[c]));
+                print!("│ {} ", right_align(&s, *w));
             }
             if compare_mode {
                 let pct = m
