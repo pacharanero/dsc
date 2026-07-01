@@ -28,6 +28,7 @@ Specs marked ⭐ are **field-driven** - they came from real-world use and are in
 - [x] ⭐ **`dsc topic pull --full`** - full-thread Markdown snapshot with YAML frontmatter and per-post headings; batch-fetches via `/t/{id}/posts.json?post_ids[]=…`. Spec: [spec/topic-pull-full-thread.md](topic-pull-full-thread.md). Phase 2 (`--since`, `--format json`) still planned.
 - [x] ⭐ **Fix `dsc user list` parse failure on negative IDs** - Discourse's built-in `system`/`discobot` accounts use IDs `-1`/`-2`, which broke deserialisation on any listing page that contained them. Widened `UserSummary.id`, `UserDetail.id`, and every user-action helper signature from `u64` to `i64`. Spec: [spec/user-list-negative-ids.md](user-list-negative-ids.md). Regression-tested.
 
+- [x] **`dsc completions install`** (v0.10.26) - detects the shell, writes the correctly-named completion file to the standard user dir, and prints any one-time setup; adds PowerShell alongside bash/zsh/fish. `dsc completions <shell>` (stdout) and `--dir` (packaging) retained.
 - [x] ⭐ **`dsc topic title` + `dsc topic tags`** - rename a topic and set its full tag list atomically (both `PUT /t/{id}.json`). Field-driven by the `forum.rcpch.tech/c/playbook` migration, where 15 bulk-created topics had slug-derived titles. Reserved-slug `403` surfaced clearly; both honour `--dry-run`. Spec: [spec/topic-title-and-tags.md](topic-title-and-tags.md). (Note: the spec's "title from front matter on `category push` create" is already satisfied - `category push` prefers the front-matter `title` when creating.)
 
 ## In progress
@@ -38,7 +39,7 @@ _(nothing currently in progress)_
 
 Polish items to land before announcing on [meta.discourse.org](https://meta.discourse.org). Most are small but cumulatively shift perception from "promising 0.x" to "stable, take it seriously."
 
-- [ ] **Bump to 1.0.0** with a written back-compat policy. State: "the CLI surface documented in `dsc --help` is stable; flags will not be removed without a deprecation cycle." The current 0.x signal undersells the project's maturity (181 lib tests + e2e suites, 5-target prebuilt distribution, 9 months of consistent shipping).
+- [ ] **Bump to 1.0.0** with a written back-compat policy. State: "the CLI surface documented in `dsc --help` is stable; flags will not be removed without a deprecation cycle." The current 0.x signal undersells the project's maturity (213 lib tests + e2e suites, 5-target prebuilt distribution, 9 months of consistent shipping).
 - [x] **Generate `CHANGELOG.md`** - [git-cliff](https://github.com/orhun/git-cliff) configured via [cliff.toml](../cliff.toml); full history (back to first conventional commit) backfilled into [CHANGELOG.md](../CHANGELOG.md). `s/version++` now refreshes it automatically on each bump. `cargo-dist` picks it up for the GitHub Release body.
 - [x] **CLI consistency audit** against [spec/spec.md](spec.md):
   - Format baseline: all 20 list commands accept `--format text|json|yaml` (fully compliant).
@@ -58,7 +59,7 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 
 ## Planned
 
-- [ ] ⭐ **`category pull/push` workflow gaps + silent push** — five gaps; phases 1–4 + 6 implemented (unreleased). Only Phase 5 (MkDocs↔Discourse content conversion) remains. Spec: [spec/category-workflow.md](category-workflow.md)
+- [ ] ⭐ **`category pull/push` workflow gaps + silent push** — five gaps; phases 1–4 + 6 shipped. Only Phase 5 (MkDocs↔Discourse content conversion) remains. Spec: [spec/category-workflow.md](category-workflow.md)
   - [x] Phase 1: `category pull` writes YAML front matter (`title`, `topic_id`, `url`, `pulled_at`) + `strip_frontmatter()` in `utils.rs`
   - [x] Phase 2: `category push` routes by front-matter `topic_id`; strips front matter before sending body (also `topic push`)
   - [x] Phase 3: working `--dry-run` for `category push` with `~`/`+`/`=` output
@@ -76,14 +77,14 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 
 - [x] ⭐ **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Phases 1-3 implemented; only small API-parity gaps left (delete/install by API). Spec: [spec/theme-management.md](theme-management.md)
   - [x] Phase 1: `dsc theme setting` (get/set/list) + `dsc theme enable|disable|attach|detach`
-  - [x] Phase 2 (field-required): `dsc theme setting pull/push` - file-based edit of component settings; JSON-list `header_links`/`dropdown_links` expand to editable arrays, push PUTs only changed keys (semantic compare). Implemented (unreleased, v0.10.25); verified against ACCM Dropdown Header
-  - [x] Phase 2: `dsc theme field list/pull/push` (raw SCSS/HTML fields; git-backed remotes refused on push) + `dsc theme asset list/set` (upload + bind `theme_upload_var`). Implemented (unreleased); shapes confirmed live on koloki-demo
-  - [x] Phase 3: `dsc theme show` + `dsc theme update` (git-backed remote refresh via `remote_check`/`remote_update`, `--check` to preview). Both done
-  - [x] API `theme install` (git URL incl. private-via-URL creds, or local `.tar.gz`/zip bundle), `theme delete <id>` (refuses site default), and `theme asset unset`. Implemented (unreleased); verified live on koloki-demo. Theme tooling now feature-complete bar a cross-instance settings diff
+  - [x] Phase 2 (field-required): `dsc theme setting pull/push` - file-based edit of component settings; JSON-list `header_links`/`dropdown_links` expand to editable arrays, push PUTs only changed keys (semantic compare). Shipped v0.10.25; verified against ACCM Dropdown Header
+  - [x] Phase 2: `dsc theme field list/pull/push` (raw SCSS/HTML fields; git-backed remotes refused on push) + `dsc theme asset list/set` (upload + bind `theme_upload_var`). Shipped v0.10.26; shapes confirmed live on koloki-demo
+  - [x] Phase 3: `dsc theme show` + `dsc theme update` (git-backed remote refresh via `remote_check`/`remote_update`, `--check` to preview). Both shipped
+  - [x] API `theme install` (git URL incl. private-via-URL creds, or local `.tar.gz`/zip bundle), `theme delete <id>` (refuses site default), and `theme asset unset`. Shipped v0.10.26; verified live on koloki-demo. Theme tooling now feature-complete bar a cross-instance settings diff
 - [x] **`dsc sar <discourse> <user>`** - one-shot Subject Access Request export (Phase 1, single forum). Gathers admin PII, authored posts (full raw), likes, and group memberships into a reviewable bundle with a `README.md` cover sheet (controller checklist + Article 15 template) and `manifest.json` flagging what needs human review. Private messages are opt-in (`--messages`) with a REVIEW REQUIRED banner. `<user>` is a username or email. Honest scope: automates data-gathering, not the legal judgement. Driver: NHS/medical-adjacent forums with real SAR obligations. Spec: [spec/subject-access-request.md](subject-access-request.md). Phase 2 (zip, combined doc, staff notes) on demand; multi-forum deliberately out of scope.
 - [ ] **`dsc chat`** - Discourse Chat is core now and the API is there. Subcommands: `chat channels`, `chat send <discourse> <channel> [<file>]`, `chat fetch <channel> [--since …]`. Mirrors the existing `dsc topic`/`pm` split.
 - [ ] ⭐ **`dsc backup setup-s3 <discourse>`** - provision an S3 backup bucket + a dedicated single-bucket IAM user/policy and point Discourse at it, replacing a ~15-step AWS-console runbook done per-forum across the fleet since 2023. Field-driven; carries the policy JSON + `aws s3api`/`aws iam` signatures. Spec: [spec/backup-s3-setup.md](backup-s3-setup.md)
-  - [x] Phase 1: end-to-end create flow via the `aws` CLI + complete offline `--dry-run` + pre-flight (implemented, unreleased)
+  - [x] Phase 1: end-to-end create flow via the `aws` CLI + complete offline `--dry-run` + pre-flight (shipped; enable-last ordering verified on ACCM)
   - [ ] Phase 2: `--reuse-user` (idempotent re-run / key rotation), `--use-iam-profile`, `--all`/`--tags`
   - [ ] Phase 3: native AWS SDK backend, `--retention` lifecycle, `dsc backup status`
 - [ ] **`dsc install <name> --host <host>`** - declarative Discourse provisioning on a `dsc harden`-prepared box. Spec: [spec/install.md](install.md). Includes: templated `app.yml`, `launcher bootstrap + start`, polls `/about.json` until ready, appends the new install to `dsc.toml`. Companion to `dsc harden` (the substrate) and `dsc update` (the steady-state).
@@ -124,7 +125,7 @@ Speculative ideas. Build only if real demand surfaces; none are required for 1.0
 
 ## Out of scope / removed
 
-- ~~Shell completion regeneration~~ - `completions/` is gitignored and `dsc completions <shell> -d ./completions` regenerates on demand. Not a release-tracked item.
+- ~~Shell completion *regeneration* as a tracked item~~ - `completions/` is gitignored and regenerates on demand. Superseded by a real feature: `dsc completions install` (v0.10.26) detects the shell, writes the correctly-named file, and prints any one-time setup, plus PowerShell support - see the Completed list.
 - ~~`dsc user password change`~~ - dropped. Discourse's API doesn't expose an admin "set this password directly" endpoint on purpose (admins shouldn't know user passwords). `dsc user password-reset` covers the operational need.
 - ~~`dsc user anonymize`~~ - dropped. Rare enough that the Admin UI is fine; not worth the destructive-confirmation UX.
 - ~~`api-key create --scope <scopes>`~~ - **parked 2026-06-29** (not dropped - revisit on demand). Scoped admin keys are low-value *for `dsc`*: nearly everything it does needs admin scope, so a scoped key only helps downstream consumers (a bot, CI) - which can be issued one from the admin UI - and the bootstrap key `dsc` itself uses is full-admin regardless. Also blocked on an unconfirmed scoped-key `POST /admin/api/keys.json` body (nested `key[scopes][][resource_name]` / `[action]`), so building blind risks minting broken keys. The existing full-admin `dsc api-key create` (all-users or single-user) stays - handy for proactive rotation, but a convenience for the already-bootstrapped, never a bootstrap (a key that's already broken still needs the UI/console). Revisit if the field session captures the body and a concrete least-privilege consumer appears.
