@@ -76,9 +76,11 @@ fi
 # Render the in-progress changelog section under the new tag + date.
 git-cliff --tag "$tag" -o CHANGELOG.md
 
-# Commit the release, THEN tag it (so the tag contains the bump). Cargo.lock is
-# gitignored, so only these two files make the commit.
-git add Cargo.toml CHANGELOG.md
+# Sync Cargo.lock's own version to the bump (workspace members only, external
+# deps untouched), then commit the release and tag it AFTER the commit (so the
+# tag contains the bump).
+cargo update --workspace >/dev/null 2>&1 || true
+git add Cargo.toml Cargo.lock CHANGELOG.md
 git commit -m "chore(release): $tag"
 git tag -a "$tag" -m "Release $tag"
 
