@@ -55,14 +55,21 @@ if ! command -v git-cliff >/dev/null 2>&1; then
   exit 1
 fi
 
-# Pre-release gate. dsc has no CI workflow gating `main` (only docs + the
-# tag-triggered release run there), so the release itself is the gate: never
-# ship code that isn't formatted or whose unit tests fail. Runs before anything
-# is modified, so a failure aborts cleanly. --lib only: fast, deterministic,
-# and no network - the e2e suite hits live forums and isn't a release gate.
-echo "Pre-release checks: rustfmt + unit tests..."
+# Pre-release gate: mirror the CI checks (.github/workflows/ci.yml) locally so we
+# never cut and push a release that CI would then reject *after* the tag has
+# already triggered the irreversible release. Runs before anything is modified,
+# so a failure aborts cleanly.
+#
+# The full `cargo test` (not just --lib) is the point: integration tests in
+# tests/ shell out to the binary and only fail at runtime, so `--lib` misses
+# them - which is how a broken flag test once slipped past into CI. Pointing
+# TEST_DSC_CONFIG at an unreadable path makes the live-forum e2e tests skip
+# (they gate on that config) exactly as they do in CI, while the offline
+# integration tests still run - so the gate never touches a live forum.
+echo "Pre-release checks (mirror CI): fmt + clippy + full test suite..."
 cargo fmt --all --check
-cargo test --lib --quiet
+cargo clippy --all-targets -- -D warnings
+TEST_DSC_CONFIG=/dev/null/disable-e2e cargo test --quiet
 
 cargo set-version --bump "$bump"
 version="$(awk -F\" '/^version = / {print $2; exit}' Cargo.toml)"
