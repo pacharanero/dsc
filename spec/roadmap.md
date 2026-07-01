@@ -74,11 +74,12 @@ Polish items to land before announcing on [meta.discourse.org](https://meta.disc
 
 ### New command surfaces
 
-- [ ] ⭐ **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Phase 1 implemented (unreleased). Spec: [spec/theme-management.md](theme-management.md)
+- [x] ⭐ **Theme management gaps** - component settings, enable/disable + attach/detach, per-field editing, asset binding, `theme show`/`theme update`. Phases 1-3 implemented; only small API-parity gaps left (delete/install by API). Spec: [spec/theme-management.md](theme-management.md)
   - [x] Phase 1: `dsc theme setting` (get/set/list) + `dsc theme enable|disable|attach|detach`
   - [x] Phase 2 (field-required): `dsc theme setting pull/push` - file-based edit of component settings; JSON-list `header_links`/`dropdown_links` expand to editable arrays, push PUTs only changed keys (semantic compare). Implemented (unreleased, v0.10.25); verified against ACCM Dropdown Header
-  - [ ] Phase 2: `dsc theme field pull/push` + `dsc theme asset set/list`
-  - [ ] Phase 3: `dsc theme show` ✅ + `dsc theme update` (remote component refresh) — `theme show` done, `theme update` planned
+  - [x] Phase 2: `dsc theme field list/pull/push` (raw SCSS/HTML fields; git-backed remotes refused on push) + `dsc theme asset list/set` (upload + bind `theme_upload_var`). Implemented (unreleased); shapes confirmed live on koloki-demo
+  - [x] Phase 3: `dsc theme show` + `dsc theme update` (git-backed remote refresh via `remote_check`/`remote_update`, `--check` to preview). Both done
+  - [ ] Remaining theme gaps (small, known API shapes): API `theme delete <id>` (deletion is SSH-by-name only), API `theme install` (`POST /admin/themes/import.json`, SSH-only today)
 - [x] **`dsc sar <discourse> <user>`** - one-shot Subject Access Request export (Phase 1, single forum). Gathers admin PII, authored posts (full raw), likes, and group memberships into a reviewable bundle with a `README.md` cover sheet (controller checklist + Article 15 template) and `manifest.json` flagging what needs human review. Private messages are opt-in (`--messages`) with a REVIEW REQUIRED banner. `<user>` is a username or email. Honest scope: automates data-gathering, not the legal judgement. Driver: NHS/medical-adjacent forums with real SAR obligations. Spec: [spec/subject-access-request.md](subject-access-request.md). Phase 2 (zip, combined doc, staff notes) on demand; multi-forum deliberately out of scope.
 - [ ] **`dsc chat`** - Discourse Chat is core now and the API is there. Subcommands: `chat channels`, `chat send <discourse> <channel> [<file>]`, `chat fetch <channel> [--since …]`. Mirrors the existing `dsc topic`/`pm` split.
 - [ ] ⭐ **`dsc backup setup-s3 <discourse>`** - provision an S3 backup bucket + a dedicated single-bucket IAM user/policy and point Discourse at it, replacing a ~15-step AWS-console runbook done per-forum across the fleet since 2023. Field-driven; carries the policy JSON + `aws s3api`/`aws iam` signatures. Spec: [spec/backup-s3-setup.md](backup-s3-setup.md)

@@ -703,6 +703,58 @@ fn main() -> Result<()> {
                 false,
                 dry_run,
             ),
+            ThemeCommand::Field { command } => match command {
+                ThemeFieldCommand::List {
+                    discourse,
+                    theme_id,
+                    format,
+                } => commands::theme::theme_field_list(&config, &discourse, theme_id, format),
+                ThemeFieldCommand::Pull {
+                    discourse,
+                    theme_id,
+                    field,
+                    local_path,
+                } => commands::theme::theme_field_pull(
+                    &config,
+                    &discourse,
+                    theme_id,
+                    &field,
+                    local_path.as_deref(),
+                ),
+                ThemeFieldCommand::Push {
+                    discourse,
+                    theme_id,
+                    field,
+                    local_path,
+                } => commands::theme::theme_field_push(
+                    &config,
+                    &discourse,
+                    theme_id,
+                    &field,
+                    &local_path,
+                    dry_run,
+                ),
+            },
+            ThemeCommand::Asset { command } => match command {
+                ThemeAssetCommand::List {
+                    discourse,
+                    theme_id,
+                    format,
+                } => commands::theme::theme_asset_list(&config, &discourse, theme_id, format),
+                ThemeAssetCommand::Set {
+                    discourse,
+                    theme_id,
+                    name,
+                    file,
+                } => commands::theme::theme_asset_set(
+                    &config, &discourse, theme_id, &name, &file, dry_run,
+                ),
+            },
+            ThemeCommand::Update {
+                discourse,
+                theme_id,
+                check,
+            } => commands::theme::theme_update(&config, &discourse, theme_id, check, dry_run),
             ThemeCommand::Palette { command } => run_palette(&config, command),
         },
 

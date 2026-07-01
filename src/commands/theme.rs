@@ -704,6 +704,473 @@ pub fn theme_setting_push(
     Ok(())
 }
 
+// ─── theme field (raw theme_fields: SCSS, head_tag, ...) ───────────────────
+
+#[derive(Debug, Serialize)]
+struct ThemeFieldEntry {
+    field: String,
+    #[serde(rename = "type")]
+    kind: String,
+    bytes: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    upload_url: Option<String>,
+}
+
+/// Discourse `ThemeField` type ids (see `ThemeField.types`).
+fn field_type_label(type_id: i64) -> &'static str {
+    match type_id {
+        0 => "html",
+        1 => "scss",
+        2 => "upload",
+        3 => "yaml",
+        4 => "js",
+        _ => "other",
+    }
+}
+
+/// Sensible file extension for a pulled field body.
+fn field_extension(type_id: i64) -> &'static str {
+    match type_id {
+        1 => "scss",
+        0 => "html",
+        3 => "yaml",
+        4 => "js",
+        _ => "txt",
+    }
+}
+
+/// Best-effort `type_id` for a *new* field from its name (only used when the
+/// field doesn't already exist server-side; the normal edit path reuses the
+/// existing field's type).
+fn infer_type_id(name: &str) -> i64 {
+    if name.contains("scss") || name == "color_definitions" {
+        1
+    } else if name.ends_with("js") {
+        4
+    } else if name == "yaml" || name == "settings" {
+        3
+    } else {
+        0
+    }
+}
+
+/// Split a `target/name` field spec. A spec with no `/` is treated as a bare
+/// name with an empty target (some fields have no target).
+fn split_target_name(spec: &str) -> (String, String) {
+    match spec.split_once('/') {
+        Some((t, n)) => (t.to_string(), n.to_string()),
+        None => (String::new(), spec.to_string()),
+    }
+}
+
+fn find_theme_field<'a>(theme: &'a Value, target: &str, name: &str) -> Option<&'a Value> {
+    theme
+        .get("theme_fields")
+        .and_then(|v| v.as_array())?
+        .iter()
+        .find(|f| {
+            f.get("name").and_then(|v| v.as_str()) == Some(name)
+                && f.get("target").and_then(|v| v.as_str()).unwrap_or("") == target
+        })
+}
+
+/// The `remote_theme` object, but only when it's a git-backed remote (the case
+/// where the DB is not the source of truth and where `theme update` applies).
+fn git_remote_theme(theme: &Value) -> Option<&Value> {
+    let rt = theme.get("remote_theme").filter(|v| !v.is_null())?;
+    rt.get("is_git")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+        .then_some(rt)
+}
+
+fn short_hash(h: &str) -> String {
+    h.chars().take(8).collect()
+}
+
+fn theme_field_entries(theme: &Value) -> Vec<ThemeFieldEntry> {
+    theme
+        .get("theme_fields")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|f| {
+                    let name = f.get("name").and_then(|v| v.as_str())?;
+                    let target = f.get("target").and_then(|v| v.as_str()).unwrap_or("");
+                    let type_id = f.get("type_id").and_then(|v| v.as_i64()).unwrap_or(-1);
+                    let value = f.get("value").and_then(|v| v.as_str()).unwrap_or("");
+                    let field = if target.is_empty() {
+                        name.to_string()
+                    } else {
+                        format!("{}/{}", target, name)
+                    };
+                    Some(ThemeFieldEntry {
+                        field,
+                        kind: field_type_label(type_id).to_string(),
+                        bytes: value.len(),
+                        upload_url: f
+                            .get("url")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| !s.is_empty())
+                            .map(str::to_string),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// List a theme's editable fields (`target/name`, type, size).
+pub fn theme_field_list(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    format: ListFormat,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let entries = theme_field_entries(theme);
+    match format {
+        ListFormat::Text => {
+            if entries.is_empty() {
+                println!("No editable fields for theme {}.", theme_id);
+                return Ok(());
+            }
+            for e in &entries {
+                match &e.upload_url {
+                    Some(url) => println!("{}  ({}, upload -> {})", e.field, e.kind, url),
+                    None => println!("{}  ({}, {} bytes)", e.field, e.kind, e.bytes),
+                }
+            }
+        }
+        ListFormat::Json => println!("{}", serde_json::to_string_pretty(&entries)?),
+        ListFormat::Yaml => println!("{}", serde_yaml::to_string(&entries)?),
+    }
+    Ok(())
+}
+
+/// Pull one field's body (e.g. `common/scss`) to a local file.
+pub fn theme_field_pull(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    field_spec: &str,
+    local_path: Option<&Path>,
+) -> Result<()> {
+    let (target, name) = split_target_name(field_spec);
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let field = find_theme_field(theme, &target, &name).ok_or_else(|| {
+        anyhow!(
+            "theme {} has no field `{}` (see `dsc theme field list {}`)",
+            theme_id,
+            field_spec,
+            discourse_name
+        )
+    })?;
+    let type_id = field.get("type_id").and_then(|v| v.as_i64()).unwrap_or(-1);
+    if type_id == 2 {
+        return Err(anyhow!(
+            "`{}` is an upload var, not a text field; use `dsc theme asset`",
+            field_spec
+        ));
+    }
+    let value = field.get("value").and_then(|v| v.as_str()).unwrap_or("");
+
+    let path = match local_path {
+        Some(p) => p.to_path_buf(),
+        None => {
+            let base = if target.is_empty() {
+                name.clone()
+            } else {
+                format!("{}-{}", target, name)
+            };
+            std::env::current_dir()
+                .context("getting current directory")?
+                .join(format!("{}.{}", base, field_extension(type_id)))
+        }
+    };
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+    }
+    std::fs::write(&path, value).with_context(|| format!("writing {}", path.display()))?;
+    println!("Wrote {} ({} bytes) to {}", field_spec, value.len(), path.display());
+    Ok(())
+}
+
+/// Push a local file back to one field. Refuses git-backed remote themes, where
+/// the repo (not the DB) owns the field.
+pub fn theme_field_push(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    field_spec: &str,
+    local_path: &Path,
+    dry_run: bool,
+) -> Result<()> {
+    let (target, name) = split_target_name(field_spec);
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+
+    if let Some(rt) = git_remote_theme(theme) {
+        let url = rt.get("remote_url").and_then(|v| v.as_str()).unwrap_or("its git repo");
+        return Err(anyhow!(
+            "theme {} is a git-backed remote component (from {}); its fields are owned by the \
+             repo, not the site. Edit upstream and `dsc theme update`, or `dsc theme duplicate` \
+             it first to get an editable copy.",
+            theme_id,
+            url
+        ));
+    }
+
+    let existing = find_theme_field(theme, &target, &name);
+    let type_id = existing
+        .and_then(|f| f.get("type_id").and_then(|v| v.as_i64()))
+        .unwrap_or_else(|| infer_type_id(&name));
+    let old_value = existing
+        .and_then(|f| f.get("value").and_then(|v| v.as_str()))
+        .unwrap_or("");
+    let new_value = std::fs::read_to_string(local_path)
+        .with_context(|| format!("reading {}", local_path.display()))?;
+
+    if new_value == old_value {
+        println!("{}: theme {} field {} unchanged", discourse.name, theme_id, field_spec);
+        return Ok(());
+    }
+    if dry_run {
+        let verb = if existing.is_some() { "update" } else { "create" };
+        println!(
+            "[dry-run] {}: would {} theme {} field {} ({} -> {} bytes)",
+            discourse.name,
+            verb,
+            theme_id,
+            field_spec,
+            old_value.len(),
+            new_value.len()
+        );
+        return Ok(());
+    }
+
+    // A single-entry `theme_fields` array upserts just this field, leaving the
+    // theme's other fields untouched.
+    let body = json!({
+        "theme_fields": [{ "target": target, "name": name, "value": new_value, "type_id": type_id }]
+    });
+    client.update_theme(theme_id, &body)?;
+    println!(
+        "{}: updated theme {} field {} ({} bytes)",
+        discourse.name,
+        theme_id,
+        field_spec,
+        new_value.len()
+    );
+    Ok(())
+}
+
+// ─── theme asset (upload + bind a theme_upload_var) ────────────────────────
+
+#[derive(Debug, Serialize)]
+struct ThemeAssetEntry {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filename: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
+}
+
+/// List a theme's bound upload assets (the `$var` uploads).
+pub fn theme_asset_list(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    format: ListFormat,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let assets: Vec<ThemeAssetEntry> = theme
+        .get("theme_fields")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter(|f| f.get("type_id").and_then(|v| v.as_i64()) == Some(2))
+                .filter_map(|f| {
+                    let name = f.get("name").and_then(|v| v.as_str())?.to_string();
+                    Some(ThemeAssetEntry {
+                        name,
+                        filename: f
+                            .get("filename")
+                            .and_then(|v| v.as_str())
+                            .map(str::to_string),
+                        url: f.get("url").and_then(|v| v.as_str()).map(str::to_string),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    match format {
+        ListFormat::Text => {
+            if assets.is_empty() {
+                println!("No upload assets bound to theme {}.", theme_id);
+                return Ok(());
+            }
+            for a in &assets {
+                println!(
+                    "${}  {}  {}",
+                    a.name,
+                    a.filename.as_deref().unwrap_or(""),
+                    a.url.as_deref().unwrap_or("")
+                );
+            }
+        }
+        ListFormat::Json => println!("{}", serde_json::to_string_pretty(&assets)?),
+        ListFormat::Yaml => println!("{}", serde_yaml::to_string(&assets)?),
+    }
+    Ok(())
+}
+
+/// Upload a file and bind it to a theme upload var (`$name`) in one step.
+pub fn theme_asset_set(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    var_name: &str,
+    file: &Path,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    if dry_run {
+        println!(
+            "[dry-run] {}: would upload {} and bind it to theme {} as ${}",
+            discourse.name,
+            file.display(),
+            theme_id,
+            var_name
+        );
+        return Ok(());
+    }
+    let info = client.upload_file(file, "theme")?;
+    // Upload vars live on the `common` target.
+    let body = json!({
+        "theme_fields": [{
+            "target": "common",
+            "name": var_name,
+            "type_id": 2,
+            "upload_id": info.id,
+            "value": ""
+        }]
+    });
+    client.update_theme(theme_id, &body)?;
+    println!(
+        "{}: bound ${} on theme {} -> {} (upload {})",
+        discourse.name,
+        var_name,
+        theme_id,
+        info.url,
+        info.id
+    );
+    Ok(())
+}
+
+// ─── theme update (remote/git-backed component refresh) ────────────────────
+
+/// Pull a git-backed remote component to its latest upstream commit. With
+/// `check`, only report how far behind it is without pulling.
+pub fn theme_update(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    check: bool,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let rt = git_remote_theme(theme).ok_or_else(|| {
+        anyhow!(
+            "theme {} is not a git-backed remote component; nothing to update \
+             (locally-authored themes have no upstream to pull from)",
+            theme_id
+        )
+    })?;
+    let remote_url = rt
+        .get("remote_url")
+        .and_then(|v| v.as_str())
+        .unwrap_or("its upstream")
+        .to_string();
+    let before = rt
+        .get("local_version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    if check || dry_run {
+        // Refresh the upstream comparison without pulling.
+        let resp = client.put_theme_flag(theme_id, "remote_check")?;
+        let behind = git_remote_theme(extract_theme(&resp))
+            .and_then(|r| r.get("commits_behind").and_then(|v| v.as_i64()))
+            .unwrap_or(0);
+        if behind > 0 {
+            println!(
+                "{}: theme {} is {} commit{} behind {} (run `dsc theme update {} {}` to pull)",
+                discourse.name,
+                theme_id,
+                behind,
+                if behind == 1 { "" } else { "s" },
+                remote_url,
+                discourse_name,
+                theme_id
+            );
+        } else {
+            println!(
+                "{}: theme {} is up to date with {}",
+                discourse.name, theme_id, remote_url
+            );
+        }
+        return Ok(());
+    }
+
+    let resp = client.put_theme_flag(theme_id, "remote_update")?;
+    let after = git_remote_theme(extract_theme(&resp))
+        .and_then(|r| r.get("local_version").and_then(|v| v.as_str()))
+        .unwrap_or("")
+        .to_string();
+    if !after.is_empty() && after != before {
+        println!(
+            "{}: updated theme {} {} -> {}",
+            discourse.name,
+            theme_id,
+            short_hash(&before),
+            short_hash(&after)
+        );
+    } else {
+        println!(
+            "{}: theme {} already up to date ({})",
+            discourse.name,
+            theme_id,
+            short_hash(&after)
+        );
+    }
+    Ok(())
+}
+
 /// Enable or disable a theme/component (`PUT /admin/themes/:id.json` toggling
 /// the `enabled` boolean).
 pub fn theme_set_enabled(
@@ -1093,6 +1560,93 @@ mod tests {
         assert_eq!(describe_change("split", "left"), "split -> left");
         let long = "x".repeat(200);
         assert!(describe_change(&long, &long).starts_with("changed ("));
+    }
+
+    #[test]
+    fn split_target_name_handles_slash_and_bare() {
+        assert_eq!(
+            split_target_name("common/scss"),
+            ("common".into(), "scss".into())
+        );
+        assert_eq!(
+            split_target_name("settings/yaml"),
+            ("settings".into(), "yaml".into())
+        );
+        // No slash -> empty target, whole thing is the name.
+        assert_eq!(split_target_name("scss"), (String::new(), "scss".into()));
+    }
+
+    #[test]
+    fn field_type_and_extension_map_ids() {
+        assert_eq!(field_type_label(1), "scss");
+        assert_eq!(field_type_label(0), "html");
+        assert_eq!(field_type_label(2), "upload");
+        assert_eq!(field_extension(1), "scss");
+        assert_eq!(field_extension(0), "html");
+        assert_eq!(field_extension(2), "txt");
+    }
+
+    #[test]
+    fn infer_type_id_from_name() {
+        assert_eq!(infer_type_id("scss"), 1);
+        assert_eq!(infer_type_id("embedded_scss"), 1);
+        assert_eq!(infer_type_id("extra_js"), 4);
+        assert_eq!(infer_type_id("head_tag"), 0);
+    }
+
+    #[test]
+    fn git_remote_theme_only_matches_git_backed() {
+        // Locally authored: remote_theme is null.
+        assert!(git_remote_theme(&json!({ "remote_theme": null })).is_none());
+        assert!(git_remote_theme(&json!({ "name": "local" })).is_none());
+        // Git-backed remote component.
+        let git = json!({ "remote_theme": { "is_git": true, "remote_url": "https://x/y.git" } });
+        assert!(git_remote_theme(&git).is_some());
+        // A non-git remote (e.g. zip import) is not updatable.
+        let zip = json!({ "remote_theme": { "is_git": false } });
+        assert!(git_remote_theme(&zip).is_none());
+    }
+
+    #[test]
+    fn theme_field_entries_parses_shape() {
+        let theme = json!({
+            "theme_fields": [
+                { "target": "common", "name": "scss", "type_id": 1, "value": "body{}" },
+                { "target": "common", "name": "logo", "type_id": 2, "value": "",
+                  "url": "/uploads/logo.png", "filename": "logo.png" }
+            ]
+        });
+        let entries = theme_field_entries(&theme);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].field, "common/scss");
+        assert_eq!(entries[0].kind, "scss");
+        assert_eq!(entries[0].bytes, 6);
+        assert!(entries[0].upload_url.is_none());
+        assert_eq!(entries[1].kind, "upload");
+        assert_eq!(entries[1].upload_url.as_deref(), Some("/uploads/logo.png"));
+    }
+
+    #[test]
+    fn find_theme_field_matches_target_and_name() {
+        let theme = json!({
+            "theme_fields": [
+                { "target": "common", "name": "scss", "type_id": 1, "value": "a" },
+                { "target": "desktop", "name": "scss", "type_id": 1, "value": "b" }
+            ]
+        });
+        assert_eq!(
+            find_theme_field(&theme, "desktop", "scss")
+                .and_then(|f| f.get("value"))
+                .and_then(|v| v.as_str()),
+            Some("b")
+        );
+        assert!(find_theme_field(&theme, "mobile", "scss").is_none());
+    }
+
+    #[test]
+    fn short_hash_takes_eight() {
+        assert_eq!(short_hash("0f474e72e256f4dfcd6685"), "0f474e72");
+        assert_eq!(short_hash("abc"), "abc");
     }
 
     #[test]

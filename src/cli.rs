@@ -983,11 +983,106 @@ pub enum ThemeCommand {
         /// Component (child theme) ID to detach.
         component_id: u64,
     },
+    /// Read/write individual theme fields (SCSS, head_tag, ...).
+    #[command(after_help = "Examples:
+  dsc theme field list myforum 11
+  dsc theme field pull myforum 11 common/scss common.scss
+  dsc theme field push myforum 11 common/scss common.scss --dry-run")]
+    Field {
+        #[command(subcommand)]
+        command: ThemeFieldCommand,
+    },
+    /// Upload and bind theme-scoped image/font assets (`$var`).
+    #[command(after_help = "Examples:
+  dsc theme asset list myforum 11
+  dsc theme asset set myforum 11 centred_logo ./logo.png")]
+    Asset {
+        #[command(subcommand)]
+        command: ThemeAssetCommand,
+    },
+    /// Pull a git-backed remote component to its latest upstream commit.
+    #[command(after_help = "Examples:
+  dsc theme update myforum 17 --check   # how far behind?
+  dsc theme update myforum 17           # pull the latest commit")]
+    Update {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID (from `dsc theme list`).
+        theme_id: u64,
+        /// Only check for updates; don't pull.
+        #[arg(long)]
+        check: bool,
+    },
     /// Manage colour palettes (colour schemes). The canonical home for what
     /// was `dsc palette`.
     Palette {
         #[command(subcommand)]
         command: PaletteCommand,
+    },
+}
+
+#[derive(Subcommand)]
+#[command(next_display_order = None)]
+pub enum ThemeFieldCommand {
+    /// List a theme's editable fields.
+    #[command(visible_alias = "ls")]
+    List {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Pull one field's body (e.g. `common/scss`) to a file.
+    Pull {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Field spec: `target/name`, e.g. `common/scss`.
+        field: String,
+        /// Destination file (auto-derived from the field name when omitted).
+        local_path: Option<PathBuf>,
+    },
+    /// Push a file back to one field. Honours global `--dry-run`.
+    Push {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Field spec: `target/name`, e.g. `common/scss`.
+        field: String,
+        /// File whose contents become the field body.
+        local_path: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+#[command(next_display_order = None)]
+pub enum ThemeAssetCommand {
+    /// List a theme's bound upload assets.
+    #[command(visible_alias = "ls")]
+    List {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Upload a file and bind it to a `$var`. Honours global `--dry-run`.
+    Set {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Upload-var name (referenced as `$name` in SCSS).
+        name: String,
+        /// File to upload (image/font).
+        file: PathBuf,
     },
 }
 

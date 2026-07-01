@@ -1,6 +1,6 @@
 # dsc theme
 
-List, install, remove, pull, push, and duplicate themes; read/write a theme's settings; enable/disable and attach/detach components.
+List, install, remove, pull, push, and duplicate themes; read/write a theme's settings, fields (SCSS/HTML), and upload assets; enable/disable and attach/detach components; and update git-backed remote components.
 
 ## dsc theme list
 
@@ -110,6 +110,47 @@ dsc theme setting push accm 17 header.yml --dry-run # header_links: changed (864
 dsc theme setting push accm 17 header.yml
 ```
 
+## dsc theme field
+
+Read and write a theme's individual **fields** - the raw source entries a theme stores: `common/scss`, `desktop/scss`, `mobile/scss`, `common/head_tag`, etc. This is the pull -> edit -> push loop for a theme's SCSS/HTML, without a whole-theme JSON round-trip.
+
+```
+dsc theme field list <discourse> <theme-id> [--format text|json|yaml]
+dsc theme field pull <discourse> <theme-id> <target/name> [<local-path>]
+dsc theme field push <discourse> <theme-id> <target/name> <local-path>   [--dry-run]
+```
+
+- `list` shows each field as `target/name` with its type (`scss`/`html`/`js`/`yaml`/`upload`) and size.
+- `pull` writes one field's body to a file (default name derived from the field, e.g. `common-scss.scss`). Upload-var fields have no text body - use `dsc theme asset` for those.
+- `push` PUTs just that one field back (a single-entry `theme_fields` upsert; other fields are untouched). Unchanged content is a no-op; `--dry-run` shows the byte delta.
+- **`push` refuses a git-backed remote component** - its fields are owned by the upstream repo, not the site. Edit upstream and `dsc theme update`, or `dsc theme duplicate` it first for an editable copy.
+
+```bash
+dsc theme field list accm 11
+dsc theme field pull accm 11 common/scss common.scss
+$EDITOR common.scss
+dsc theme field push accm 11 common/scss common.scss --dry-run
+dsc theme field push accm 11 common/scss common.scss
+```
+
+## dsc theme asset
+
+Upload an image or font and bind it to a theme upload variable (`$name`) in one step, so the theme's SCSS/settings can reference it.
+
+```
+dsc theme asset list <discourse> <theme-id> [--format text|json|yaml]
+dsc theme asset set  <discourse> <theme-id> <name> <file>   [--dry-run]
+```
+
+- `set` uploads `<file>`, then binds it as a `theme_upload_var` field named `<name>` on the `common` target - referenceable as `$name` in the theme's SCSS.
+- `list` shows the theme's bound upload assets (name, filename, URL).
+- Site-wide header logos (`logo`, `logo_small`, `mobile_logo`) are **site settings**, not theme assets - set those with `dsc setting set` + `dsc upload`. `theme asset` is for theme-scoped `$var` images/fonts.
+
+```bash
+dsc theme asset set accm 11 centred_logo ./logo.png
+dsc theme asset list accm 11
+```
+
 ## dsc theme enable / disable
 
 ```
@@ -133,4 +174,21 @@ Attaches or detaches a component to/from a parent theme - this is what makes a c
 dsc theme attach accm 2 14
 # Retire it again
 dsc theme detach accm 2 14
+```
+
+## dsc theme update
+
+Pull a git-backed **remote** component to its latest upstream commit - the CLI equivalent of the Admin UI's "check for updates" / "update" on a remote theme. Distinct from `dsc update`, which rebuilds the OS/Discourse host.
+
+```
+dsc theme update <discourse> <theme-id> [--check]
+```
+
+- `--check` (and `--dry-run`) reports how many commits behind upstream the component is, without pulling.
+- Without `--check`, it pulls the latest commit and reports the old -> new short hash (or "already up to date").
+- Only git-backed remote components can be updated; a locally-authored theme reports a clear error (it has no upstream).
+
+```bash
+dsc theme update accm 17 --check   # e.g. "3 commits behind https://github.com/…"
+dsc theme update accm 17           # pull the latest commit
 ```

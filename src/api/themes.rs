@@ -88,4 +88,21 @@ impl DiscourseClient {
         }
         Ok(())
     }
+
+    /// Flip a boolean flag on a theme via `PUT /admin/themes/:id.json` and
+    /// return the updated theme JSON. Used for the remote-theme lifecycle:
+    /// `remote_check` refreshes `commits_behind` without pulling, and
+    /// `remote_update` pulls the latest upstream commit.
+    pub fn put_theme_flag(&self, theme_id: u64, flag: &str) -> Result<Value> {
+        let payload = json!({ "theme": { flag: true } });
+        let path = format!("/admin/themes/{}.json", theme_id);
+        let response = self.send_retrying(|| Ok(self.put(&path)?.json(&payload)))?;
+        let status = response.status();
+        let text = response.text().context("reading theme flag response")?;
+        if !status.is_success() {
+            return Err(http_error("theme flag update request", status, &text));
+        }
+        let value: Value = serde_json::from_str(&text).context("parsing theme flag response")?;
+        Ok(value)
+    }
 }

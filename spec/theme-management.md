@@ -1,14 +1,15 @@
 # `dsc theme` - management gaps spec
 
-> **Status: Phase 1 + `theme show` + `theme setting pull/push` implemented (unreleased, v0.10.25).**
-> `dsc theme setting list/get/set/pull/push`, `theme enable/disable`,
-> `theme attach/detach`, and `theme show` ship - including the field-required
-> **`theme setting pull/push`** (JSON-list settings like `header_links` expand
-> to editable arrays; push PUTs only changed keys, compared semantically).
-> The rest of Phase 2 (`theme field`, `theme asset`) and the `theme update`
-> half of Phase 3 remain planned. Note for those: the `theme_fields` JSON shape
-> was not captured in the field reference below; confirm it against a live theme
-> (`dsc theme pull`) before implementing `theme field`/`asset`.
+> **Status: Phases 1-3 implemented (setting pull/push in v0.10.25; field/asset/update unreleased).**
+> All specced commands now ship: `theme setting list/get/set/pull/push`,
+> `theme field list/pull/push`, `theme asset list/set`, `theme enable/disable`,
+> `theme attach/detach`, `theme show`, and `theme update` (git-backed remote
+> refresh). The `theme_fields` shape flagged as uncaptured was confirmed live
+> (2026-07-01, against koloki-demo + ACCM): `{ target, name, type_id, value,
+> upload_id? }`, `type_id` 0=html/1=scss/2=upload_var. Remaining gaps are
+> deletion-by-id over the API (`theme remove` is still SSH-by-name only) and
+> API-based `theme install` (also SSH only) - see the completeness note at the
+> end.
 
 Spec for extending `dsc theme` to cover component configuration, enable/disable, per-field editing, and asset binding. Goal: drive a Discourse theme/component setup end-to-end from the CLI, without dropping into the Admin UI. Motivated by the ACCM (kitchen.culinarymedicine.org) header customisation work, where configuring header-nav components and iterating on theme SCSS from `dsc` is currently impossible.
 
@@ -84,7 +85,7 @@ dsc theme setting push <discourse> <theme-id> <file>   [--dry-run]
 
 **Confirmed shape (2026-06-29, against Dropdown Header id 17 on ACCM, Discourse 2026.6.0):** the JSON-list settings report `"type": "string"` - same as plain string settings like `main_link_color` - and carry their value as a string of escaped JSON (`"[{\"id\": 1, ...}]"`). So `type` can't flag them; detection is "parse the string; if it yields an array/object, expand it." Push serialises the edited array back to compact JSON text (NOT the site-settings pipe-join, which would corrupt it) and compares **semantically** (parsed JSON, not raw strings) so the compact-vs-spaced and key-order differences between file and server don't register as spurious edits - an untouched `pull -> push` is a verified no-op. `--dry-run` summarises long list values by length rather than dumping the whole array.
 
-### `dsc theme field`
+### `dsc theme field` — implemented (unreleased)
 
 Edit one `theme_field` without a whole-theme round-trip.
 
@@ -98,9 +99,9 @@ dsc theme field push <discourse> <theme-id> <target/name> <local-path>   [--dry-
 - `pull` writes the raw field body (e.g. the SCSS) to a file with a sensible default name; `push` PUTs just that field back via `PUT /admin/themes/:id.json` with a single-entry `theme_fields` array.
 - Refuse (with a clear message) to push to a field on a git-backed remote component, where the DB value is not the source of truth.
 
-### `dsc theme asset`
+### `dsc theme asset` — implemented (unreleased)
 
-Upload an image and bind it to a theme upload variable in one step, so SCSS/settings can reference `$name`.
+Upload an image and bind it to a theme upload variable in one step, so SCSS/settings can reference `$name`. Confirmed live: `/uploads.json` accepts `type=theme`, and binding a `theme_upload_var` (`type_id: 2`) via a single-entry `theme_fields` PUT works.
 
 ```
 dsc theme asset set <discourse> <theme-id> <name> <file>   [--dry-run]
@@ -110,10 +111,18 @@ dsc theme asset list <discourse> <theme-id>
 - Uploads `<file>` (reusing the existing `dsc upload` path), then writes a `theme_upload_var` `theme_field` named `<name>` bound to the resulting upload. Needed for ACCM's centred-logo image and brand imagery.
 - Note: the site-wide header logos (`logo`, `logo_small`, `mobile_logo`) are **site settings**, already settable via `dsc setting set` + `dsc upload`; `theme asset` is specifically for theme-scoped `$var` assets.
 
-## Phase 3 - nice to have
+## Phase 3 - nice to have (implemented)
 
-- **`dsc theme show <discourse> <theme-id>`** - richer than `list`: component flag, enabled state, default flag, parent(s), attached children, settings count, field inventory. `list` today shows only `id - name - enabled/disabled`.
-- **`dsc theme update <discourse> <theme-id>`** - pull an installed *remote* component to its latest upstream commit (distinct from `dsc update`, which is the OS/Discourse rebuild). Maps to the Admin UI "check for updates" on a remote theme.
+- [x] **`dsc theme show <discourse> <theme-id>`** - richer than `list`: component flag, enabled state, default flag, parent(s), attached children, settings count, field inventory. `list` today shows only `id - name - enabled/disabled`.
+- [x] **`dsc theme update <discourse> <theme-id>`** - pull an installed *remote* component to its latest upstream commit (distinct from `dsc update`, which is the OS/Discourse rebuild). Maps to the Admin UI "check for updates" on a remote theme. Endpoint confirmed from Discourse source: `PUT /admin/themes/:id.json` with `theme.remote_check` (refresh `commits_behind`) or `theme.remote_update` (pull). `--check` reports how far behind; the default pulls and reports old->new short hash.
+
+## Completeness (2026-07-01)
+
+With Phases 1-3 done, `dsc theme` covers the full ACCM driver and most day-to-day theme ops: list/show/pull/push/duplicate, settings (incl. pull/push), fields (SCSS/HTML), upload assets, enable/disable, attach/detach, palettes, and remote update. Remaining gaps, both with known API shapes:
+
+- **API `theme delete <id>`** - deletion is still `theme remove` (SSH rake, by name). The `delete_theme` API (`DELETE /admin/themes/:id.json`) exists in the client but isn't exposed as a command; would round out CRUD and give clean teardown.
+- **API `theme install`** - install is SSH-only today; `POST /admin/themes/import.json` with `remote=<git-url>&branch=<branch>` (documented in the reference above) would remove the SSH dependency.
+- **Minor:** `theme asset` can bind but not unbind a `$var`; no cross-instance theme settings diff (deliberately out of scope below).
 
 ## Reference: API calls observed in the field
 
