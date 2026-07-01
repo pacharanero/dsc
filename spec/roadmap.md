@@ -17,6 +17,10 @@ The built surface, grouped - see CHANGELOG for the full per-release detail.
 
 _(nothing currently in progress)_
 
+## Known bugs
+
+- [ ] **`tag pull` writes tag-group permissions keyed by group *id*, not name.** A pulled `tags.yaml` shows e.g. `permissions: {'0': full}` instead of `permissions: {everyone: full}`. What's happening: Discourse's `tag_groups.json` returns each group's `permissions` as a map keyed by the numeric **group id** (`{"0": 1}` - id `0` is the built-in `everyone` group, value `1` = full), but `parse_tag_group_permissions` (`src/commands/tag.rs`) assumes the map is keyed by group **name** and copies the key through verbatim. So the id leaks into the file as if it were a group name. Pushing that file back then sends `permissions[0]=…`, and `0` is not a valid group name, so the permission does **not** round-trip. Secondary: only levels `1`/`3` are labelled (`full`/`readonly`); level `2` = `create_post` is left as the bare string `"2"`. **Impact is low today** - tag groups are usually created fresh (Discourse applies the default `everyone` permission implicitly) and dsc doesn't yet set restrictive tag-group permissions, so nobody has hit a broken restriction; it's a cosmetic-plus-latent-round-trip bug, not a data-loss one. **Fix:** resolve group id ↔ name on both sides (pull: map id→name using the group list; push: map name→id), and label level `2` as `create_post`; or, until then, drop the `permissions` field from `tag pull` output so it can't emit something that won't round-trip. Discovered 2026-07-01 on koloki-demo while verifying the tag delete/create fixes. Spec: [tag-sync](commands/tag-sync.md).
+
 ## Pre-1.0 launch checklist
 
 Polish before announcing on [meta.discourse.org](https://meta.discourse.org).
