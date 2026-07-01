@@ -72,6 +72,14 @@ tag_groups:
 
 ## Known bugs (observed 2026-07-01, yorkmusic.org, Discourse 2026.7.0-latest)
 
+> **Status: both fixed (unreleased).** `delete_tag` now uses the singular
+> `/tag/{name}.json` endpoint; `tag_push` reconciles tag **groups first** (which
+> materialise their tags) and only then sets descriptions, and a desired tag
+> that belongs to no group and does not exist is reported (no silent 404 abort).
+> Re-verified end-to-end on koloki-demo: create-via-group + description + a
+> `--prune` delete that actually removes the tag. See `plan_tags` in
+> `src/commands/tag.rs` and its unit tests.
+
 Two defects in the implemented `tag push` / tag delete path, found while applying
 `tags.yaml` to a live install. These are bugs (the spec promises behaviour the
 implementation does wrong), not gaps.

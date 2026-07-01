@@ -324,6 +324,86 @@ fn is_json_path(p: &Path) -> bool {
 
 // ─── Push ─────────────────────────────────────────────────────────────────────
 
+/// The reconciliation plan for tags (not groups), computed before any writes so
+/// the dry-run and the apply path share one source of truth.
+///
+/// Discourse has no admin create-tag endpoint (`PUT /tag/{name}.json` 404s for a
+/// non-existent tag); a tag is materialised only by being placed in a tag group
+/// or assigned to a topic. So creation is a side effect of group reconciliation,
+/// and any desired tag that belongs to no group and does not already exist
+/// simply cannot be created - that case is surfaced, not silently dropped.
+#[derive(Debug, Default, PartialEq)]
+struct TagPlan {
+    /// Desired tags absent from the server that a group will materialise
+    /// (named in a group). Created as a side effect of group create/update.
+    created_via_group: Vec<String>,
+    /// `(name, description)` for tags that will exist after group reconciliation
+    /// and carry a description to set.
+    set_description: Vec<(String, String)>,
+    /// Explicit `tags:` entries in no group and absent from the server: no API
+    /// can create them. Reported so the run does not pretend to have applied them.
+    groupless_missing: Vec<String>,
+    /// Tags on the server but not desired (prune only).
+    to_delete: Vec<String>,
+}
+
+impl TagPlan {
+    fn is_empty(&self) -> bool {
+        self.created_via_group.is_empty()
+            && self.set_description.is_empty()
+            && self.groupless_missing.is_empty()
+            && self.to_delete.is_empty()
+    }
+}
+
+/// Partition the desired tags against the server. `group_tags` is the set of
+/// tags that group reconciliation will materialise (empty when the admin group
+/// endpoint is unreachable).
+fn plan_tags(
+    explicit: &BTreeMap<String, Option<String>>,
+    group_tags: &BTreeSet<String>,
+    server_tags: &BTreeSet<String>,
+    prune: bool,
+) -> TagPlan {
+    // Tags that will exist once groups are reconciled.
+    let will_exist: BTreeSet<String> = server_tags.iter().chain(group_tags).cloned().collect();
+
+    let created_via_group: Vec<String> = group_tags.difference(server_tags).cloned().collect();
+
+    let mut set_description: Vec<(String, String)> = explicit
+        .iter()
+        .filter_map(|(name, desc)| match desc {
+            Some(d) if will_exist.contains(name) => Some((name.clone(), d.clone())),
+            _ => None,
+        })
+        .collect();
+    set_description.sort();
+
+    let groupless_missing: Vec<String> = explicit
+        .keys()
+        .filter(|name| !group_tags.contains(*name) && !server_tags.contains(*name))
+        .cloned()
+        .collect();
+
+    let to_delete: Vec<String> = if prune {
+        let desired: BTreeSet<&String> = explicit.keys().chain(group_tags).collect();
+        server_tags
+            .iter()
+            .filter(|t| !desired.contains(t))
+            .cloned()
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    TagPlan {
+        created_via_group,
+        set_description,
+        groupless_missing,
+        to_delete,
+    }
+}
+
 pub fn tag_push(
     config: &Config,
     discourse_name: &str,
@@ -347,123 +427,82 @@ pub fn tag_push(
         anyhow::bail!("unsupported taxonomy file version: {}", taxonomy.version);
     }
 
-    // Desired tag set = explicit tags + all tags mentioned in groups
-    let desired_tags: BTreeSet<String> = taxonomy
-        .tags
-        .iter()
-        .map(|t| t.name.clone())
-        .chain(taxonomy.tag_groups.iter().flat_map(|g| g.tags.clone()))
-        .collect();
-
-    // Build description map from explicit entries
-    let desired_descriptions: BTreeMap<String, Option<String>> = taxonomy
+    // The file's tags arrive in two forms: explicit `tags:` entries (each may
+    // carry a description) and tags named inside a group. A tag group's
+    // `POST /tag_groups.json` with `tag_names` is the ONLY admin-API way to
+    // create a tag, so groups are reconciled FIRST; their tags then exist and
+    // descriptions can be set. See `update_tag` for why.
+    let explicit: BTreeMap<String, Option<String>> = taxonomy
         .tags
         .iter()
         .map(|t| (t.name.clone(), t.description.clone()))
         .collect();
-
-    // ── Reconcile tags ────────────────────────────────────────────────────────
-    let server_tags = client.list_tags()?;
-    let server_tag_names: BTreeSet<String> = server_tags.iter().map(|t| t.text.clone()).collect();
-
-    let tags_to_create: Vec<&String> = desired_tags.difference(&server_tag_names).collect();
-    let tags_to_delete: Vec<&String> = if prune {
-        server_tag_names.difference(&desired_tags).collect()
-    } else {
-        Vec::new()
-    };
-
-    // Tags that exist and have a description to set
-    let tags_to_update: Vec<(&String, &Option<String>)> = desired_descriptions
+    let group_tags: BTreeSet<String> = taxonomy
+        .tag_groups
         .iter()
-        .filter(|(name, desc)| server_tag_names.contains(*name) && desc.is_some())
+        .flat_map(|g| g.tags.clone())
         .collect();
 
-    if dry_run {
-        println!("[dry-run] Tag plan:");
-        if tags_to_create.is_empty() && tags_to_delete.is_empty() && tags_to_update.is_empty() {
-            println!("  (no tag changes)");
-        }
-        for name in &tags_to_create {
-            println!("  + create tag: {}", name);
-        }
-        for (name, desc) in &tags_to_update {
-            println!(
-                "  ~ update tag: {} (set description: {:?})",
-                name,
-                desc.as_deref().unwrap_or("")
-            );
-        }
-        for name in &tags_to_delete {
-            println!("  - delete tag: {}", name);
-        }
-    } else {
-        for name in &tags_to_create {
-            let desc = desired_descriptions.get(*name).and_then(|d| d.as_deref());
-            client
-                .update_tag(name, desc)
-                .with_context(|| format!("creating/updating tag '{}'", name))?;
-            println!("  + created tag: {}", name);
-        }
-        for (name, desc) in &tags_to_update {
-            client
-                .update_tag(name, desc.as_deref())
-                .with_context(|| format!("updating tag '{}'", name))?;
-            println!("  ~ updated tag: {}", name);
-        }
-        for name in &tags_to_delete {
-            client
-                .delete_tag(name)
-                .with_context(|| format!("deleting tag '{}'", name))?;
-            println!("  - deleted tag: {}", name);
-        }
+    let server_tag_names: BTreeSet<String> =
+        client.list_tags()?.into_iter().map(|t| t.text).collect();
+
+    // Group reconciliation needs the admin endpoint; fetch it up front so the
+    // whole plan reflects what will actually happen. Without it, no group tags
+    // can be materialised, so those tags fall through to `groupless_missing`.
+    let server_groups = client.list_tag_groups()?;
+    let groups_available = server_groups.is_some();
+    if !groups_available && !taxonomy.tag_groups.is_empty() {
+        eprintln!(
+            "Warning: tag groups not accessible (requires admin API key); groups in the file cannot be reconciled and their tags cannot be created."
+        );
     }
-
-    // ── Reconcile tag groups ──────────────────────────────────────────────────
-    let server_groups = match client.list_tag_groups()? {
-        Some(groups) => groups,
-        None => {
-            if !taxonomy.tag_groups.is_empty() {
-                eprintln!(
-                    "Warning: tag groups not accessible (requires admin API key); skipping group reconciliation."
-                );
-            }
-            return Ok(());
-        }
+    let effective_group_tags: BTreeSet<String> = if groups_available {
+        group_tags.clone()
+    } else {
+        BTreeSet::new()
     };
+    let server_groups = server_groups.unwrap_or_default();
 
+    let tag_plan = plan_tags(&explicit, &effective_group_tags, &server_tag_names, prune);
+
+    // ── Compute the tag-group plan (only when the admin endpoint is reachable) ─
     let server_groups_by_name: BTreeMap<String, &TagGroupInfo> =
         server_groups.iter().map(|g| (g.name.clone(), g)).collect();
-
     let desired_group_names: BTreeSet<String> =
         taxonomy.tag_groups.iter().map(|g| g.name.clone()).collect();
     let server_group_names: BTreeSet<String> =
         server_groups.iter().map(|g| g.name.clone()).collect();
 
-    let groups_to_create: Vec<&TagGroupEntry> = taxonomy
-        .tag_groups
-        .iter()
-        .filter(|g| !server_group_names.contains(&g.name))
-        .collect();
-
-    let groups_to_update: Vec<(&TagGroupEntry, u64)> = taxonomy
-        .tag_groups
-        .iter()
-        .filter_map(|g| server_groups_by_name.get(&g.name).map(|sg| (g, sg.id)))
-        .filter(|(desired, _id)| {
-            // Only update if something differs
-            let server = server_groups_by_name.get(&desired.name).unwrap();
-            let mut server_tags = server.tag_names.clone();
-            server_tags.sort();
-            let mut desired_tags = desired.tags.clone();
-            desired_tags.sort();
-            server_tags != desired_tags
-                || server.one_per_topic != desired.one_per_topic
-                || server.parent_tag_name != desired.parent_tag
-        })
-        .collect();
-
-    let groups_to_delete: Vec<(&str, u64)> = if prune {
+    let groups_to_create: Vec<&TagGroupEntry> = if groups_available {
+        taxonomy
+            .tag_groups
+            .iter()
+            .filter(|g| !server_group_names.contains(&g.name))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let groups_to_update: Vec<(&TagGroupEntry, u64)> = if groups_available {
+        taxonomy
+            .tag_groups
+            .iter()
+            .filter_map(|g| server_groups_by_name.get(&g.name).map(|sg| (g, sg.id)))
+            .filter(|(desired, _id)| {
+                // Only update if something differs
+                let server = server_groups_by_name.get(&desired.name).unwrap();
+                let mut server_tags = server.tag_names.clone();
+                server_tags.sort();
+                let mut desired_tags = desired.tags.clone();
+                desired_tags.sort();
+                server_tags != desired_tags
+                    || server.one_per_topic != desired.one_per_topic
+                    || server.parent_tag_name != desired.parent_tag
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let groups_to_delete: Vec<(&str, u64)> = if prune && groups_available {
         server_groups
             .iter()
             .filter(|g| !desired_group_names.contains(&g.name))
@@ -473,6 +512,7 @@ pub fn tag_push(
         Vec::new()
     };
 
+    // ── Dry-run: print the plan (groups first, then tags); apply nothing ──────
     if dry_run {
         println!("[dry-run] Tag group plan:");
         if groups_to_create.is_empty() && groups_to_update.is_empty() && groups_to_delete.is_empty()
@@ -496,34 +536,92 @@ pub fn tag_push(
         for (name, _id) in &groups_to_delete {
             println!("  - delete group: {}", name);
         }
-    } else {
-        for g in &groups_to_create {
-            let payload = build_tag_group_payload(g);
-            client
-                .create_tag_group(&payload)
-                .with_context(|| format!("creating tag group '{}'", g.name))?;
-            println!("  + created group: {}", g.name);
+
+        println!("[dry-run] Tag plan:");
+        if tag_plan.is_empty() {
+            println!("  (no tag changes)");
         }
-        for (g, id) in &groups_to_update {
-            let payload = build_tag_group_payload(g);
-            client
-                .update_tag_group(*id, &payload)
-                .with_context(|| format!("updating tag group '{}'", g.name))?;
-            println!("  ~ updated group: {}", g.name);
+        for name in &tag_plan.created_via_group {
+            println!("  + create tag: {} (via its tag group)", name);
         }
-        for (name, id) in &groups_to_delete {
-            client
-                .delete_tag_group(*id)
-                .with_context(|| format!("deleting tag group '{}'", name))?;
-            println!("  - deleted group: {}", name);
+        for (name, desc) in &tag_plan.set_description {
+            println!("  ~ set description: {} ({:?})", name, desc);
+        }
+        for name in &tag_plan.groupless_missing {
+            println!(
+                "  ! cannot create tag: {} (Discourse has no create-tag API; add it to a tag group or create it by tagging a topic)",
+                name
+            );
+        }
+        for name in &tag_plan.to_delete {
+            println!("  - delete tag: {}", name);
+        }
+
+        println!("[dry-run] No changes applied.");
+        return Ok(());
+    }
+
+    // ── Apply, groups first so their tags are materialised ────────────────────
+    for g in &groups_to_create {
+        let payload = build_tag_group_payload(g);
+        client
+            .create_tag_group(&payload)
+            .with_context(|| format!("creating tag group '{}'", g.name))?;
+        println!("  + created group: {}", g.name);
+    }
+    for (g, id) in &groups_to_update {
+        let payload = build_tag_group_payload(g);
+        client
+            .update_tag_group(*id, &payload)
+            .with_context(|| format!("updating tag group '{}'", g.name))?;
+        println!("  ~ updated group: {}", g.name);
+    }
+
+    // Re-read tags: group reconciliation just materialised the group tags.
+    let now_existing: BTreeSet<String> = client.list_tags()?.into_iter().map(|t| t.text).collect();
+    for name in &tag_plan.created_via_group {
+        if now_existing.contains(name) {
+            println!("  + created tag: {} (via its tag group)", name);
         }
     }
 
-    if dry_run {
-        println!("[dry-run] No changes applied.");
-    } else {
-        println!("Push complete.");
+    // Set descriptions on tags that now exist.
+    for (name, desc) in &tag_plan.set_description {
+        if now_existing.contains(name) {
+            client
+                .update_tag(name, Some(desc))
+                .with_context(|| format!("setting description on tag '{}'", name))?;
+            println!("  ~ set description: {}", name);
+        }
     }
+
+    // Prune: delete undesired tags (singular endpoint), then undesired groups.
+    for name in &tag_plan.to_delete {
+        client
+            .delete_tag(name)
+            .with_context(|| format!("deleting tag '{}'", name))?;
+        println!("  - deleted tag: {}", name);
+    }
+    for (name, id) in &groups_to_delete {
+        client
+            .delete_tag_group(*id)
+            .with_context(|| format!("deleting tag group '{}'", name))?;
+        println!("  - deleted group: {}", name);
+    }
+
+    // Any desired tag that belongs to no group and did not already exist could
+    // not be created (no admin create-tag endpoint). Report after doing all the
+    // achievable work, so the exit code reflects the incomplete apply rather
+    // than aborting on the first one.
+    if !tag_plan.groupless_missing.is_empty() {
+        anyhow::bail!(
+            "these tags are in no tag group and do not exist on '{}', and Discourse has no admin create-tag endpoint, so they were not created: {}. Add them to a tag group in the file, or create them by tagging a topic.",
+            discourse_name,
+            tag_plan.groupless_missing.join(", ")
+        );
+    }
+
+    println!("Push complete.");
     Ok(())
 }
 
@@ -557,10 +655,22 @@ fn build_tag_group_payload(entry: &TagGroupEntry) -> serde_json::Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{next_tags_after_apply, next_tags_after_remove, validate_rename_names};
+    use super::{next_tags_after_apply, next_tags_after_remove, plan_tags, validate_rename_names};
+    use std::collections::{BTreeMap, BTreeSet};
 
     fn s(items: &[&str]) -> Vec<String> {
         items.iter().map(|x| x.to_string()).collect()
+    }
+
+    fn set(items: &[&str]) -> BTreeSet<String> {
+        items.iter().map(|x| x.to_string()).collect()
+    }
+
+    fn explicit(pairs: &[(&str, Option<&str>)]) -> BTreeMap<String, Option<String>> {
+        pairs
+            .iter()
+            .map(|(n, d)| (n.to_string(), d.map(|s| s.to_string())))
+            .collect()
     }
 
     #[test]
@@ -641,5 +751,110 @@ mod tests {
         // After trimming, "foo " and "foo" are the same.
         let err = validate_rename_names("foo ", "foo").unwrap_err();
         assert!(err.to_string().contains("identical"));
+    }
+
+    // ── plan_tags (bug #2: create-tag ordering) ───────────────────────────────
+
+    #[test]
+    fn plan_group_tag_absent_is_created_via_group() {
+        // A tag named in a group but missing from the server is materialised by
+        // group reconciliation, not a standalone (impossible) create.
+        let p = plan_tags(
+            &explicit(&[]),
+            &set(&["acoustic", "jazz"]),
+            &set(&["jazz"]),
+            false,
+        );
+        assert_eq!(p.created_via_group, s(&["acoustic"]));
+        assert!(p.groupless_missing.is_empty());
+    }
+
+    #[test]
+    fn plan_groupless_missing_is_reported_not_created() {
+        // An explicit tag in no group and absent from the server cannot be
+        // created by any API - it must be surfaced, not silently attempted.
+        let p = plan_tags(&explicit(&[("orphan", None)]), &set(&[]), &set(&[]), false);
+        assert_eq!(p.groupless_missing, s(&["orphan"]));
+        assert!(p.created_via_group.is_empty());
+        assert!(p.set_description.is_empty());
+    }
+
+    #[test]
+    fn plan_sets_description_for_group_created_tag() {
+        // In a group (so it will exist) + has a description → set it after group
+        // reconciliation.
+        let p = plan_tags(
+            &explicit(&[("jazz", Some("Jazz music"))]),
+            &set(&["jazz"]),
+            &set(&[]),
+            false,
+        );
+        assert_eq!(
+            p.set_description,
+            vec![("jazz".to_string(), "Jazz music".to_string())]
+        );
+        assert!(p.groupless_missing.is_empty());
+    }
+
+    #[test]
+    fn plan_no_description_set_for_uncreatable_orphan() {
+        // An orphan can't be created, so its description can't be set either.
+        let p = plan_tags(
+            &explicit(&[("orphan", Some("x"))]),
+            &set(&[]),
+            &set(&[]),
+            false,
+        );
+        assert!(p.set_description.is_empty());
+        assert_eq!(p.groupless_missing, s(&["orphan"]));
+    }
+
+    #[test]
+    fn plan_sets_description_for_existing_server_tag() {
+        let p = plan_tags(
+            &explicit(&[("rock", Some("Rock"))]),
+            &set(&[]),
+            &set(&["rock"]),
+            false,
+        );
+        assert_eq!(
+            p.set_description,
+            vec![("rock".to_string(), "Rock".to_string())]
+        );
+        assert!(p.groupless_missing.is_empty());
+    }
+
+    #[test]
+    fn plan_prune_deletes_undesired_server_tags() {
+        let p = plan_tags(
+            &explicit(&[("keep", None)]),
+            &set(&[]),
+            &set(&["keep", "old"]),
+            true,
+        );
+        assert_eq!(p.to_delete, s(&["old"]));
+    }
+
+    #[test]
+    fn plan_without_prune_deletes_nothing() {
+        let p = plan_tags(&explicit(&[]), &set(&[]), &set(&["old"]), false);
+        assert!(p.to_delete.is_empty());
+    }
+
+    #[test]
+    fn plan_group_tag_still_desired_is_not_pruned() {
+        // A tag desired only via a group must not be pruned just because it's
+        // absent from the explicit list.
+        let p = plan_tags(&explicit(&[]), &set(&["jazz"]), &set(&["jazz"]), true);
+        assert!(p.to_delete.is_empty());
+    }
+
+    #[test]
+    fn plan_no_group_access_makes_group_only_explicit_tags_orphans() {
+        // When the admin group endpoint is unreachable the caller passes empty
+        // group_tags; an explicit tag that only lived in a group can no longer
+        // be created and is reported.
+        let p = plan_tags(&explicit(&[("jazz", None)]), &set(&[]), &set(&[]), false);
+        assert_eq!(p.groupless_missing, s(&["jazz"]));
     }
 }

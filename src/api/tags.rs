@@ -141,7 +141,14 @@ impl DiscourseClient {
         Ok(())
     }
 
-    /// Update tag metadata (description). Creates the tag implicitly if it doesn't exist.
+    /// Update an existing tag's metadata (description).
+    ///
+    /// Note: this does NOT create a tag. Discourse exposes no standalone
+    /// create-tag endpoint to an admin API key - `PUT /tag/{name}.json` returns
+    /// 404 for a tag that does not yet exist (verified against 2026.7.0). Tags
+    /// are materialised only implicitly: by a tag group (`POST /tag_groups.json`
+    /// with `tag_names`) or by being assigned to a topic. Call this only for a
+    /// tag that already exists (see `tag_push`, which reconciles groups first).
     pub fn update_tag(&self, tag_name: &str, description: Option<&str>) -> Result<()> {
         let path = format!("/tag/{}.json", tag_name);
         let mut payload = serde_json::Map::new();
@@ -173,8 +180,12 @@ impl DiscourseClient {
     }
 
     /// Delete a tag.
+    ///
+    /// The endpoint is singular `/tag/{name}.json` - the plural `/tags/...`
+    /// form returns 404 and silently leaves the tag in place (verified against
+    /// 2026.7.0).
     pub fn delete_tag(&self, tag_name: &str) -> Result<()> {
-        let path = format!("/tags/{}.json", tag_name);
+        let path = format!("/tag/{}.json", tag_name);
         let response = self.delete(&path)?;
         let status = response.status();
         if !status.is_success() {
