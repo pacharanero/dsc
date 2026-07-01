@@ -57,7 +57,24 @@ fn run_palette(config: &dsc::config::Config, command: PaletteCommand) -> Result<
     }
 }
 
+/// Restore the default SIGPIPE disposition on Unix so piping `dsc` into
+/// `head`, `less`, or `diff <(dsc …) …` terminates cleanly instead of
+/// panicking from `println!` on a closed stdout. Rust's runtime ignores
+/// SIGPIPE by default, which turns every broken-pipe write into a panic -
+/// fine for a long-lived service, wrong for a CLI.
+#[cfg(unix)]
+fn reset_sigpipe() {
+    // SAFETY: single FFI call with well-defined semantics, called once at startup.
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+}
+
+#[cfg(not(unix))]
+fn reset_sigpipe() {}
+
 fn main() -> Result<()> {
+    reset_sigpipe();
     let cli = Cli::parse();
     let config_source = resolve_config_source(cli.config)?;
     let config_path = config_source.path().to_path_buf();
@@ -1078,12 +1095,8 @@ fn main() -> Result<()> {
 
         Commands::Man { dir } => commands::manpages::write_manpages(&dir),
 
-        Commands::Version { discourse } => match discourse {
-            Some(name) => commands::version::forum_version(&config, &name),
-            None => {
-                println!("{}", env!("CARGO_PKG_VERSION"));
-                Ok(())
-            }
-        },
+        Commands::Version { discourse, format } => {
+            commands::version::version(&config, discourse.as_deref(), format)
+        }
     }
 }
