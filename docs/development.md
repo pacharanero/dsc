@@ -28,6 +28,12 @@ Standard test suite:
 cargo test
 ```
 
+The full CI-mirroring gate (fmt + clippy `-D warnings` + the complete test suite, with the live e2e tests skipped) is one script - a green run here means a green run in CI, and `s/version++` runs it before cutting a release:
+
+```bash
+s/test-fmt-clippy
+```
+
 Verbose end-to-end output:
 
 ```bash

@@ -55,21 +55,12 @@ if ! command -v git-cliff >/dev/null 2>&1; then
   exit 1
 fi
 
-# Pre-release gate: mirror the CI checks (.github/workflows/ci.yml) locally so we
-# never cut and push a release that CI would then reject *after* the tag has
-# already triggered the irreversible release. Runs before anything is modified,
-# so a failure aborts cleanly.
-#
-# The full `cargo test` (not just --lib) is the point: integration tests in
-# tests/ shell out to the binary and only fail at runtime, so `--lib` misses
-# them - which is how a broken flag test once slipped past into CI. Pointing
-# TEST_DSC_CONFIG at an unreadable path makes the live-forum e2e tests skip
-# (they gate on that config) exactly as they do in CI, while the offline
-# integration tests still run - so the gate never touches a live forum.
+# Pre-release gate: the shared fmt + clippy + full-test-suite check (which itself
+# mirrors .github/workflows/ci.yml), so we never cut and push a release that CI
+# would then reject *after* the tag has already triggered the irreversible
+# release. Runs before anything is modified, so a failure aborts cleanly.
 echo "Pre-release checks (mirror CI): fmt + clippy + full test suite..."
-cargo fmt --all --check
-cargo clippy --all-targets -- -D warnings
-TEST_DSC_CONFIG=/dev/null/disable-e2e cargo test --quiet
+s/test-fmt-clippy
 
 cargo set-version --bump "$bump"
 version="$(awk -F\" '/^version = / {print $2; exit}' Cargo.toml)"
