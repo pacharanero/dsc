@@ -117,4 +117,4 @@ Releases are automated via Git tags and GitHub Actions using cargo-dist.
 - Config structures and helpers: [src/config.rs](../src/config.rs)
 - Utility helpers (slugify, I/O): [src/utils.rs](../src/utils.rs)
 - Example configuration: [dsc.example.toml](../dsc.example.toml)
-- Specification notes: [spec/spec.md](../spec/spec.md)
+- CLI design standards: [spec/cli-design.md](../spec/cli-design.md); internals/release: [spec/spec.md](../spec/spec.md)

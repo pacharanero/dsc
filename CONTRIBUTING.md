@@ -7,7 +7,7 @@ Thanks for thinking about contributing. `dsc` is a small but actively-shaped pro
 | You want to … | Read |
 |---|---|
 | Build and test the project locally | [docs/development.md](docs/development.md) |
-| Understand the CLI design standards | [spec/spec.md](spec/spec.md) |
+| Understand the CLI design standards | [spec/cli-design.md](spec/cli-design.md) |
 | Use `dsc` to manage a real Discourse | [docs/](docs/) (per-command pages) |
 | Use `dsc` from another LLM/agent session | [AGENTS.md](AGENTS.md) |
 | File a feature request | See **"Filing issues"** below |

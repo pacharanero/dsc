@@ -44,7 +44,7 @@ Aliases: `dsc stats` is accepted as an alias for discoverability but `analytics`
 - `--since <when>` (or `-s`) — the window to report on. Accepts the same relative durations as `dsc user activity` (`24h`, `7d`, `30d`, `1w`, `1m`, `90s`) or an ISO-8601 date/timestamp. Defaults to `30d`.
 - `--compare` (or `-c`) — also fetch the immediately preceding window of equal length and show a delta column. For example with `--since 30d --compare`, the prior 30 days are pulled and reported alongside.
 - `--section` — restrict output to one section. Defaults to `all`.
-- `--format` (or `-f`) — see "Format baseline" in `spec/spec.md`. Default is `text`. `markdown` and `markdown-table` are intended for piping into a `dsc topic reply` so that admins can keep a rolling community-health thread on their own forum (mirrors the `dsc user activity` archive workflow).
+- `--format` (or `-f`) — see "Output" / "Format-support baseline" in `spec/cli-design.md`. Default is `text`. `markdown` and `markdown-table` are intended for piping into a `dsc topic reply` so that admins can keep a rolling community-health thread on their own forum (mirrors the `dsc user activity` archive workflow).
 
 ### Auth
 
@@ -200,7 +200,7 @@ Caching: a per-invocation cache in memory only. No on-disk cache in this iterati
 
 ## CLI consistency conformance
 
-This command must comply with the standards in `spec/spec.md`:
+This command must comply with the standards in `spec/cli-design.md`:
 
 - `--format text|json|yaml` baseline plus the listed extras.
 - Empty / clamped sections follow the empty-list behaviour: text renders `—`; JSON/YAML emit `null` or `0` as appropriate (never strings like `"n/a"`).

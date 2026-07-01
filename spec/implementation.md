@@ -9,8 +9,8 @@
 
 ## Source Spec
 
-- Read and implement the CLI described in `spec/spec.md`.
-- Treat "CLI Consistency Standards" in `spec/spec.md` as normative for all new command UX/output changes.
+- Read and implement the CLI design described in `spec/cli-design.md` (surface, patterns, and consistency standards); `spec/spec.md` holds the config schema and release rules.
+- Treat `spec/cli-design.md` as normative for all new command UX/output changes.
 
 ## CLI Consistency Rollout
 
