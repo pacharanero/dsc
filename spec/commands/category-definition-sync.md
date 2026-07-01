@@ -1,4 +1,4 @@
-# `dsc category` definition sync — `def pull/push` + per-category `settings`
+# `dsc category` definition sync — `def pull/push` + per-category `show`/`get`/`set`
 
 Spec for declarative version-control of a Discourse instance's **category
 definitions** (name, slug, colour, permissions, position, description, topic
@@ -123,10 +123,15 @@ dsc category def push <DISCOURSE> <LOCAL_PATH>    # apply file → server
 
 ### Imperative (single category, one field)
 
+Verbs mirror the rest of `dsc`: `show` (like `theme show`) for the whole object,
+`get`/`set` (like `setting get`/`setting set`) for one field. No `settings`
+sub-noun — that would clash with the singular top-level `dsc setting` and add a
+layer `setting get`/`set` don't have.
+
 ```text
-dsc category settings list <DISCOURSE> <CATEGORY>             # show all definition fields for one category
-dsc category settings get  <DISCOURSE> <CATEGORY> <FIELD>     # print one field's value
-dsc category settings set  <DISCOURSE> <CATEGORY> <FIELD> <VALUE>   # set one field
+dsc category show <DISCOURSE> <CATEGORY>                     # show all definition fields for one category
+dsc category get  <DISCOURSE> <CATEGORY> <FIELD>            # print one field's value
+dsc category set  <DISCOURSE> <CATEGORY> <FIELD> <VALUE>    # set one field
 ```
 
 - `<CATEGORY>` resolves by `id`, `slug`, or `name` (reuse `resolve_category_id`).
@@ -146,7 +151,7 @@ dsc category settings set  <DISCOURSE> <CATEGORY> <FIELD> <VALUE>   # set one fi
   permissions implies `read_restricted=true` when any group other than
   `everyone` is granted, mirroring the admin UI behaviour.
 
-Both families hit the same Discourse endpoints; `settings set` is the
+Both families hit the same Discourse endpoints; `category set` is the
 convenience face of the same writes `def push` does in bulk.
 
 ## File schema (the contract)
@@ -348,34 +353,54 @@ also accepted; the form form is simpler and matches `create_category`'s existing
 
 ### Phase 1 — blocking (unblocks yorkmusic.org config-as-code)
 
-- [ ] `dsc category def pull <discourse> [categories.yaml]` — read
-  `/categories.json?show_permissions=true&include_subcategories=true`, emit the
-  file schema above, definitions only, stable-sorted for clean diffs.
-- [ ] `dsc category def push <discourse> <categories.yaml>` — upsert only (no
-  prune); create missing, update changed by `id`/`slug`/`name`; honour
-  `--dry-run` with `~`/`=`/`+`/`?` sigils; idempotent. Map `permissions` map →
-  `permissions[group]=level` form params; map `parent` slug → `parent_category_id`.
-- [ ] `dsc category settings set <discourse> <category> <field> <value>` —
-  single `PUT /categories/{id}` for the one field (the topic_template + the
-  description case that prompted this spec). `--dry-run`.
-- [ ] `dsc category settings get <discourse> <category> [field]` — read from the
-  categories list endpoint, print the field (or all definition fields when no
-  field given, alias of `settings list`).
-- [ ] Extend `CategoryInfo` (or add a `CategoryDefinition` model) with the
-  definition fields and add `update_category()` to `src/api/categories.rs`.
+> **Status: implemented (unreleased).** All Phase 1 items below, in
+> `src/commands/category_def.rs` + `src/api/categories.rs`/`models.rs`.
+> Verified end-to-end on koloki-demo: pull, show, get, reversible set, and def
+> push (create with rename-warning, update, and idempotent `= unchanged` on a
+> full pull→push→pull). Unit-tested (`plan_push`, `differs`, permission
+> round-trip, single-field param building).
+>
+> Two findings baked into the implementation:
+> - **`description` is read from `description_text`.** The API's `description`
+>   is the *cooked* HTML excerpt of the category's auto-created "About" topic and
+>   settles asynchronously after create, so reading it broke idempotency (raw
+>   file text vs `<p>…</p>`). Reading the plain `description_text` and writing
+>   `description` makes the round-trip clean.
+> - **Parent-in-same-push limitation.** `parent` is resolved against categories
+>   that already exist on the server; a brand-new parent created in the *same*
+>   push isn't yet resolvable. Create the parent first (or run push twice). A
+>   two-pass ordering is deferred to Phase 2.
+
+- [x] `dsc category def pull <discourse> [categories.yaml]` — reads
+  `/categories.json?show_permissions=true&include_subcategories=true`, emits the
+  file schema above, definitions only, stable-sorted (position, then name).
+- [x] `dsc category def push <discourse> <categories.yaml>` — upsert only (no
+  prune); creates missing, updates changed by `id`/`slug`/`name`; honours
+  `--dry-run` with `+`/`~`/`=` sigils and a loud rename warning for a no-`id`
+  no-match entry; idempotent. Maps `permissions` map → `permissions[group]=level`
+  (integer) form params; maps `parent` slug → `parent_category_id`.
+- [x] `dsc category set <discourse> <category> <field> <value>` — single
+  `PUT /categories/{id}` for the one field (the topic_template + description
+  case that prompted this spec); `--dry-run` prints the payload.
+- [x] `dsc category get <discourse> <category> <field>` and `dsc category show
+  <discourse> <category>` — read from the categories list endpoint; `get` prints
+  one field, `show` prints all definition fields (both honour `--format`).
+- [x] Added a `CategoryDefinition` model with the definition fields and
+  `update_category()` / `create_category_def()` / `fetch_category_definitions()`
+  to `src/api/categories.rs`.
 
 ### Phase 2 — iteration ergonomics
 
 - [ ] `dsc category rename <discourse> <category> <new-name>` — safe rename via
   `PUT /categories/{id}` (preserves topics); mirrors `tag rename`. The
   recommended path for no-`id` files.
-- [ ] `--append` / `--remove` for list fields on `settings set` (`allowed_tags`,
+- [ ] `--append` / `--remove` for list fields on `category set` (`allowed_tags`,
   `allowed_tag_groups`).
 - [ ] `required_tag_groups` round-trip (list of `{name, min_tags}`).
 - [ ] `parent` resolution by name as well as slug; validation that the parent
   exists before push (clear error instead of a 4xx from the API).
 - [ ] `topic_title_placeholder`, logo/background asset fields, `custom_fields`,
-  `icon`/`emoji` — surface as `settings set` fields once the asset-upload path
+  `icon`/`emoji` — surface as `category set` fields once the asset-upload path
   is decided.
 
 ### Phase 3 — nice to have
@@ -394,12 +419,12 @@ also accepted; the form form is simpler and matches `create_category`'s existing
 ## Backward compatibility
 
 - No existing command changes. `category list/copy/pull/push` keep their current
-  meaning (topics for pull/push). New subcommands `def` and `settings` are
-  added under `category`.
+  meaning (topics for pull/push). New subcommands `def` and `show`/`get`/`set`
+  are added under `category`.
 - `category list -f json` currently serialises the sparse `CategoryInfo`. Adding
   fields to that struct is additive (existing consumers tolerant of new keys);
   but to avoid changing `category list`'s output shape, prefer a separate
-  `CategoryDefinition` model used by `def pull`/`settings` only, and leave
+  `CategoryDefinition` model used by `def pull`/`show`/`get`/`set` only, and leave
   `category list` as-is. (If `CategoryInfo` is extended instead, the extra
   fields are `#[serde(default)]` so parsing the old sparse `/site.json` payload
   still works.)

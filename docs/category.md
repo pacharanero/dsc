@@ -1,6 +1,11 @@
 # dsc category
 
-List, pull, push, and copy categories.
+List, pull, push, and copy categories, plus sync category *definitions*.
+
+Two distinct kinds of sync live under `dsc category`:
+
+- **Topic content** — `pull`/`push` move the Markdown *topics inside* a category.
+- **Category definitions** — `def pull`/`def push` and `show`/`get`/`set` manage the category objects themselves (name, colour, permissions, description, topic template, tag rules, ordering). This is the config-as-code counterpart to `dsc tag pull/push` and `dsc setting pull/push`.
 
 ## dsc category list
 
@@ -76,3 +81,37 @@ Copies the specified category. If `--target` is omitted, copies within the same 
 - All other fields match the source, except the ID which is assigned by Discourse.
 
 `<category-id-or-slug>` can be found using `dsc category list`.
+
+## Category definitions
+
+Version-control a forum's category structure the way `tag pull/push` handles the tag taxonomy.
+
+```
+dsc category def pull <discourse> [categories.yaml]   # snapshot every definition to a file
+dsc category def push <discourse> <categories.yaml>   # apply the file (upsert; never deletes)
+```
+
+- `def pull` writes one `categories.yaml` (or `.json` by extension) holding every category's definition - name, slug, colour, position, parent, `read_restricted`, description, topic template, permissions, tag rules, and display knobs. Usage counts and other volatile fields are dropped so re-pulls diff cleanly.
+- `def push` reconciles the server toward the file: it **creates** missing categories and **updates** changed ones, matching by `id` (stable), then `slug`, then `name`. It never deletes. `--dry-run` prints the plan with `+` (create), `~` (update), `=` (unchanged) sigils. A file entry with no `id` that matches nothing is flagged loudly - it would create a new category, so if you meant to rename an existing one, keep its `id` in the file to preserve its topics.
+- The push is idempotent: a pull followed by a push with no edits reports every category `= unchanged`.
+
+### Single-field access
+
+For a quick one-field read or edit without rewriting the whole file - mirrors `dsc setting get/set` and `dsc theme show`:
+
+```
+dsc category show <discourse> <category>            # all definition fields
+dsc category get  <discourse> <category> <field>    # one field
+dsc category set  <discourse> <category> <field> <value>
+```
+
+- `<category>` resolves by `id`, `slug`, or `name`.
+- `<field>` is one of: `name`, `slug`, `color`, `text_color`, `position`, `parent`, `read_restricted`, `description`, `topic_template`, `permissions`, `allowed_tags`, `allowed_tag_groups`, `minimum_required_tags`, `sort_order`, `default_view`, `subcategory_list_style`, `num_featured_topics`, `show_subcategory_list`.
+- List fields (`allowed_tags`, `allowed_tag_groups`) take a comma-separated value; an empty value clears the list.
+- `permissions` takes `group:level,...` where level is `full`, `create_post`, or `readonly` (e.g. `staff:full`). Granting any group other than `everyone` also sets `read_restricted=true`, matching the admin UI.
+- `show`/`get` honour `--format text|json|yaml`; `set` honours the global `--dry-run`.
+
+Notes:
+
+- `description` is read from the plain-text form; on write, Discourse re-cooks it as the category's "About" topic excerpt (settles a moment after a create).
+- When `def push` creates a category whose `parent` is itself brand-new in the same file, run the push twice (or create the parent first) - a parent is resolved against categories that already exist on the server.

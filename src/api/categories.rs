@@ -1,6 +1,9 @@
 use super::client::DiscourseClient;
 use super::error::http_error;
-use super::models::{CategoriesResponse, CategoryInfo, CategoryResponse, CreateCategoryResponse};
+use super::models::{
+    CategoriesResponse, CategoryDefinition, CategoryDefinitionsResponse, CategoryInfo,
+    CategoryResponse, CreateCategoryResponse,
+};
 use anyhow::{Context, Result, anyhow};
 use reqwest::StatusCode;
 use serde_json::Value;
@@ -76,6 +79,58 @@ impl DiscourseClient {
         let body: CreateCategoryResponse =
             serde_json::from_str(&text).context("reading category response")?;
         Ok(body.category.id)
+    }
+
+    /// Fetch the full definition of every category, including group permissions.
+    /// This is the read side of `category def pull` / `show` / `get`; unlike
+    /// `fetch_categories` it carries description, permissions, topic template,
+    /// tag rules, and ordering.
+    pub fn fetch_category_definitions(&self) -> Result<Vec<CategoryDefinition>> {
+        let response =
+            self.get("/categories.json?show_permissions=true&include_subcategories=true")?;
+        let status = response.status();
+        let text = response
+            .text()
+            .context("reading category definitions response body")?;
+        if !status.is_success() {
+            return Err(http_error("category definitions request", status, &text));
+        }
+        let body: CategoryDefinitionsResponse =
+            serde_json::from_str(&text).context("reading category definitions json")?;
+        Ok(body.category_list.categories)
+    }
+
+    /// Create a category from raw form params, returning the new category's ID.
+    /// The caller assembles the definition params (name is required); this is
+    /// the full-definition counterpart to [`create_category`], which sends only
+    /// the four fields `category copy` needs.
+    pub fn create_category_def(&self, params: &[(String, String)]) -> Result<u64> {
+        let response = self.send_retrying(|| Ok(self.post("/categories")?.form(params)))?;
+        let status = response.status();
+        let text = response
+            .text()
+            .context("reading create category response body")?;
+        if !status.is_success() {
+            return Err(http_error("create category request", status, &text));
+        }
+        let body: CreateCategoryResponse =
+            serde_json::from_str(&text).context("reading create category response")?;
+        Ok(body.category.id)
+    }
+
+    /// Update a category's definition from raw form params
+    /// (`PUT /categories/{id}.json`). The endpoint missing from `dsc` until now.
+    pub fn update_category(&self, id: u64, params: &[(String, String)]) -> Result<()> {
+        let path = format!("/categories/{}.json", id);
+        let response = self.send_retrying(|| Ok(self.put(&path)?.form(params)))?;
+        let status = response.status();
+        let text = response
+            .text()
+            .context("reading update category response body")?;
+        if !status.is_success() {
+            return Err(http_error("update category request", status, &text));
+        }
+        Ok(())
     }
 
     fn fetch_site_categories(&self) -> Result<Vec<CategoryInfo>> {

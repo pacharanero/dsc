@@ -40,7 +40,7 @@ Spec: [update-concurrency](commands/update-concurrency.md).
 ### Content sync
 
 - [ ] ⭐ **`category` Phase 5** - `--convert-admonitions` / `--rewrite-links` for MkDocs↔Discourse portability (the only remaining gap; phases 1-4, 6 shipped). Spec: [category-workflow](commands/category-workflow.md).
-- [ ] ⭐ **`category` definition sync** - `category def pull/push` (declarative file round-trip of category *definitions*: description, permissions, position, topic template, tag rules) + `category settings get/set` (imperative single-field). Fills the gap beside the topic-content `category pull/push`. Spec: [category-definition-sync](commands/category-definition-sync.md).
+- [x] ⭐ **`category` definition sync** - `category def pull/push` (declarative file round-trip of category *definitions*: description, permissions, position, topic template, tag rules) + `category show/get/set` (imperative single-field). Fills the gap beside the topic-content `category pull/push`. **Phase 1 implemented (unreleased)**, verified on koloki-demo; Phases 2-3 (rename, list `--append`/`--remove`, prune, `def diff`) planned. Spec: [category-definition-sync](commands/category-definition-sync.md).
 
 ### New command surfaces
 

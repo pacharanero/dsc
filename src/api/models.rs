@@ -93,6 +93,80 @@ pub struct CategoryInfo {
     pub parent_category_id: Option<u64>,
 }
 
+/// One group's permission on a category, as returned in `group_permissions`.
+/// `permission_type`: 1 = full, 2 = create_post, 3 = readonly.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GroupPermission {
+    #[serde(default)]
+    pub group_name: Option<String>,
+    pub permission_type: u8,
+}
+
+/// The full definition of a category (from `/categories.json?show_permissions=true`).
+///
+/// Distinct from the sparse [`CategoryInfo`] used by `category list`: this carries
+/// the definition surface (description, permissions, topic template, tag rules,
+/// ordering) that `category def pull/push` and `category show/get/set` operate on.
+/// Every field beyond `name` is optional so partial payloads still deserialize.
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct CategoryDefinition {
+    #[serde(default)]
+    pub id: Option<u64>,
+    pub name: String,
+    #[serde(default)]
+    pub slug: Option<String>,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub text_color: Option<String>,
+    #[serde(default)]
+    pub position: Option<i64>,
+    #[serde(default)]
+    pub parent_category_id: Option<u64>,
+    #[serde(default)]
+    pub read_restricted: Option<bool>,
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Plain-text form of `description`. `description` itself is the *cooked*
+    /// excerpt of the category's auto-created "About" topic (HTML, and settles
+    /// asynchronously after creation), so definition sync reads this instead for
+    /// a stable, idempotent round-trip.
+    #[serde(default)]
+    pub description_text: Option<String>,
+    #[serde(default)]
+    pub topic_template: Option<String>,
+    #[serde(default)]
+    pub group_permissions: Option<Vec<GroupPermission>>,
+    #[serde(default)]
+    pub allowed_tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub allowed_tag_groups: Option<Vec<String>>,
+    #[serde(default)]
+    pub minimum_required_tags: Option<u64>,
+    #[serde(default)]
+    pub sort_order: Option<String>,
+    #[serde(default)]
+    pub default_view: Option<String>,
+    #[serde(default)]
+    pub subcategory_list_style: Option<String>,
+    #[serde(default)]
+    pub num_featured_topics: Option<u64>,
+    #[serde(default)]
+    pub show_subcategory_list: Option<bool>,
+}
+
+/// Response payload for `/categories.json?show_permissions=true`.
+#[derive(Debug, Deserialize)]
+pub struct CategoryDefinitionsResponse {
+    pub category_list: CategoryDefinitionList,
+}
+
+/// Category definition listing.
+#[derive(Debug, Deserialize)]
+pub struct CategoryDefinitionList {
+    pub categories: Vec<CategoryDefinition>,
+}
+
 /// Response payload for categories.json.
 #[derive(Debug, Deserialize)]
 pub struct CategoriesResponse {

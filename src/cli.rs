@@ -715,6 +715,68 @@ pub enum CategoryCommand {
         #[arg(long)]
         skip_revision: bool,
     },
+    /// Sync category *definitions* (name, colour, permissions, topic template,
+    /// tag rules, ...) as a file. Distinct from `pull`/`push`, which sync topic
+    /// content.
+    Def {
+        #[command(subcommand)]
+        command: CategoryDefCommand,
+    },
+    /// Show all definition fields of one category.
+    Show {
+        /// Discourse name.
+        discourse: String,
+        /// Category ID, slug, or name.
+        category: String,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Print one definition field of a category.
+    Get {
+        /// Discourse name.
+        discourse: String,
+        /// Category ID, slug, or name.
+        category: String,
+        /// Field name (e.g. description, topic_template, color).
+        field: String,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Set one definition field of a category.
+    Set {
+        /// Discourse name.
+        discourse: String,
+        /// Category ID, slug, or name.
+        category: String,
+        /// Field name (e.g. description, topic_template, color).
+        field: String,
+        /// New value. For list fields (allowed_tags, allowed_tag_groups) use a
+        /// comma-separated list; for permissions use `group:level,...`.
+        value: String,
+    },
+}
+
+#[derive(Subcommand)]
+#[command(next_display_order = None)]
+pub enum CategoryDefCommand {
+    /// Snapshot every category definition to a file.
+    #[command(visible_alias = "pl")]
+    Pull {
+        /// Discourse name.
+        discourse: String,
+        /// Destination file (defaults to categories.yaml).
+        local_path: Option<PathBuf>,
+    },
+    /// Apply a category-definition file to a Discourse (upsert; never deletes).
+    #[command(visible_alias = "ps")]
+    Push {
+        /// Discourse name.
+        discourse: String,
+        /// Local categories.yaml (or .json) file.
+        local_path: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]

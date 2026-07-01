@@ -4,6 +4,7 @@ pub mod api_key;
 pub mod backup;
 pub mod backup_s3;
 pub mod category;
+pub mod category_def;
 pub mod common;
 pub mod completions;
 pub mod config;

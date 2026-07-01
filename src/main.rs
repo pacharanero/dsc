@@ -352,6 +352,50 @@ fn main() -> Result<()> {
                     skip_revision,
                 },
             ),
+
+            CategoryCommand::Def { command } => match command {
+                CategoryDefCommand::Pull {
+                    discourse,
+                    local_path,
+                } => commands::category_def::category_def_pull(
+                    &config,
+                    &discourse,
+                    local_path.as_deref(),
+                ),
+                CategoryDefCommand::Push {
+                    discourse,
+                    local_path,
+                } => commands::category_def::category_def_push(
+                    &config,
+                    &discourse,
+                    &local_path,
+                    dry_run,
+                ),
+            },
+
+            CategoryCommand::Show {
+                discourse,
+                category,
+                format,
+            } => commands::category_def::category_show(&config, &discourse, &category, format),
+
+            CategoryCommand::Get {
+                discourse,
+                category,
+                field,
+                format,
+            } => {
+                commands::category_def::category_get(&config, &discourse, &category, &field, format)
+            }
+
+            CategoryCommand::Set {
+                discourse,
+                category,
+                field,
+                value,
+            } => commands::category_def::category_set(
+                &config, &discourse, &category, &field, &value, dry_run,
+            ),
         },
 
         Commands::Group { command } => match command {
