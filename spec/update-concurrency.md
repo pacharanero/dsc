@@ -1,9 +1,11 @@
 # `dsc update` - leaner parallelism flag + don't collide with an in-flight rebuild
 
-> **Status: proposed (field-driven, 2026-07-01).** Two refinements to `dsc update`
+> **Status: implemented (unreleased).** Two refinements to `dsc update`
 > surfaced during a fleet update (`dsc update all -p -m 2 -y`): a cleaner parallel
-> flag, and - more importantly - a pre-flight that stops `dsc` from stomping a
-> rebuild that is already running on a host.
+> flag (`-p [N]`, `-m` removed), and - more importantly - a pre-flight that stops
+> `dsc` from stomping a rebuild already running on a host. Both verified on
+> koloki-demo (a held-open fake `./launcher rebuild` process; `dsc update` skips
+> the forum before any OS op, exit 0).
 
 Driver: the Koloki / Baw Medical fleet update on 2026-07-01. One forum (igkt) failed to rebuild (an unrelated leftover MySQL import template), and while supervising a manual `./launcher rebuild app` in another terminal, re-running `dsc update all` would have been unsafe - see Motivation.
 
@@ -53,8 +55,8 @@ This is distinct from the existing **skip-if-current** gate (`is_discourse_up_to
 
 ## Phases
 
-- [ ] **Phase 1:** `-p [N]` folding (remove `-m`); dispatch + `update_all` signature simplified; `--help` note about arg ordering.
-- [ ] **Phase 2:** pre-flight rebuild-lock check (`pgrep -f 'launcher rebuild'`) at the top of `run_update`; skip-with-message; `--force` override; distinct tally in `update all`. Verify on koloki-demo (start a throwaway `./launcher rebuild`, confirm `dsc` skips it) - never on a customer box.
+- [x] **Phase 1:** `-p [N]` folding (removed `-m`); dispatch + `update_all` signature simplified; `--help` notes the arg ordering. `-p 0` rejected; `-p` on a single forum rejected.
+- [x] **Phase 2:** pre-flight rebuild-lock check at the top of `run_update` via `REBUILD_CHECK_CMD` (`pgrep -f '[l]auncher rebuild'`, bracketed to avoid self-match, always exits 0); returns `UpdateOutcome::SkippedRebuildInProgress`; `--force` override. Verified live on koloki-demo. (A distinct cross-worker tally in parallel `update all` is a further nice-to-have, not done - each forum still reports its own outcome.)
 
 ## Out of scope
 

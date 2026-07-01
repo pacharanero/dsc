@@ -15,37 +15,45 @@ use std::time::Duration;
 
 const DEFAULT_PARALLEL_UPDATE_WORKERS: usize = 3;
 
-pub fn update_one(config: &Config, name: &str, post_changelog: bool, yes: bool) -> Result<()> {
+pub fn update_one(
+    config: &Config,
+    name: &str,
+    post_changelog: bool,
+    yes: bool,
+    force: bool,
+) -> Result<()> {
     let discourse =
         find_discourse(config, name).ok_or_else(|| anyhow!("discourse not found: {}", name))?;
-    let metadata = run_update(discourse)?;
-    let payload = print_update_summary(discourse, &metadata);
-    if post_changelog {
-        handle_changelog_post(discourse, &payload, yes)?;
+    if let UpdateOutcome::Updated(metadata) = run_update(discourse, force)? {
+        let payload = print_update_summary(discourse, &metadata);
+        if post_changelog {
+            handle_changelog_post(discourse, &payload, yes)?;
+        }
     }
     Ok(())
 }
 
 pub fn update_all(
     config: &Config,
-    parallel: bool,
-    max: Option<usize>,
+    parallel: Option<usize>,
     post_changelog: bool,
     yes: bool,
+    force: bool,
 ) -> Result<()> {
-    if !parallel {
+    let Some(width) = parallel else {
         for discourse in &config.discourse {
             if discourse.ssh_host.is_none() {
                 continue;
             }
-            let metadata = run_update(discourse)?;
-            let payload = print_update_summary(discourse, &metadata);
-            if post_changelog {
-                handle_changelog_post(discourse, &payload, yes)?;
+            if let UpdateOutcome::Updated(metadata) = run_update(discourse, force)? {
+                let payload = print_update_summary(discourse, &metadata);
+                if post_changelog {
+                    handle_changelog_post(discourse, &payload, yes)?;
+                }
             }
         }
         return Ok(());
-    }
+    };
 
     let updatable: Vec<_> = config
         .discourse
@@ -53,7 +61,7 @@ pub fn update_all(
         .filter(|d| d.ssh_host.is_some())
         .cloned()
         .collect();
-    let max_threads = parallel_worker_count(max, updatable.len());
+    let max_threads = parallel_worker_count(Some(width), updatable.len());
     let mut handles: Vec<thread::JoinHandle<Result<()>>> = Vec::new();
     for discourse in updatable {
         if handles.len() >= max_threads
@@ -64,10 +72,11 @@ pub fn update_all(
         let do_post = post_changelog;
         let auto_yes = yes;
         handles.push(thread::spawn(move || {
-            let metadata = run_update(&discourse)?;
-            let payload = print_update_summary(&discourse, &metadata);
-            if do_post {
-                handle_changelog_post(&discourse, &payload, auto_yes)?;
+            if let UpdateOutcome::Updated(metadata) = run_update(&discourse, force)? {
+                let payload = print_update_summary(&discourse, &metadata);
+                if do_post {
+                    handle_changelog_post(&discourse, &payload, auto_yes)?;
+                }
             }
             Ok::<_, anyhow::Error>(())
         }));
@@ -98,6 +107,15 @@ mod tests {
     fn max_workers_is_capped_by_discourse_count() {
         assert_eq!(parallel_worker_count(Some(8), 2), 2);
     }
+
+    #[test]
+    fn rebuild_check_avoids_self_match() {
+        // The bracketed pattern must match a real `./launcher rebuild` but NOT
+        // contain the literal "launcher rebuild" - otherwise pgrep matches its
+        // own shell and every host looks busy.
+        assert!(super::REBUILD_CHECK_CMD.contains("[l]auncher rebuild"));
+        assert!(!super::REBUILD_CHECK_CMD.contains("launcher rebuild"));
+    }
 }
 
 struct UpdateMetadata {
@@ -113,7 +131,26 @@ struct UpdateMetadata {
     server_rebooted: bool,
 }
 
-fn run_update(discourse: &DiscourseConfig) -> Result<UpdateMetadata> {
+/// The result of one forum's update pass.
+enum UpdateOutcome {
+    Updated(UpdateMetadata),
+    /// A `./launcher rebuild` was already running on the host, so the whole
+    /// forum was left untouched (no OS update, no reboot, no rebuild).
+    SkippedRebuildInProgress,
+}
+
+/// Detect an in-progress `./launcher rebuild` on the host. The `[l]auncher`
+/// bracket keeps pgrep from matching its own shell (its cmdline holds
+/// `[l]auncher`, not `launcher`), and the `&& … || …` makes the check always
+/// exit 0 so a "not running" result isn't surfaced as an ssh error.
+const REBUILD_CHECK_CMD: &str =
+    "pgrep -f '[l]auncher rebuild' >/dev/null 2>&1 && echo REBUILDING || echo IDLE";
+
+fn rebuild_in_progress(target: &str) -> Result<bool> {
+    Ok(run_ssh_command(target, REBUILD_CHECK_CMD)?.contains("REBUILDING"))
+}
+
+fn run_update(discourse: &DiscourseConfig, force: bool) -> Result<UpdateOutcome> {
     let client = DiscourseClient::new(discourse)?;
     let target = discourse
         .ssh_host
@@ -121,6 +158,20 @@ fn run_update(discourse: &DiscourseConfig) -> Result<UpdateMetadata> {
         .unwrap_or_else(|| discourse.name.clone());
     let discourse_label = colored_discourse_display(discourse);
     println!("\n==> Updating {} ({})", discourse_label, target);
+
+    // Never step on a rebuild that's already running - dsc's first destructive
+    // act would be a reboot, which would kill an in-flight `./launcher rebuild`.
+    if !force {
+        stage(&discourse_label, "Checking for an in-progress rebuild");
+        if rebuild_in_progress(&target)? {
+            stage(
+                &discourse_label,
+                "A ./launcher rebuild is already running - skipping this forum (use --force to override)",
+            );
+            return Ok(UpdateOutcome::SkippedRebuildInProgress);
+        }
+    }
+
     stage(
         &discourse_label,
         "Fetching Discourse version (before update)",
@@ -328,7 +379,7 @@ fn run_update(discourse: &DiscourseConfig) -> Result<UpdateMetadata> {
         }
     };
 
-    Ok(UpdateMetadata {
+    Ok(UpdateOutcome::Updated(UpdateMetadata {
         before_version: before_info.version,
         before_commit: before_info.commit,
         after_version: after_info.version,
@@ -339,7 +390,7 @@ fn run_update(discourse: &DiscourseConfig) -> Result<UpdateMetadata> {
         root_disk_usage,
         os_updated,
         server_rebooted,
-    })
+    }))
 }
 
 pub(crate) fn run_ssh_command(target: &str, command: &str) -> Result<String> {

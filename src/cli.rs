@@ -75,18 +75,20 @@ pub enum Commands {
     Update {
         /// Discourse name, or 'all' to update every configured Discourse.
         name: String,
-        /// Parallel update mode for `dsc update all`.
-        #[arg(long, short = 'p')]
-        parallel: bool,
-        /// Maximum workers when parallel mode is enabled (default: 3).
-        #[arg(long, short = 'm')]
-        max: Option<usize>,
+        /// Parallel mode for `dsc update all`: `-p` runs 3 at once, `-p N`
+        /// runs N. Put the forum name before `-p` (e.g. `update all -p 4`).
+        #[arg(long, short = 'p', num_args = 0..=1, default_missing_value = "3", value_name = "N")]
+        parallel: Option<usize>,
         /// Disable changelog posting (posting prompt is on by default).
         #[arg(long = "no-changelog", action = ArgAction::SetFalse, default_value_t = true)]
         post_changelog: bool,
         /// Auto-confirm changelog posting prompt (non-interactive mode).
         #[arg(long, short = 'y')]
         yes: bool,
+        /// Update even if a `./launcher rebuild` is already running on the host
+        /// (by default such a forum is skipped, to avoid colliding).
+        #[arg(long)]
+        force: bool,
     },
     /// Manage custom emoji.
     #[command(visible_alias = "em")]

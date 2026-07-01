@@ -33,8 +33,8 @@ Polish before announcing on [meta.discourse.org](https://meta.discourse.org).
 
 Spec: [update-concurrency](update-concurrency.md).
 
-- [ ] **Leaner `-p [N]`** - fold `-p`/`--parallel` + `-m`/`--max` into one optional-value flag (`-p` = default width, `-p N` = N workers); drop `-m`.
-- [ ] **Rebuild-lock pre-flight** - skip a forum that already has a `./launcher rebuild` in flight (`pgrep -f 'launcher rebuild'`), *before* the reboot, so a re-run never stomps a supervised rebuild. `--force` to override.
+- [x] **Leaner `-p [N]`** - folded `-p`/`--parallel` + `-m`/`--max` into one optional-value flag (`-p` = width 3, `-p N` = N workers); `-m` dropped. Implemented (unreleased).
+- [x] **Rebuild-lock pre-flight** - skips a forum that already has a `./launcher rebuild` in flight (`pgrep -f '[l]auncher rebuild'`), *before* the reboot, so a re-run never stomps a supervised rebuild. `--force` overrides. Implemented (unreleased); verified on koloki-demo.
 
 ### Content sync
 
