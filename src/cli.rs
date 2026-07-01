@@ -885,21 +885,36 @@ pub enum ThemeCommand {
         #[arg(long, short = 'v')]
         verbose: bool,
     },
-    /// Install a theme from URL.
+    /// Install a theme from a git repo or a local bundle file (via the API).
     #[command(visible_alias = "i")]
+    #[command(after_help = "Examples:
+  dsc theme install myforum https://github.com/org/theme
+  dsc theme install myforum https://user:TOKEN@github.com/org/private-theme.git
+  dsc theme install myforum ./my-theme.tar.gz")]
     Install {
         /// Discourse name.
         discourse: String,
-        /// Theme repository URL.
-        url: String,
+        /// Git repo URL (creds may be embedded for private repos) or a local
+        /// bundle file (`.tar.gz`/zip theme export).
+        source: String,
+        /// Git branch to import (remote only; defaults to the repo's default).
+        #[arg(long, short = 'b')]
+        branch: Option<String>,
     },
-    /// Remove a theme by name.
+    /// Remove a theme by name (SSH rake). Prefer `theme delete <id>` (API).
     #[command(visible_alias = "rm")]
     Remove {
         /// Discourse name.
         discourse: String,
         /// Theme name.
         name: String,
+    },
+    /// Delete a theme/component by id via the API. Honours `--dry-run`.
+    Delete {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID (from `dsc theme list`).
+        theme_id: u64,
     },
     /// Pull a theme to a local JSON file.
     #[command(visible_alias = "pl")]
@@ -1083,6 +1098,15 @@ pub enum ThemeAssetCommand {
         name: String,
         /// File to upload (image/font).
         file: PathBuf,
+    },
+    /// Remove a bound upload asset (`$var`). Honours global `--dry-run`.
+    Unset {
+        /// Discourse name.
+        discourse: String,
+        /// Theme ID.
+        theme_id: u64,
+        /// Upload-var name to unbind.
+        name: String,
     },
 }
 

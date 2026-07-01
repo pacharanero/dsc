@@ -136,7 +136,7 @@ dsc update myforum
   - [category](docs/category.md) — list, pull, push, and copy categories
   - [palette](docs/palette.md) — list, pull, and push colour palettes
   - [plugin](docs/plugin.md) — list, install, and remove plugins
-  - [theme](docs/theme.md) — list, install, remove, pull, push, and duplicate themes
+  - [theme](docs/theme.md) — install (git/bundle), delete, list, pull, push, duplicate; edit settings, fields (SCSS), and assets; enable/attach components; update remotes
   - [group](docs/group.md) — list, inspect, copy, and bulk-add members
   - [user](docs/user.md) — list, inspect, suspend, archive activity, and manage group memberships
   - [sar](docs/sar.md) — export everything a forum holds about one person as a GDPR Subject Access Request bundle

@@ -77,30 +77,117 @@ pub fn theme_list(
     Ok(())
 }
 
+/// Install a theme/component via the admin import API, from either a git repo
+/// (a URL, optionally with embedded credentials for a private repo) or a local
+/// bundle file (a `.tar.gz`/zip theme export).
 pub fn theme_install(
     config: &Config,
     discourse_name: &str,
-    url: &str,
+    source: &str,
+    branch: Option<&str>,
     dry_run: bool,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
-    let target = ssh_target(discourse);
-    let template = std::env::var("DSC_SSH_THEME_INSTALL_CMD")
-        .map_err(|_| {
-            anyhow!(
-                "missing DSC_SSH_THEME_INSTALL_CMD for theme install; set DSC_SSH_THEME_INSTALL_CMD to your install command"
-            )
-        })?;
-    let command = render_template(&template, &[("url", url), ("name", url)]);
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let remote = looks_like_git_url(source);
+
     if dry_run {
-        println!("[dry-run] would run on {}: {}", target, command);
+        if remote {
+            let branch_note = branch
+                .filter(|b| !b.is_empty())
+                .map(|b| format!(" (branch {})", b))
+                .unwrap_or_default();
+            println!(
+                "[dry-run] {}: would import theme from {}{}",
+                discourse.name,
+                redact_url(source),
+                branch_note
+            );
+        } else {
+            println!(
+                "[dry-run] {}: would import theme from local bundle {}",
+                discourse.name, source
+            );
+        }
         return Ok(());
     }
-    let output = run_ssh_command(&target, &command)?;
-    println!("Theme install completed: {}", url);
-    if !output.trim().is_empty() {
-        println!("{}", output.trim());
+
+    let result = if remote {
+        client.import_theme_remote(source, branch)?
+    } else {
+        let path = Path::new(source);
+        if !path.is_file() {
+            return Err(anyhow!(
+                "`{}` is neither a git URL nor an existing local bundle file",
+                source
+            ));
+        }
+        client.import_theme_bundle(path)?
+    };
+
+    let theme = extract_theme(&result);
+    let name = theme.get("name").and_then(|v| v.as_str()).unwrap_or("(unknown)");
+    match theme.get("id").and_then(|v| v.as_u64()) {
+        Some(id) => println!("{}: installed \"{}\" (theme {})", discourse.name, name, id),
+        None => println!("{}: theme import completed", discourse.name),
     }
+    Ok(())
+}
+
+/// Heuristic: does this install source look like a git URL (vs a local path)?
+fn looks_like_git_url(s: &str) -> bool {
+    s.starts_with("http://")
+        || s.starts_with("https://")
+        || s.starts_with("git@")
+        || s.starts_with("ssh://")
+        || s.ends_with(".git")
+}
+
+/// Redact `user:token@` credentials from a URL before printing it.
+fn redact_url(url: &str) -> String {
+    if let Some(scheme_end) = url.find("://") {
+        let rest = &url[scheme_end + 3..];
+        if let Some(at) = rest.find('@') {
+            return format!("{}://***@{}", &url[..scheme_end], &rest[at + 1..]);
+        }
+    }
+    url.to_string()
+}
+
+/// Delete a theme/component by id via the admin API. Refuses the site default.
+pub fn theme_delete(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    let name = theme
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("(unknown)")
+        .to_string();
+    if theme.get("default").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return Err(anyhow!(
+            "theme {} (\"{}\") is the site default; set another theme as default before deleting it",
+            theme_id,
+            name
+        ));
+    }
+    if dry_run {
+        println!(
+            "[dry-run] {}: would delete theme {} (\"{}\")",
+            discourse.name, theme_id, name
+        );
+        return Ok(());
+    }
+    client.delete_theme(theme_id)?;
+    println!("{}: deleted theme {} (\"{}\")", discourse.name, theme_id, name);
     Ok(())
 }
 
@@ -1087,6 +1174,49 @@ pub fn theme_asset_set(
     Ok(())
 }
 
+/// Remove a theme upload var binding. Clearing the field's value and upload
+/// deletes the `theme_upload_var` field server-side.
+pub fn theme_asset_unset(
+    config: &Config,
+    discourse_name: &str,
+    theme_id: u64,
+    var_name: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let response = client.fetch_theme(theme_id)?;
+    let theme = extract_theme(&response);
+    if find_theme_field(theme, "common", var_name).is_none() {
+        return Err(anyhow!(
+            "theme {} has no asset ${} (see `dsc theme asset list {}`)",
+            theme_id,
+            var_name,
+            discourse_name
+        ));
+    }
+    if dry_run {
+        println!(
+            "[dry-run] {}: would unbind ${} from theme {}",
+            discourse.name, var_name, theme_id
+        );
+        return Ok(());
+    }
+    let body = json!({
+        "theme_fields": [{
+            "target": "common",
+            "name": var_name,
+            "type_id": 2,
+            "value": "",
+            "upload_id": null
+        }]
+    });
+    client.update_theme(theme_id, &body)?;
+    println!("{}: unbound ${} from theme {}", discourse.name, var_name, theme_id);
+    Ok(())
+}
+
 // ─── theme update (remote/git-backed component refresh) ────────────────────
 
 /// Pull a git-backed remote component to its latest upstream commit. With
@@ -1647,6 +1777,31 @@ mod tests {
     fn short_hash_takes_eight() {
         assert_eq!(short_hash("0f474e72e256f4dfcd6685"), "0f474e72");
         assert_eq!(short_hash("abc"), "abc");
+    }
+
+    #[test]
+    fn looks_like_git_url_distinguishes_urls_from_paths() {
+        assert!(looks_like_git_url("https://github.com/org/theme"));
+        assert!(looks_like_git_url("http://x/y"));
+        assert!(looks_like_git_url("git@github.com:org/theme.git"));
+        assert!(looks_like_git_url("ssh://git@host/repo"));
+        assert!(looks_like_git_url("/tmp/theme.git")); // .git suffix
+        assert!(!looks_like_git_url("./my-theme.tar.gz"));
+        assert!(!looks_like_git_url("/home/me/theme.zip"));
+    }
+
+    #[test]
+    fn redact_url_hides_credentials() {
+        assert_eq!(
+            redact_url("https://user:token@github.com/org/private.git"),
+            "https://***@github.com/org/private.git"
+        );
+        // No credentials -> unchanged.
+        assert_eq!(
+            redact_url("https://github.com/org/public"),
+            "https://github.com/org/public"
+        );
+        assert_eq!(redact_url("./local.tar.gz"), "./local.tar.gz");
     }
 
     #[test]

@@ -601,12 +601,24 @@ fn main() -> Result<()> {
                 format,
                 verbose,
             } => commands::theme::theme_list(&config, &discourse, format, verbose),
-            ThemeCommand::Install { discourse, url } => {
-                commands::theme::theme_install(&config, &discourse, &url, dry_run)
-            }
+            ThemeCommand::Install {
+                discourse,
+                source,
+                branch,
+            } => commands::theme::theme_install(
+                &config,
+                &discourse,
+                &source,
+                branch.as_deref(),
+                dry_run,
+            ),
             ThemeCommand::Remove { discourse, name } => {
                 commands::theme::theme_remove(&config, &discourse, &name, dry_run)
             }
+            ThemeCommand::Delete {
+                discourse,
+                theme_id,
+            } => commands::theme::theme_delete(&config, &discourse, theme_id, dry_run),
             ThemeCommand::Pull {
                 discourse,
                 theme_id,
@@ -748,6 +760,13 @@ fn main() -> Result<()> {
                     file,
                 } => commands::theme::theme_asset_set(
                     &config, &discourse, theme_id, &name, &file, dry_run,
+                ),
+                ThemeAssetCommand::Unset {
+                    discourse,
+                    theme_id,
+                    name,
+                } => commands::theme::theme_asset_unset(
+                    &config, &discourse, theme_id, &name, dry_run,
                 ),
             },
             ThemeCommand::Update {

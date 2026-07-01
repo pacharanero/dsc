@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use serde_json::{Value, json};
+use std::path::Path;
 
 use super::client::DiscourseClient;
 use super::error::http_error;
@@ -104,5 +105,48 @@ impl DiscourseClient {
         }
         let value: Value = serde_json::from_str(&text).context("parsing theme flag response")?;
         Ok(value)
+    }
+
+    /// Import a theme/component from a git repo via
+    /// `POST /admin/themes/import.json`. `remote` may embed credentials for a
+    /// private repo (`https://user:token@host/...`). Returns the created theme
+    /// JSON. Retries only on 429 (which means the import didn't run), so a slow
+    /// clone won't double-import.
+    pub fn import_theme_remote(&self, remote: &str, branch: Option<&str>) -> Result<Value> {
+        let mut form: Vec<(&str, &str)> = vec![("remote", remote)];
+        if let Some(b) = branch.filter(|b| !b.is_empty()) {
+            form.push(("branch", b));
+        }
+        let response =
+            self.send_retrying(|| Ok(self.post("/admin/themes/import.json")?.form(&form)))?;
+        let status = response.status();
+        let text = response.text().context("reading theme import response")?;
+        if !status.is_success() {
+            return Err(http_error("theme import request", status, &text));
+        }
+        serde_json::from_str(&text).context("parsing theme import response")
+    }
+
+    /// Import a theme/component from a local bundle file (`.tar.gz`/zip export)
+    /// via `POST /admin/themes/import.json` with the `bundle` multipart part.
+    pub fn import_theme_bundle(&self, file: &Path) -> Result<Value> {
+        let make_form = || -> Result<reqwest::blocking::multipart::Form> {
+            let bytes = std::fs::read(file).with_context(|| format!("reading {}", file.display()))?;
+            let filename = file
+                .file_name()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| anyhow!("theme bundle path missing filename: {}", file.display()))?
+                .to_string();
+            let part = reqwest::blocking::multipart::Part::bytes(bytes).file_name(filename);
+            Ok(reqwest::blocking::multipart::Form::new().part("bundle", part))
+        };
+        let response =
+            self.send_retrying(|| Ok(self.post("/admin/themes/import.json")?.multipart(make_form()?)))?;
+        let status = response.status();
+        let text = response.text().context("reading theme bundle import response")?;
+        if !status.is_success() {
+            return Err(http_error("theme bundle import request", status, &text));
+        }
+        serde_json::from_str(&text).context("parsing theme bundle import response")
     }
 }

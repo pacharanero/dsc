@@ -1,6 +1,6 @@
 # dsc theme
 
-List, install, remove, pull, push, and duplicate themes; read/write a theme's settings, fields (SCSS/HTML), and upload assets; enable/disable and attach/detach components; and update git-backed remote components.
+Install (from git or a local bundle), delete, list, pull, push, and duplicate themes; read/write a theme's settings, fields (SCSS/HTML), and upload assets; enable/disable and attach/detach components; and update git-backed remote components.
 
 ## dsc theme list
 
@@ -13,10 +13,27 @@ Lists installed themes on the specified Discourse.
 ## dsc theme install
 
 ```
-dsc theme install <discourse> <url>
+dsc theme install <discourse> <source> [--branch <branch>]
 ```
 
-Installs a theme using the SSH command template in `DSC_SSH_THEME_INSTALL_CMD`. The template supports `{url}` and `{name}` placeholders.
+Installs a theme/component via the admin import API (`POST /admin/themes/import.json`). `<source>` is either:
+
+- a **git repo URL** - imported by the server. Private repos work by embedding credentials in the URL (`https://user:TOKEN@github.com/org/repo.git`); the token is redacted in `--dry-run` output. `--branch`/`-b` selects a branch (defaults to the repo's default).
+- a **local bundle file** - a `.tar.gz`/zip theme export, uploaded and imported.
+
+```bash
+dsc theme install myforum https://github.com/org/theme
+dsc theme install myforum https://user:TOKEN@github.com/org/private-theme.git -b main
+dsc theme install myforum ./my-theme.tar.gz
+```
+
+## dsc theme delete
+
+```
+dsc theme delete <discourse> <theme-id>
+```
+
+Deletes a theme/component by id via the API (`DELETE /admin/themes/:id.json`). Refuses to delete the site default theme (reassign the default first). Honours `-n` / `--dry-run`. Prefer this over `theme remove` - it needs no SSH setup.
 
 ## dsc theme remove
 
@@ -24,7 +41,7 @@ Installs a theme using the SSH command template in `DSC_SSH_THEME_INSTALL_CMD`. 
 dsc theme remove <discourse> <name>
 ```
 
-Removes a theme using the SSH command template in `DSC_SSH_THEME_REMOVE_CMD`. The template supports `{name}` and `{url}` placeholders.
+Legacy SSH removal by name, using the command template in `DSC_SSH_THEME_REMOVE_CMD` (supports `{name}` and `{url}` placeholders). Prefer `dsc theme delete <id>`, which uses the API and needs no SSH template.
 
 ## dsc theme pull
 
@@ -138,17 +155,20 @@ dsc theme field push accm 11 common/scss common.scss
 Upload an image or font and bind it to a theme upload variable (`$name`) in one step, so the theme's SCSS/settings can reference it.
 
 ```
-dsc theme asset list <discourse> <theme-id> [--format text|json|yaml]
-dsc theme asset set  <discourse> <theme-id> <name> <file>   [--dry-run]
+dsc theme asset list  <discourse> <theme-id> [--format text|json|yaml]
+dsc theme asset set   <discourse> <theme-id> <name> <file>   [--dry-run]
+dsc theme asset unset <discourse> <theme-id> <name>          [--dry-run]
 ```
 
 - `set` uploads `<file>`, then binds it as a `theme_upload_var` field named `<name>` on the `common` target - referenceable as `$name` in the theme's SCSS.
 - `list` shows the theme's bound upload assets (name, filename, URL).
+- `unset` removes a binding (deletes the `theme_upload_var` field).
 - Site-wide header logos (`logo`, `logo_small`, `mobile_logo`) are **site settings**, not theme assets - set those with `dsc setting set` + `dsc upload`. `theme asset` is for theme-scoped `$var` images/fonts.
 
 ```bash
 dsc theme asset set accm 11 centred_logo ./logo.png
 dsc theme asset list accm 11
+dsc theme asset unset accm 11 centred_logo
 ```
 
 ## dsc theme enable / disable
