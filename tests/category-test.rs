@@ -123,7 +123,7 @@ fn category_push() {
 
     let dir = TempDir::new().expect("tempdir");
     let file_path = dir.path().join("category-push.md");
-    let title = format!("E2E Category Push {}", &marker);
+    let title = format!("E2E Category Push {}", marker);
     fs::write(&file_path, format!("# {}\n\n{}", title, marker)).expect("write file");
     let config_path = write_temp_config(
         &dir,

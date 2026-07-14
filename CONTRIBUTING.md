@@ -30,6 +30,7 @@ git clone https://github.com/pacharanero/dsc.git
 cd dsc
 cargo build
 cargo test
+s/install-hooks # optional but encouraged: enables the tracked pre-commit lint hook
 ```
 
 ### Conventions
@@ -40,12 +41,13 @@ cargo test
   - help text on the CLI (`#[arg(help = …)]` or doc-comment)
   - a section in the matching `docs/<command>.md`
   - a row in [README.md](README.md) "Documentation" if it's a new top-level command
+- **Local hooks (optional but encouraged).** Run `s/install-hooks` once per checkout. The tracked pre-commit hook runs `s/lint` (fmt + strict Clippy); full tests remain separate so commits stay quick.
 - **No version-bump commits without a feature** — `s/version++ patch` is for release-worthy changes, not docs polish. Pure docs commits use `docs:` prefix and no bump.
 
 ### Pull requests
 
 - Keep PRs focused on one change.
-- Run `cargo test` and `cargo clippy` before pushing.
+- Run `s/test-fmt-clippy` before pushing; it mirrors CI's formatting, strict Clippy, and full test gate.
 - Reference the issue or spec in the PR description.
 
 ## Project layout

@@ -406,7 +406,7 @@ fn fetch_topic_brief(
     match client.fetch_topic(topic_id, false) {
         Ok(topic) => {
             let title = topic_display_title(&topic, topic_id);
-            let count = topic.posts_count.unwrap_or_else(|| {
+            let count = topic.posts_count.unwrap_or({
                 if !topic.post_stream.stream.is_empty() {
                     topic.post_stream.stream.len() as u64
                 } else {

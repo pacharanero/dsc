@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Install tracked local Git hooks for this checkout. Hooks are opt-in and this
+# script deliberately does not write into the untracked .git/hooks directory.
+
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+if [[ ! -d .githooks ]]; then
+  echo "No .githooks directory found." >&2
+  exit 1
+fi
+
+git config core.hooksPath .githooks
+echo "Git hooks installed: core.hooksPath=.githooks"

@@ -19,7 +19,7 @@ where
     D: Deserializer<'de>,
 {
     let value = Option::<String>::deserialize(deserializer)?;
-    Ok(value.and_then(|s| if s.is_empty() { None } else { Some(s) }))
+    Ok(value.filter(|s| !s.is_empty()))
 }
 
 fn deserialize_opt_u64_zero_as_none<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
@@ -27,7 +27,7 @@ where
     D: Deserializer<'de>,
 {
     let value = Option::<u64>::deserialize(deserializer)?;
-    Ok(value.and_then(|v| if v == 0 { None } else { Some(v) }))
+    Ok(value.filter(|v| *v != 0))
 }
 
 /// Top-level configuration for dsc.
