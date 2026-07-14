@@ -70,19 +70,21 @@ tag_groups:
 2. **paid/unpaid exclusivity.** If these should be mutually exclusive on a topic, they need their own group with `one_per_topic: true`. The starter file keeps them in a non-exclusive `Other` group — confirm the desired behaviour.
 3. **Tag-creation permissions (complementary, not part of this command).** Set `min_trust_to_create_tag` via `dsc setting` so ordinary users can apply existing tags but not spawn new junk tags — directly supports the forum's signal-to-noise goal.
 
-## Known bugs (observed 2026-07-01, yorkmusic.org, Discourse 2026.7.0-latest)
+## Fixed bugs (observed 2026-07-01, yorkmusic.org, Discourse 2026.7.0-latest)
 
-> **Status: both fixed (unreleased).** `delete_tag` now uses the singular
+> **Status: all fixed (unreleased).** `delete_tag` now uses the singular
 > `/tag/{name}.json` endpoint; `tag_push` reconciles tag **groups first** (which
 > materialise their tags) and only then sets descriptions, and a desired tag
 > that belongs to no group and does not exist is reported (no silent 404 abort).
-> Re-verified end-to-end on koloki-demo: create-via-group + description + a
-> `--prune` delete that actually removes the tag. See `plan_tags` in
-> `src/commands/tag.rs` and its unit tests.
+> Tag-group permissions now translate numeric API group IDs ↔ names in the file,
+> label level `2` as `create_post`, and trigger an update when permissions alone
+> change. The earlier create-via-group + description + `--prune` delete path was
+> re-verified end-to-end on koloki-demo; the permission conversion is covered by
+> focused unit tests. See `src/commands/tag.rs`.
 
-Two defects in the implemented `tag push` / tag delete path, found while applying
-`tags.yaml` to a live install. These are bugs (the spec promises behaviour the
-implementation does wrong), not gaps.
+The first two defects in the implemented `tag push` / tag delete path were found
+while applying `tags.yaml` to a live install. They are bugs (the spec promises
+behaviour the implementation does wrong), not gaps.
 
 ### 1. `tag push` cannot create a tag that does not yet exist
 
@@ -131,3 +133,18 @@ Fix: change the path in `delete_tag` from `/tags/{name}.json` to
 Both were verified against `yorkmusic.org` (Discourse 2026.7.0-latest),
 admin-scope API key, 2026-07-01; probe groups/tags were created and cleaned up
 during verification.
+
+### 3. Tag-group permissions did not round-trip by group name (R1)
+
+`GET /tag_groups.json` returns `permissions` as a map keyed by numeric group ID,
+for example `{"0": 1}` for `everyone: full`. The taxonomy file promises group
+names so it can be shared across sites. Previously, `tag pull` copied `"0"` into
+the file and `tag push` sent a group name where the API expects an ID. A
+permission-only change was also omitted from the tag-group update plan. Level
+`2` was emitted as `"2"` instead of `create_post`.
+
+**Fix (implemented):** `tag pull` resolves permission IDs through the site's
+group list (with built-in `everyone` = `0`); `tag push` resolves file names back
+to IDs; `full`, `create_post`, and `readonly` map to `1`, `2`, and `3`;
+permission-only changes trigger `PUT /tag_groups/{id}.json`. Focused unit tests
+cover both conversions, the update decision, and an unknown group-name error.

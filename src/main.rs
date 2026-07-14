@@ -247,6 +247,15 @@ fn main() -> Result<()> {
                 yes,
             } => commands::topic::topic_sync(&config, &discourse, topic_id, &local_path, yes),
 
+            TopicCommand::List {
+                discourse,
+                deleted,
+                query,
+                format,
+            } => {
+                commands::topic::topic_list(&config, &discourse, deleted, query.as_deref(), format)
+            }
+
             TopicCommand::Reply {
                 discourse,
                 topic_id,
@@ -276,6 +285,21 @@ fn main() -> Result<()> {
                 dry_run,
                 format,
             ),
+
+            TopicCommand::Delete {
+                discourse,
+                topic_id,
+                mut topic_ids,
+                purge,
+            } => {
+                topic_ids.insert(0, topic_id);
+                commands::topic::topic_delete(&config, &discourse, &topic_ids, dry_run, purge)
+            }
+
+            TopicCommand::Restore {
+                discourse,
+                topic_id,
+            } => commands::topic::topic_restore(&config, &discourse, topic_id, dry_run),
 
             TopicCommand::Tag {
                 discourse,

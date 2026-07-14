@@ -585,6 +585,20 @@ pub enum TopicCommand {
         #[arg(long, short = 'y')]
         yes: bool,
     },
+    /// List topics. Currently supports staff-only deleted-topic discovery.
+    #[command(visible_alias = "ls")]
+    List {
+        /// Discourse name.
+        discourse: String,
+        /// List soft-deleted topics (use these IDs with `topic restore`).
+        #[arg(long)]
+        deleted: bool,
+        /// Optional search terms to narrow deleted-topic results.
+        query: Option<String>,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
     /// Reply to a topic with content from a file or stdin.
     #[command(visible_alias = "r")]
     Reply {
@@ -613,6 +627,26 @@ pub enum TopicCommand {
         /// Output format.
         #[arg(long, short = 'f', value_enum, default_value = "text")]
         format: ListFormat,
+    },
+    /// Delete one or more topics by topic ID. Soft-delete by default; `--purge` permanently deletes.
+    #[command(visible_alias = "rm")]
+    Delete {
+        /// Discourse name.
+        discourse: String,
+        /// First topic ID to delete.
+        topic_id: u64,
+        /// Additional topic IDs to delete.
+        topic_ids: Vec<u64>,
+        /// Permanently delete instead of soft-deleting to the trash.
+        #[arg(long, visible_alias = "permanent")]
+        purge: bool,
+    },
+    /// Restore a soft-deleted topic by topic ID.
+    Restore {
+        /// Discourse name.
+        discourse: String,
+        /// Topic ID to restore. Use `topic list --deleted` to discover IDs.
+        topic_id: u64,
     },
     /// Add a tag to a topic.
     Tag {

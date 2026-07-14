@@ -9,8 +9,8 @@ Cross-cutting documents that sit above any single command:
 - [spec.md](spec.md) - internal spec: the `dsc.toml` config schema and the release/distribution rules.
 - [cli-design.md](cli-design.md) - the normative CLI design philosophy: output/formats, the `pull → edit → push → diff` sync loop, `--dry-run`, destructive-action guards, error/empty-list/flag conventions. Anything about *how commands behave* lives here.
 - [implementation.md](implementation.md) - the implementation plan and the working agreement for agents (commit discipline, keeping specs current, roadmap flow).
-- [roadmap.md](roadmap.md) - planned and in-progress work. Shipped history is in [CHANGELOG.md](../CHANGELOG.md).
-- [from-the-field.md](from-the-field.md) - index of the field-driven (⭐) specs: the ones that came from a real task against a live Discourse, with the API calls captured in the field. These outrank speculative items.
+- [roadmap.md](roadmap.md) - planned and in-progress work, with stable `RXX` reference codes for each actionable item. Shipped history is in [CHANGELOG.md](../CHANGELOG.md).
+- [from-the-field.md](from-the-field.md) - active index of field-driven (⭐) specs: real tasks against live Discourses that still have unimplemented work. Completed field work moves into the relevant command spec/docs and the shipped history.
 
 ## Per-command ([commands/](commands/))
 
@@ -18,5 +18,6 @@ One spec per discrete feature or gap, named after the command surface it belongs
 
 ## Conventions
 
-- A spec that originated from real-world use gets a ⭐ and a row in [from-the-field.md](from-the-field.md), including a "Reference: API calls observed in the field" section (template in [../AGENTS.md](../AGENTS.md)). Record the Discourse version tested against - the admin API is not formally versioned.
+- A spec that originated from real-world use gets a ⭐ and, while work remains, a row in [from-the-field.md](from-the-field.md), including a "Reference: API calls observed in the field" section when an API was involved (template in [../AGENTS.md](../AGENTS.md)). Record the Discourse version tested against - the admin API is not formally versioned.
+- Every actionable item in [roadmap.md](roadmap.md) gets the next unused stable `RXX` code in the item title (`- [ ] **R12 - Title**`). Never renumber or reuse codes; keep the code when an item moves from planned to in-progress or done.
 - User-facing per-command usage lives in [docs/](../docs/), not here. Specs are design intent; docs are the reference.

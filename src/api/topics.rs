@@ -45,6 +45,20 @@ pub struct PmTopicSummary {
     pub unread: Option<u64>,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DeletedTopicSummary {
+    pub id: u64,
+    pub title: String,
+    #[serde(default)]
+    pub slug: String,
+    #[serde(default)]
+    pub posts_count: u64,
+    #[serde(default)]
+    pub category_id: Option<u64>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+}
+
 impl DiscourseClient {
     /// Fetch a topic by ID.
     pub fn fetch_topic(&self, topic_id: u64, include_raw: bool) -> Result<TopicResponse> {
@@ -125,6 +139,55 @@ impl DiscourseClient {
         }
 
         Ok(topic)
+    }
+
+    /// Soft-delete or permanently delete a topic by ID (`DELETE /t/{id}`).
+    pub fn delete_topic(&self, topic_id: u64, permanent: bool) -> Result<()> {
+        let path = if permanent {
+            format!("/t/{}.json?permanent=true", topic_id)
+        } else {
+            format!("/t/{}.json", topic_id)
+        };
+        let response = self.send_retrying(|| self.delete_builder(&path))?;
+        let status = response.status();
+        let text = response
+            .text()
+            .unwrap_or_else(|_| "<failed to read response body>".to_string());
+        if !status.is_success() {
+            return Err(http_error("delete topic request", status, &text));
+        }
+        Ok(())
+    }
+
+    /// Recover a soft-deleted topic by ID (`PUT /t/{id}/recover`).
+    pub fn recover_topic(&self, topic_id: u64) -> Result<()> {
+        let path = format!("/t/{}/recover.json", topic_id);
+        let response = self.send_retrying(|| self.put(&path))?;
+        let status = response.status();
+        let text = response
+            .text()
+            .unwrap_or_else(|_| "<failed to read response body>".to_string());
+        if !status.is_success() {
+            return Err(http_error("recover topic request", status, &text));
+        }
+        Ok(())
+    }
+
+    /// List soft-deleted topics via Discourse search (`status:deleted`).
+    pub fn list_deleted_topics(&self, query: Option<&str>) -> Result<Vec<DeletedTopicSummary>> {
+        let q = deleted_topics_query(query);
+        let hits = self.search_topics(&q)?;
+        Ok(hits
+            .into_iter()
+            .map(|hit| DeletedTopicSummary {
+                id: hit.id,
+                title: hit.title,
+                slug: hit.slug,
+                posts_count: hit.posts_count,
+                category_id: hit.category_id,
+                tags: hit.tags,
+            })
+            .collect())
     }
 
     /// Fetch a post by ID and return its raw content.
@@ -328,12 +391,18 @@ impl DiscourseClient {
     }
 }
 
-/// Build the urlencoded form payload for a `PUT /posts/{id}.json` edit.
-/// Always sends `post[raw]`; `post[no_bump]` / `post[skip_revision]` are added
-/// only when requested, so a default edit is byte-for-byte what `dsc` sent
-/// before these options existed.
-fn post_edit_payload(raw: &str, opts: PostEditOptions) -> Vec<(&'static str, &str)> {
-    let mut payload: Vec<(&'static str, &str)> = vec![("post[raw]", raw)];
+/// Build a Discourse search query for soft-deleted topics, preserving any
+/// user-supplied narrowing terms while ensuring `status:deleted` is present.
+fn deleted_topics_query(query: Option<&str>) -> String {
+    match query.map(str::trim).filter(|q| !q.is_empty()) {
+        Some(q) if q.contains("status:deleted") => q.to_string(),
+        Some(q) => format!("{} status:deleted", q),
+        None => "status:deleted".to_string(),
+    }
+}
+
+fn post_edit_payload<'a>(raw: &'a str, opts: PostEditOptions) -> Vec<(&'static str, &'a str)> {
+    let mut payload: Vec<(&'static str, &'a str)> = vec![("post[raw]", raw)];
     if opts.no_bump {
         payload.push(("post[no_bump]", "true"));
     }
@@ -346,6 +415,28 @@ fn post_edit_payload(raw: &str, opts: PostEditOptions) -> Vec<(&'static str, &st
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deleted_topics_query_defaults_to_status_deleted() {
+        assert_eq!(deleted_topics_query(None), "status:deleted");
+        assert_eq!(deleted_topics_query(Some("  ")), "status:deleted");
+    }
+
+    #[test]
+    fn deleted_topics_query_adds_status_deleted_to_terms() {
+        assert_eq!(
+            deleted_topics_query(Some("house archive")),
+            "house archive status:deleted"
+        );
+    }
+
+    #[test]
+    fn deleted_topics_query_does_not_duplicate_status_deleted() {
+        assert_eq!(
+            deleted_topics_query(Some("status:deleted category:staff")),
+            "status:deleted category:staff"
+        );
+    }
 
     #[test]
     fn default_edit_sends_only_raw() {

@@ -247,26 +247,28 @@ pub fn tag_pull(config: &Config, discourse_name: &str, local_path: &Path) -> Res
     // Attempt tag groups (admin-only)
     let tag_groups = match client.list_tag_groups()? {
         Some(groups) => {
+            let group_names_by_id = group_names_by_id(&client)?;
             let mut entries: Vec<TagGroupEntry> = groups
                 .into_iter()
                 .map(|g| {
-                    let permissions = g.permissions.and_then(|p| {
-                        // Discourse returns permissions as {"group_name": "level_int"}
-                        // or a more complex structure; normalize to group→level string
-                        parse_tag_group_permissions(&p)
-                    });
+                    let permissions = g
+                        .permissions
+                        .as_ref()
+                        .map(|p| parse_tag_group_permissions(p, &group_names_by_id))
+                        .transpose()?
+                        .flatten();
                     let mut tags = g.tag_names;
                     tags.sort();
-                    TagGroupEntry {
+                    Ok(TagGroupEntry {
                         name: g.name,
                         description: None, // not returned by list endpoint
                         one_per_topic: g.one_per_topic,
                         parent_tag: g.parent_tag_name,
                         permissions,
                         tags,
-                    }
+                    })
                 })
-                .collect();
+                .collect::<Result<_>>()?;
             entries.sort_by(|a, b| a.name.cmp(&b.name));
             entries
         }
@@ -295,24 +297,91 @@ pub fn tag_pull(config: &Config, discourse_name: &str, local_path: &Path) -> Res
     Ok(())
 }
 
-fn parse_tag_group_permissions(value: &serde_json::Value) -> Option<BTreeMap<String, String>> {
-    // Discourse API returns permissions as: {"everyone": 1} where 1=full, 3=readonly
-    // or as an object. Normalize to string labels.
-    let obj = value.as_object()?;
+/// Return the site's group names keyed by their numeric IDs. Tag-group
+/// permissions use these IDs in the Discourse API, while the taxonomy file uses
+/// names so it can be shared across sites. `everyone` is the built-in group 0.
+fn group_names_by_id(client: &DiscourseClient) -> Result<BTreeMap<u64, String>> {
+    let mut names = client
+        .fetch_groups()?
+        .into_iter()
+        .map(|group| (group.id, group.name))
+        .collect::<BTreeMap<_, _>>();
+    names.entry(0).or_insert_with(|| "everyone".to_string());
+    Ok(names)
+}
+
+fn group_ids_by_name(group_names_by_id: &BTreeMap<u64, String>) -> BTreeMap<String, u64> {
+    group_names_by_id
+        .iter()
+        .map(|(id, name)| (name.clone(), *id))
+        .collect()
+}
+
+/// Normalise a numeric Discourse permission level for the taxonomy file.
+fn permission_label(level: &serde_json::Value) -> Result<String> {
+    if let Some(level) = level.as_u64() {
+        return Ok(match level {
+            1 => "full".to_string(),
+            2 => "create_post".to_string(),
+            3 => "readonly".to_string(),
+            other => other.to_string(),
+        });
+    }
+
+    let label = level
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("tag-group permission level must be a string or number"))?;
+    match label {
+        "full" | "create_post" | "readonly" => Ok(label.to_string()),
+        other => other
+            .parse::<u64>()
+            .map(|level| match level {
+                1 => "full".to_string(),
+                2 => "create_post".to_string(),
+                3 => "readonly".to_string(),
+                other => other.to_string(),
+            })
+            .with_context(|| format!("unknown tag-group permission level '{other}'")),
+    }
+}
+
+/// Convert a taxonomy permission label back to the numeric API value.
+fn permission_level(label: &str) -> Result<u64> {
+    match label {
+        "full" => Ok(1),
+        "create_post" => Ok(2),
+        "readonly" => Ok(3),
+        other => other
+            .parse()
+            .with_context(|| format!("unknown tag-group permission level '{other}'")),
+    }
+}
+
+/// Parse the API's numeric-group-ID permission map into file-safe group names.
+fn parse_tag_group_permissions(
+    value: &serde_json::Value,
+    group_names_by_id: &BTreeMap<u64, String>,
+) -> Result<Option<BTreeMap<String, String>>> {
+    let Some(obj) = value.as_object() else {
+        return Ok(None);
+    };
     if obj.is_empty() {
-        return None;
+        return Ok(None);
     }
+
     let mut map = BTreeMap::new();
-    for (group, level) in obj {
-        let level_str = match level.as_u64() {
-            Some(1) => "full".to_string(),
-            Some(3) => "readonly".to_string(),
-            Some(n) => n.to_string(),
-            None => level.as_str().unwrap_or("full").to_string(),
+    for (group_id, level) in obj {
+        // Current Discourse returns numeric IDs, but accepting name-keyed data
+        // keeps pulled files portable across older API responses.
+        let group_name = match group_id.parse::<u64>() {
+            Ok(id) => group_names_by_id.get(&id).cloned().ok_or_else(|| {
+                anyhow::anyhow!("tag-group permission references unknown group ID {id}")
+            })?,
+            Err(_) => group_id.clone(),
         };
-        map.insert(group.clone(), level_str);
+        map.insert(group_name, permission_label(level)?);
     }
-    Some(map)
+    Ok(Some(map))
 }
 
 fn is_json_path(p: &Path) -> bool {
@@ -462,6 +531,17 @@ pub fn tag_push(
         BTreeSet::new()
     };
     let server_groups = server_groups.unwrap_or_default();
+    let group_names_by_id = if groups_available
+        && taxonomy
+            .tag_groups
+            .iter()
+            .any(|group| group.permissions.is_some())
+    {
+        group_names_by_id(&client)?
+    } else {
+        BTreeMap::new()
+    };
+    let group_ids_by_name = group_ids_by_name(&group_names_by_id);
 
     let tag_plan = plan_tags(&explicit, &effective_group_tags, &server_tag_names, prune);
 
@@ -482,26 +562,16 @@ pub fn tag_push(
     } else {
         Vec::new()
     };
-    let groups_to_update: Vec<(&TagGroupEntry, u64)> = if groups_available {
-        taxonomy
-            .tag_groups
-            .iter()
-            .filter_map(|g| server_groups_by_name.get(&g.name).map(|sg| (g, sg.id)))
-            .filter(|(desired, _id)| {
-                // Only update if something differs
-                let server = server_groups_by_name.get(&desired.name).unwrap();
-                let mut server_tags = server.tag_names.clone();
-                server_tags.sort();
-                let mut desired_tags = desired.tags.clone();
-                desired_tags.sort();
-                server_tags != desired_tags
-                    || server.one_per_topic != desired.one_per_topic
-                    || server.parent_tag_name != desired.parent_tag
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let mut groups_to_update: Vec<(&TagGroupEntry, u64)> = Vec::new();
+    if groups_available {
+        for desired in &taxonomy.tag_groups {
+            if let Some(server) = server_groups_by_name.get(&desired.name)
+                && tag_group_needs_update(desired, server, &group_names_by_id)?
+            {
+                groups_to_update.push((desired, server.id));
+            }
+        }
+    }
     let groups_to_delete: Vec<(&str, u64)> = if prune && groups_available {
         server_groups
             .iter()
@@ -563,14 +633,16 @@ pub fn tag_push(
 
     // ── Apply, groups first so their tags are materialised ────────────────────
     for g in &groups_to_create {
-        let payload = build_tag_group_payload(g);
+        let payload = build_tag_group_payload(g, &group_ids_by_name)
+            .with_context(|| format!("building payload for tag group '{}'", g.name))?;
         client
             .create_tag_group(&payload)
             .with_context(|| format!("creating tag group '{}'", g.name))?;
         println!("  + created group: {}", g.name);
     }
     for (g, id) in &groups_to_update {
-        let payload = build_tag_group_payload(g);
+        let payload = build_tag_group_payload(g, &group_ids_by_name)
+            .with_context(|| format!("building payload for tag group '{}'", g.name))?;
         client
             .update_tag_group(*id, &payload)
             .with_context(|| format!("updating tag group '{}'", g.name))?;
@@ -625,7 +697,40 @@ pub fn tag_push(
     Ok(())
 }
 
-fn build_tag_group_payload(entry: &TagGroupEntry) -> serde_json::Value {
+/// Whether a server tag group differs from the file definition. Unspecified
+/// file permissions are intentionally ignored, preserving Discourse defaults.
+fn tag_group_needs_update(
+    desired: &TagGroupEntry,
+    server: &TagGroupInfo,
+    group_names_by_id: &BTreeMap<u64, String>,
+) -> Result<bool> {
+    let mut server_tags = server.tag_names.clone();
+    server_tags.sort();
+    let mut desired_tags = desired.tags.clone();
+    desired_tags.sort();
+    if server_tags != desired_tags
+        || server.one_per_topic != desired.one_per_topic
+        || server.parent_tag_name != desired.parent_tag
+    {
+        return Ok(true);
+    }
+
+    let Some(desired_permissions) = &desired.permissions else {
+        return Ok(false);
+    };
+    let server_permissions = server
+        .permissions
+        .as_ref()
+        .map(|permissions| parse_tag_group_permissions(permissions, group_names_by_id))
+        .transpose()?
+        .flatten();
+    Ok(server_permissions.as_ref() != Some(desired_permissions))
+}
+
+fn build_tag_group_payload(
+    entry: &TagGroupEntry,
+    group_ids_by_name: &BTreeMap<String, u64>,
+) -> Result<serde_json::Value> {
     let mut group = serde_json::Map::new();
     group.insert("name".to_string(), serde_json::json!(entry.name));
     group.insert("tag_names".to_string(), serde_json::json!(entry.tags));
@@ -637,25 +742,26 @@ fn build_tag_group_payload(entry: &TagGroupEntry) -> serde_json::Value {
         group.insert("parent_tag_name".to_string(), serde_json::json!([parent]));
     }
     if let Some(perms) = &entry.permissions {
-        let perm_map: BTreeMap<&String, u64> = perms
-            .iter()
-            .map(|(k, v)| {
-                let level = match v.as_str() {
-                    "full" => 1,
-                    "readonly" => 3,
-                    _ => v.parse().unwrap_or(1),
-                };
-                (k, level)
-            })
-            .collect();
+        let mut perm_map = BTreeMap::new();
+        for (group_name, level) in perms {
+            let group_id = group_ids_by_name.get(group_name).ok_or_else(|| {
+                anyhow::anyhow!("tag-group permission references unknown group '{group_name}'")
+            })?;
+            perm_map.insert(group_id.to_string(), permission_level(level)?);
+        }
         group.insert("permissions".to_string(), serde_json::json!(perm_map));
     }
-    serde_json::json!({ "tag_group": group })
+    Ok(serde_json::json!({ "tag_group": group }))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{next_tags_after_apply, next_tags_after_remove, plan_tags, validate_rename_names};
+    use super::{
+        TagGroupEntry, build_tag_group_payload, next_tags_after_apply, next_tags_after_remove,
+        parse_tag_group_permissions, plan_tags, tag_group_needs_update, validate_rename_names,
+    };
+    use crate::api::TagGroupInfo;
+    use serde_json::json;
     use std::collections::{BTreeMap, BTreeSet};
 
     fn s(items: &[&str]) -> Vec<String> {
@@ -671,6 +777,24 @@ mod tests {
             .iter()
             .map(|(n, d)| (n.to_string(), d.map(|s| s.to_string())))
             .collect()
+    }
+
+    fn permissions(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(group, level)| (group.to_string(), level.to_string()))
+            .collect()
+    }
+
+    fn tag_group(permissions: Option<BTreeMap<String, String>>) -> TagGroupEntry {
+        TagGroupEntry {
+            name: "Role".to_string(),
+            description: None,
+            one_per_topic: false,
+            parent_tag: None,
+            permissions,
+            tags: s(&["guitarist"]),
+        }
     }
 
     #[test]
@@ -856,5 +980,73 @@ mod tests {
         // be created and is reported.
         let p = plan_tags(&explicit(&[("jazz", None)]), &set(&[]), &set(&[]), false);
         assert_eq!(p.groupless_missing, s(&["jazz"]));
+    }
+
+    #[test]
+    fn pull_converts_permission_group_ids_and_labels_create_post() {
+        let group_names_by_id = [(0, "everyone"), (12, "members"), (42, "staff")]
+            .into_iter()
+            .map(|(id, name)| (id, name.to_string()))
+            .collect();
+        let parsed =
+            parse_tag_group_permissions(&json!({"0": 1, "12": 2, "42": 3}), &group_names_by_id)
+                .unwrap()
+                .unwrap();
+
+        assert_eq!(
+            parsed,
+            permissions(&[
+                ("everyone", "full"),
+                ("members", "create_post"),
+                ("staff", "readonly"),
+            ])
+        );
+    }
+
+    #[test]
+    fn push_converts_permission_names_to_group_ids() {
+        let group_ids_by_name = [("everyone", 0), ("members", 12), ("staff", 42)]
+            .into_iter()
+            .map(|(name, id)| (name.to_string(), id))
+            .collect();
+        let entry = tag_group(Some(permissions(&[
+            ("everyone", "full"),
+            ("members", "create_post"),
+            ("staff", "readonly"),
+        ])));
+
+        let payload = build_tag_group_payload(&entry, &group_ids_by_name).unwrap();
+        assert_eq!(
+            payload["tag_group"]["permissions"],
+            json!({"0": 1, "12": 2, "42": 3})
+        );
+    }
+
+    #[test]
+    fn permission_only_change_requires_tag_group_update() {
+        let group_names_by_id = [(0, "everyone")]
+            .into_iter()
+            .map(|(id, name)| (id, name.to_string()))
+            .collect();
+        let desired = tag_group(Some(permissions(&[("everyone", "full")])));
+        let mut server = TagGroupInfo {
+            id: 9,
+            name: "Role".to_string(),
+            tag_names: s(&["guitarist"]),
+            one_per_topic: false,
+            parent_tag_name: None,
+            permissions: Some(json!({"0": 1})),
+        };
+
+        assert!(!tag_group_needs_update(&desired, &server, &group_names_by_id).unwrap());
+        server.permissions = Some(json!({"0": 3}));
+        assert!(tag_group_needs_update(&desired, &server, &group_names_by_id).unwrap());
+    }
+
+    #[test]
+    fn push_rejects_unknown_permission_group() {
+        let entry = tag_group(Some(permissions(&[("missing", "full")])));
+        let err = build_tag_group_payload(&entry, &BTreeMap::new()).unwrap_err();
+        assert!(err.to_string().contains("unknown group 'missing'"));
     }
 }

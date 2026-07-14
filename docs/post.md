@@ -34,7 +34,7 @@ echo "Edited on the fly." | dsc post push myforum 98765
 dsc post delete <discourse> <post-id>
 ```
 
-Soft-deletes the post. Deleting the first post of a topic deletes the whole topic. Supports `--dry-run` (or `-n`).
+Soft-deletes the post. This is post-ID based; use it when you know the specific post ID. To delete a whole topic by topic ID, use `dsc topic delete`. Supports `--dry-run` (or `-n`).
 
 ## dsc post move
 

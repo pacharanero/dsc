@@ -15,7 +15,7 @@ pub struct SearchHit {
     pub posts_count: u64,
     #[serde(default)]
     pub category_id: Option<u64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_search_tags")]
     pub tags: Option<Vec<String>>,
 }
 
@@ -42,6 +42,37 @@ impl DiscourseClient {
     }
 }
 
+fn deserialize_search_tags<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let Some(items) = value.as_array() else {
+        return Ok(None);
+    };
+    let tags = items
+        .iter()
+        .filter_map(|item| {
+            item.as_str()
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    item.get("name")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                })
+                .or_else(|| {
+                    item.get("slug")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                })
+        })
+        .collect();
+    Ok(Some(tags))
+}
+
 /// Minimal `application/x-www-form-urlencoded` encoder for the query string.
 /// Avoids pulling in an extra crate just for one field.
 fn urlencode_form(input: &str) -> String {
@@ -61,7 +92,29 @@ fn urlencode_form(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::urlencode_form;
+    use super::{deserialize_search_tags, urlencode_form};
+    use serde::Deserialize;
+
+    #[derive(Debug, Deserialize)]
+    struct TagsWrapper {
+        #[serde(default, deserialize_with = "deserialize_search_tags")]
+        tags: Option<Vec<String>>,
+    }
+
+    #[test]
+    fn search_tags_accept_plain_strings() {
+        let got: TagsWrapper = serde_json::from_str(r#"{"tags":["bug","ops"]}"#).unwrap();
+        assert_eq!(got.tags.unwrap(), vec!["bug", "ops"]);
+    }
+
+    #[test]
+    fn search_tags_accept_tag_objects() {
+        let got: TagsWrapper = serde_json::from_str(
+            r#"{"tags":[{"id":1,"name":"bug","slug":"bug"},{"id":2,"slug":"ops"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(got.tags.unwrap(), vec!["bug", "ops"]);
+    }
 
     #[test]
     fn encodes_spaces_as_plus() {

@@ -1,6 +1,6 @@
 # dsc topic
 
-Pull, push, and sync individual topics as local Markdown files. Also tag/untag topics.
+Pull, push, sync, delete, restore, and tag individual topics.
 
 ## dsc topic pull
 
@@ -100,6 +100,58 @@ Examples:
 dsc topic new myforum 42 --title "Release notes" ./notes.md
 df -h | dsc topic new myforum 42 -t "Disk report $(date -I)"
 ```
+
+## dsc topic delete
+
+```text
+dsc topic delete <discourse> <topic-id> [<topic-id>...] [--purge]
+dsc topic rm     <discourse> <topic-id> [<topic-id>...] [--purge]
+```
+
+Deletes one or more topics by topic ID. By default this is a Discourse soft-delete, so staff can restore the topic from the trash. Supports global `-n` / `--dry-run`, which fetches each topic and prints the title/post count plus the planned delete without sending it.
+
+`--purge` (alias `--permanent`) permanently deletes instead of moving to trash. Use only after confirming the topic has been archived or is genuinely disposable.
+
+```bash
+# Archive then remove from the forum
+dsc topic pull myforum 1178 --full ./archive/topic-1178.md
+dsc -n topic delete myforum 1178
+dsc topic delete myforum 1178
+
+# Batch delete
+dsc topic rm myforum 1178 969
+
+# Permanent deletion
+dsc topic delete myforum 1178 --purge
+```
+
+## dsc topic restore
+
+```text
+dsc topic restore <discourse> <topic-id>
+```
+
+Restores a soft-deleted topic via Discourse's topic recovery endpoint. Supports global `-n` / `--dry-run`.
+
+```bash
+dsc topic restore myforum 1178
+```
+
+## dsc topic list --deleted
+
+```text
+dsc topic list <discourse> --deleted [query] [--format text|json|yaml]
+```
+
+Lists soft-deleted topics visible to the configured staff/admin API key. This is the discovery path for `topic restore` when you do not remember the topic ID. Internally this uses Discourse search with `status:deleted`; optional `query` terms narrow the result set.
+
+```bash
+dsc topic list myforum --deleted
+dsc topic list myforum --deleted "Postern Close"
+dsc topic list myforum --deleted --format json
+```
+
+For general topic search, use `dsc search` directly.
 
 ## dsc topic tag
 

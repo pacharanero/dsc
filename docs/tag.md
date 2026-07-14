@@ -40,7 +40,7 @@ tag_groups:
   - name: Role
     one_per_topic: false
     parent_tag: null
-    permissions:
+    permissions: # group names; levels: full | create_post | readonly
       everyone: full
     tags:
       - guitarist
@@ -60,7 +60,7 @@ Reads a taxonomy file and reconciles server state toward it.
 - Idempotent: a push with no file change is a no-op.
 - Supports `--dry-run` (`-n`) to preview the plan without sending writes.
 
-Tag groups require an admin API key. If not accessible, group reconciliation is skipped with a warning.
+Tag groups require an admin API key. If not accessible, group reconciliation is skipped with a warning. Permissions in the file use group names; `dsc` resolves the numeric group IDs required by the Discourse API.
 
 ```bash
 dsc -n tag push myforum tags.yaml          # dry-run: show plan

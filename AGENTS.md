@@ -27,7 +27,7 @@ This is the most useful thing you can do. `dsc`'s author is actively shaping the
 
 ### Where to put it
 
-Specs are two-tier (see [spec/README.md](spec/README.md)). A spec for a command or a discrete feature goes under [spec/commands/](spec/commands/), named slug-case after the command surface, mirroring `src/commands/` and [docs/](docs/): `spec/commands/theme-management.md`, `spec/commands/config-path-resolution.md`. Overarching, cross-cutting specs (config schema, CLI design, roadmap) stay at the [spec/](spec/) root. Don't suffix with `-spec.md` for new ones (legacy filenames have it; new ones don't need to). Reference it from [spec/roadmap.md](spec/roadmap.md) under **Planned** if appropriate.
+Specs are two-tier (see [spec/README.md](spec/README.md)). A spec for a command or a discrete feature goes under [spec/commands/](spec/commands/), named slug-case after the command surface, mirroring `src/commands/` and [docs/](docs/): `spec/commands/theme-management.md`, `spec/commands/config-path-resolution.md`. Overarching, cross-cutting specs (config schema, CLI design, roadmap) stay at the [spec/](spec/) root. Don't suffix with `-spec.md` for new ones (legacy filenames have it; new ones don't need to). Reference it from [spec/roadmap.md](spec/roadmap.md) under **Planned** if appropriate, assigning the next unused stable `RXX` roadmap code to each actionable item.
 
 ### What makes a spec land fast
 

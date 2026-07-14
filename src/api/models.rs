@@ -29,9 +29,13 @@ pub struct AboutInfo {
 #[derive(Debug, Deserialize)]
 pub struct TopicResponse {
     #[serde(default)]
+    pub id: Option<u64>,
+    #[serde(default)]
     pub title: Option<String>,
     #[serde(default)]
     pub slug: Option<String>,
+    #[serde(default)]
+    pub posts_count: Option<u64>,
     pub post_stream: PostStream,
 }
 

@@ -260,6 +260,166 @@ pub fn topic_reply(
     )
 }
 
+pub fn topic_delete(
+    config: &Config,
+    discourse_name: &str,
+    topic_ids: &[u64],
+    dry_run: bool,
+    purge: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    if topic_ids.is_empty() {
+        return Err(anyhow!("at least one topic ID is required"));
+    }
+    let client = DiscourseClient::new(discourse)?;
+
+    for topic_id in topic_ids {
+        let brief = fetch_topic_brief(&client, *topic_id, dry_run)?;
+        let action = if purge {
+            "permanently delete"
+        } else {
+            "delete"
+        };
+        if dry_run {
+            println!(
+                "[dry-run] {}: would {} topic {}{}",
+                discourse.name,
+                action,
+                topic_id,
+                brief
+                    .as_ref()
+                    .map(|b| format!(" — {}", b))
+                    .unwrap_or_default()
+            );
+            continue;
+        }
+        client.delete_topic(*topic_id, purge)?;
+        println!(
+            "Topic {} {}{}",
+            topic_id,
+            if purge {
+                "permanently deleted"
+            } else {
+                "deleted"
+            },
+            brief
+                .as_ref()
+                .map(|b| format!(" — {}", b))
+                .unwrap_or_default()
+        );
+    }
+    Ok(())
+}
+
+pub fn topic_restore(
+    config: &Config,
+    discourse_name: &str,
+    topic_id: u64,
+    dry_run: bool,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let brief = fetch_topic_brief(&client, topic_id, false).ok().flatten();
+
+    if dry_run {
+        println!(
+            "[dry-run] {}: would restore topic {}{}",
+            discourse.name,
+            topic_id,
+            brief
+                .as_ref()
+                .map(|b| format!(" — {}", b))
+                .unwrap_or_default()
+        );
+        return Ok(());
+    }
+
+    client.recover_topic(topic_id)?;
+    println!(
+        "Topic {} restored{}",
+        topic_id,
+        brief
+            .as_ref()
+            .map(|b| format!(" — {}", b))
+            .unwrap_or_default()
+    );
+    Ok(())
+}
+
+pub fn topic_list(
+    config: &Config,
+    discourse_name: &str,
+    deleted: bool,
+    query: Option<&str>,
+    format: ListFormat,
+) -> Result<()> {
+    let discourse = select_discourse(config, Some(discourse_name))?;
+    if !deleted {
+        return Err(anyhow!(
+            "topic list currently supports only --deleted; for general topic search use `dsc search {}`",
+            discourse.name
+        ));
+    }
+    ensure_api_credentials(discourse)?;
+    let client = DiscourseClient::new(discourse)?;
+    let topics = client.list_deleted_topics(query)?;
+
+    match format {
+        ListFormat::Text => {
+            if topics.is_empty() {
+                println!("No deleted topics found.");
+                return Ok(());
+            }
+            let id_width = topics
+                .iter()
+                .map(|t| t.id.to_string().len())
+                .max()
+                .unwrap_or(2);
+            for topic in &topics {
+                let title = if topic.title.trim().is_empty() {
+                    topic.slug.as_str()
+                } else {
+                    topic.title.as_str()
+                };
+                println!(
+                    "{:>width$}  {:>4} posts  {}",
+                    topic.id,
+                    topic.posts_count,
+                    title,
+                    width = id_width
+                );
+            }
+        }
+        ListFormat::Json => println!("{}", serde_json::to_string_pretty(&topics)?),
+        ListFormat::Yaml => println!("{}", serde_yaml::to_string(&topics)?),
+    }
+    Ok(())
+}
+
+fn fetch_topic_brief(
+    client: &DiscourseClient,
+    topic_id: u64,
+    required: bool,
+) -> Result<Option<String>> {
+    match client.fetch_topic(topic_id, false) {
+        Ok(topic) => {
+            let title = topic_display_title(&topic, topic_id);
+            let count = topic.posts_count.unwrap_or_else(|| {
+                if !topic.post_stream.stream.is_empty() {
+                    topic.post_stream.stream.len() as u64
+                } else {
+                    topic.post_stream.posts.len() as u64
+                }
+            });
+            Ok(Some(format!("\"{}\" ({} posts)", title, count)))
+        }
+        Err(err) if required => Err(err),
+        Err(_) => Ok(None),
+    }
+}
+
 pub fn topic_new(
     config: &Config,
     discourse_name: &str,
@@ -420,8 +580,10 @@ mod tests {
 
     fn make_topic(title: Option<&str>, posts: Vec<Post>, stream: Vec<u64>) -> TopicResponse {
         TopicResponse {
+            id: None,
             title: title.map(|s| s.to_string()),
             slug: Some("hello-world".to_string()),
+            posts_count: None,
             post_stream: PostStream { posts, stream },
         }
     }
@@ -465,15 +627,19 @@ mod tests {
         assert_eq!(topic_display_title(&t1, 42), "My Title");
 
         let t2 = TopicResponse {
+            id: None,
             title: Some("  ".to_string()),
             slug: Some("my-slug".to_string()),
+            posts_count: None,
             post_stream: PostStream::default(),
         };
         assert_eq!(topic_display_title(&t2, 42), "my-slug");
 
         let t3 = TopicResponse {
+            id: None,
             title: None,
             slug: None,
+            posts_count: None,
             post_stream: PostStream::default(),
         };
         assert_eq!(topic_display_title(&t3, 42), "topic-42");

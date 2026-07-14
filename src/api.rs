@@ -30,7 +30,7 @@ pub use search::SearchHit;
 pub use settings::SiteSettingDetail;
 pub use tags::TagGroupInfo;
 pub use tags::TagInfo;
-pub use topics::{PmTopicSummary, PostEditOptions, PostInfo};
+pub use topics::{DeletedTopicSummary, PmTopicSummary, PostEditOptions, PostInfo};
 pub use uploads::UploadInfo;
 pub use user_actions::UserAction;
 pub use users::{UserDetail, UserSummary};
