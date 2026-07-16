@@ -1,5 +1,5 @@
 use crate::api::{CategoryInfo, DiscourseClient, PostEditOptions, TopicSummary};
-use crate::cli::ListFormat;
+use crate::cli::{AdmonitionStyle, ListFormat};
 use crate::commands::common::{ensure_api_credentials, not_found, select_discourse};
 use crate::config::Config;
 use crate::utils::{
@@ -111,6 +111,7 @@ pub fn category_pull(
     discourse_name: &str,
     category: &str,
     local_path: Option<&Path>,
+    admonition_style: Option<AdmonitionStyle>,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
@@ -137,8 +138,12 @@ pub fn category_pull(
             .first()
             .and_then(|p| p.raw.clone())
             .unwrap_or_default();
+        let body = match admonition_style {
+            Some(style) => convert_discourse_admonitions(&raw, style),
+            None => raw,
+        };
         let filename = format!("{}.md", slugify(&topic.title));
-        let contents = render_category_topic(&topic, &discourse.baseurl, &raw);
+        let contents = render_category_topic(&topic, &discourse.baseurl, &body);
         write_markdown(&dir.join(filename), &contents)?;
     }
     println!("{}", dir.display());
@@ -164,6 +169,18 @@ fn render_category_topic(topic: &TopicSummary, baseurl: &str, raw: &str) -> Stri
     out.push_str(raw.trim_end());
     out.push('\n');
     out
+}
+
+/// Controls the non-content behaviour of [`category_push`]. Grouped so the
+/// command boundary remains stable as category sync gains opt-in transforms.
+#[derive(Clone, Copy)]
+pub struct CategoryPushOptions {
+    /// Refuse to create a topic for a file without a remote match.
+    pub updates_only: bool,
+    /// Whether successful post edits should bump a topic or record a revision.
+    pub edit: PostEditOptions,
+    /// Optional local MkDocs/Zensical admonition conversion before push.
+    pub admonition_style: Option<AdmonitionStyle>,
 }
 
 /// One planned change for `category push`, decided before any mutation so
@@ -194,8 +211,7 @@ pub fn category_push(
     category: &str,
     local_path: &Path,
     dry_run: bool,
-    updates_only: bool,
-    edit_opts: PostEditOptions,
+    options: CategoryPushOptions,
 ) -> Result<()> {
     let discourse = select_discourse(config, Some(discourse_name))?;
     ensure_api_credentials(discourse)?;
@@ -218,6 +234,10 @@ pub fn category_push(
     for path in paths {
         let raw = read_markdown(&path)?;
         let (front, body) = strip_frontmatter(&raw);
+        let body = match options.admonition_style {
+            Some(style) => convert_mkdocs_admonitions(&body, style),
+            None => body,
+        };
         let title = front
             .get("title")
             .cloned()
@@ -247,7 +267,7 @@ pub fn category_push(
                 }
             }
             None => {
-                if updates_only {
+                if options.updates_only {
                     return Err(anyhow!(
                         "no matching topic for {} (title: {:?})\n\
                          hint: remove --updates-only to allow new topic creation, \
@@ -267,7 +287,7 @@ pub fn category_push(
         for action in &plan {
             match action {
                 PushAction::Update { post_id, body, .. } => {
-                    client.update_post(*post_id, body, edit_opts)?;
+                    client.update_post(*post_id, body, options.edit)?;
                 }
                 PushAction::Create { title, body, .. } => {
                     client.create_topic(category_id, title, body)?;
@@ -507,6 +527,405 @@ fn find_topic_match<'a>(
     })
 }
 
+/// MkDocs/Zensical's three admonition markers, including its two foldable
+/// forms. The mode is retained while parsing so Quote Callouts can preserve
+/// collapsible behaviour; ordinary blockquotes intentionally cannot.
+#[derive(Clone, Copy)]
+enum MkdocsFold {
+    None,
+    Collapsed,
+    Expanded,
+}
+
+struct MkdocsAdmonition {
+    indent: usize,
+    fold: MkdocsFold,
+    kind: String,
+    title: Option<String>,
+}
+
+/// Convert MkDocs/Zensical admonitions in a local Markdown body to the chosen
+/// Discourse representation. This is deliberately a small line-oriented
+/// parser rather than a general Markdown rewriter: it only recognises
+/// admonition openers outside fenced code blocks and leaves all other content
+/// byte-for-byte intact.
+fn convert_mkdocs_admonitions(raw: &str, style: AdmonitionStyle) -> String {
+    let lines = raw.split('\n').map(str::to_owned).collect::<Vec<_>>();
+    convert_mkdocs_lines(&lines, style).join("\n")
+}
+
+fn convert_mkdocs_lines(lines: &[String], style: AdmonitionStyle) -> Vec<String> {
+    let mut out = Vec::with_capacity(lines.len());
+    let mut index = 0;
+    let mut fence = None;
+
+    while index < lines.len() {
+        let line = &lines[index];
+        update_fence(&mut fence, line);
+        if fence.is_none()
+            && let Some(admonition) = parse_mkdocs_admonition(line)
+        {
+            let (body_end, next_index) = mkdocs_block_bounds(lines, index, admonition.indent);
+            let body = lines[index + 1..body_end]
+                .iter()
+                .map(|body_line| strip_leading_spaces(body_line, admonition.indent + 4))
+                .collect::<Vec<_>>();
+            let converted_body = convert_mkdocs_lines(&body, style);
+
+            out.push(render_discourse_admonition_header(&admonition, style));
+            for body_line in converted_body {
+                if body_line.is_empty() {
+                    out.push(">".to_string());
+                } else {
+                    out.push(format!("> {body_line}"));
+                }
+            }
+            // Preserve blank lines separating this block from the following
+            // paragraph, but do not make them part of the blockquote.
+            out.extend(lines[body_end..next_index].iter().cloned());
+            index = next_index;
+            continue;
+        }
+        out.push(line.clone());
+        index += 1;
+    }
+    out
+}
+
+fn parse_mkdocs_admonition(line: &str) -> Option<MkdocsAdmonition> {
+    let indent = leading_spaces(line);
+    let rest = &line[indent..];
+    let (fold, after_marker) = if let Some(after) = rest.strip_prefix("???+") {
+        (MkdocsFold::Expanded, after)
+    } else if let Some(after) = rest.strip_prefix("???") {
+        (MkdocsFold::Collapsed, after)
+    } else {
+        let after = rest.strip_prefix("!!!")?;
+        (MkdocsFold::None, after)
+    };
+
+    if after_marker
+        .chars()
+        .next()
+        .is_some_and(|character| !character.is_whitespace())
+    {
+        return None;
+    }
+    let after_marker = after_marker.trim_start();
+    let kind_end = after_marker
+        .find(char::is_whitespace)
+        .unwrap_or(after_marker.len());
+    let kind = &after_marker[..kind_end];
+    if kind.is_empty()
+        || !kind
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+    {
+        return None;
+    }
+    let title = parse_admonition_title(after_marker[kind_end..].trim());
+    Some(MkdocsAdmonition {
+        indent,
+        fold,
+        kind: kind.to_string(),
+        title,
+    })
+}
+
+fn parse_admonition_title(raw: &str) -> Option<String> {
+    if raw.is_empty() {
+        return None;
+    }
+    let title = raw
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .map(|value| value.replace("\\\"", "\"").replace("\\\\", "\\"))
+        .unwrap_or_else(|| raw.to_string());
+    Some(title)
+}
+
+fn mkdocs_block_bounds(lines: &[String], start: usize, indent: usize) -> (usize, usize) {
+    let mut next_index = start + 1;
+    while next_index < lines.len()
+        && (lines[next_index].trim().is_empty() || leading_spaces(&lines[next_index]) > indent)
+    {
+        next_index += 1;
+    }
+    let mut body_end = next_index;
+    while body_end > start + 1 && lines[body_end - 1].trim().is_empty() {
+        body_end -= 1;
+    }
+    (body_end, next_index)
+}
+
+fn render_discourse_admonition_header(
+    admonition: &MkdocsAdmonition,
+    style: AdmonitionStyle,
+) -> String {
+    match style {
+        AdmonitionStyle::QuoteCallouts => {
+            let fold = match admonition.fold {
+                MkdocsFold::None => "",
+                MkdocsFold::Collapsed => "-",
+                MkdocsFold::Expanded => "+",
+            };
+            let title = admonition
+                .title
+                .as_ref()
+                .map(|title| format!(" {title}"))
+                .unwrap_or_default();
+            format!("> [!{}]{}{}", admonition.kind, fold, title)
+        }
+        AdmonitionStyle::PlainBlockquote => {
+            let (emoji, label) = plain_callout_heading(&admonition.kind);
+            let title = admonition
+                .title
+                .as_ref()
+                .map(|title| format!(" — {title}"))
+                .unwrap_or_default();
+            format!("> **{emoji} {label}{title}**")
+        }
+    }
+}
+
+/// Convert a selected `dsc`-generated Discourse callout representation back to
+/// MkDocs/Zensical syntax. Ordinary blockquotes, including styles from another
+/// mode, are intentionally left unchanged.
+fn convert_discourse_admonitions(raw: &str, style: AdmonitionStyle) -> String {
+    let lines = raw.split('\n').map(str::to_owned).collect::<Vec<_>>();
+    convert_discourse_lines(&lines, style).join("\n")
+}
+
+fn convert_discourse_lines(lines: &[String], style: AdmonitionStyle) -> Vec<String> {
+    let mut out = Vec::with_capacity(lines.len());
+    let mut index = 0;
+    let mut fence = None;
+
+    while index < lines.len() {
+        let line = &lines[index];
+        update_fence(&mut fence, line);
+        if fence.is_none()
+            && let Some((fold, kind, title)) = parse_discourse_admonition(line, style)
+        {
+            let (body_end, next_index) = quote_block_bounds(lines, index);
+            let body = lines[index + 1..body_end]
+                .iter()
+                .filter_map(|body_line| strip_quote_prefix(body_line).map(str::to_owned))
+                .collect::<Vec<_>>();
+            let converted_body = convert_discourse_lines(&body, style);
+
+            out.push(render_mkdocs_admonition_header(
+                fold,
+                &kind,
+                title.as_deref(),
+            ));
+            for body_line in converted_body {
+                out.push(format!("    {body_line}"));
+            }
+            // A quoted blank line terminates the source blockquote. Preserve
+            // its separation without retaining a stray quote marker locally.
+            out.extend((body_end..next_index).map(|_| String::new()));
+            index = next_index;
+            continue;
+        }
+        out.push(line.clone());
+        index += 1;
+    }
+    out
+}
+
+fn parse_discourse_admonition(
+    line: &str,
+    style: AdmonitionStyle,
+) -> Option<(MkdocsFold, String, Option<String>)> {
+    let content = strip_quote_prefix(line)?;
+    match style {
+        AdmonitionStyle::QuoteCallouts => parse_quote_callout_header(content),
+        AdmonitionStyle::PlainBlockquote => parse_plain_blockquote_header(content),
+    }
+}
+
+fn parse_quote_callout_header(content: &str) -> Option<(MkdocsFold, String, Option<String>)> {
+    let rest = content.strip_prefix("[!")?;
+    let close = rest.find(']')?;
+    let kind = &rest[..close];
+    if kind.is_empty()
+        || !kind
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+    {
+        return None;
+    }
+    let after = &rest[close + 1..];
+    let (fold, title) = if let Some(title) = after.strip_prefix('-') {
+        if starts_with_non_whitespace(title) {
+            return None;
+        }
+        (MkdocsFold::Collapsed, raw_callout_title(title))
+    } else if let Some(title) = after.strip_prefix('+') {
+        if starts_with_non_whitespace(title) {
+            return None;
+        }
+        (MkdocsFold::Expanded, raw_callout_title(title))
+    } else {
+        if starts_with_non_whitespace(after) {
+            return None;
+        }
+        (MkdocsFold::None, raw_callout_title(after))
+    };
+    Some((fold, kind.to_string(), title))
+}
+
+fn starts_with_non_whitespace(value: &str) -> bool {
+    value
+        .chars()
+        .next()
+        .is_some_and(|character| !character.is_whitespace())
+}
+
+fn raw_callout_title(raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    (!raw.is_empty()).then(|| raw.to_string())
+}
+
+fn parse_plain_blockquote_header(content: &str) -> Option<(MkdocsFold, String, Option<String>)> {
+    let bold = content.strip_prefix("**")?.strip_suffix("**")?;
+    let (label, title) = bold
+        .split_once(" — ")
+        .map(|(label, title)| (label, Some(title.to_string())))
+        .unwrap_or((bold, None));
+    let kind = plain_callout_kind(label)?;
+    Some((MkdocsFold::None, kind, title))
+}
+
+fn quote_block_bounds(lines: &[String], start: usize) -> (usize, usize) {
+    let mut next_index = start + 1;
+    while next_index < lines.len() && strip_quote_prefix(&lines[next_index]).is_some() {
+        next_index += 1;
+    }
+    let mut body_end = next_index;
+    while body_end > start + 1
+        && strip_quote_prefix(&lines[body_end - 1]).is_some_and(|line| line.trim().is_empty())
+    {
+        body_end -= 1;
+    }
+    (body_end, next_index)
+}
+
+fn render_mkdocs_admonition_header(fold: MkdocsFold, kind: &str, title: Option<&str>) -> String {
+    let marker = match fold {
+        MkdocsFold::None => "!!!",
+        MkdocsFold::Collapsed => "???",
+        MkdocsFold::Expanded => "???+",
+    };
+    let title = title
+        .map(|title| {
+            let escaped = title.replace('\\', "\\\\").replace('"', "\\\"");
+            format!(" \"{escaped}\"")
+        })
+        .unwrap_or_default();
+    format!("{marker} {kind}{title}")
+}
+
+fn plain_callout_heading(kind: &str) -> (&'static str, String) {
+    let kind = kind.to_ascii_lowercase();
+    match kind.as_str() {
+        "note" | "info" => ("📝", "Note".to_string()),
+        "abstract" | "summary" | "tldr" => ("📄", "Abstract".to_string()),
+        "todo" => ("☑️", "Todo".to_string()),
+        "tip" | "hint" | "important" => ("💡", "Tip".to_string()),
+        "success" | "check" | "done" => ("✅", "Success".to_string()),
+        "question" | "help" | "faq" => ("❓", "Question".to_string()),
+        "warning" | "caution" | "attention" => ("⚠️", "Warning".to_string()),
+        "failure" | "fail" | "missing" => ("❌", "Failure".to_string()),
+        "danger" | "error" => ("🚨", "Danger".to_string()),
+        "bug" => ("🐛", "Bug".to_string()),
+        "example" => ("🧪", "Example".to_string()),
+        "quote" | "cite" => ("💬", "Quote".to_string()),
+        _ => ("📌", display_callout_type(&kind)),
+    }
+}
+
+fn plain_callout_kind(label: &str) -> Option<String> {
+    let kind = match label {
+        "📝 Note" => "note",
+        "📄 Abstract" => "abstract",
+        "☑️ Todo" => "todo",
+        "💡 Tip" => "tip",
+        "✅ Success" => "success",
+        "❓ Question" => "question",
+        "⚠️ Warning" => "warning",
+        "❌ Failure" => "failure",
+        "🚨 Danger" => "danger",
+        "🐛 Bug" => "bug",
+        "🧪 Example" => "example",
+        "💬 Quote" => "quote",
+        _ => {
+            let custom = label.strip_prefix("📌 ")?;
+            let kind = custom
+                .split_whitespace()
+                .map(|word| word.to_ascii_lowercase())
+                .collect::<Vec<_>>()
+                .join("-");
+            if kind.is_empty() {
+                return None;
+            }
+            return Some(kind);
+        }
+    };
+    Some(kind.to_string())
+}
+
+fn display_callout_type(kind: &str) -> String {
+    kind.split(['-', '_'])
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => format!("{}{}", first.to_ascii_uppercase(), chars.as_str()),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn strip_quote_prefix(line: &str) -> Option<&str> {
+    let indent = leading_spaces(line);
+    let rest = line[indent..].strip_prefix('>')?;
+    Some(rest.strip_prefix(' ').unwrap_or(rest))
+}
+
+fn leading_spaces(line: &str) -> usize {
+    line.as_bytes()
+        .iter()
+        .take_while(|&&byte| byte == b' ')
+        .count()
+}
+
+fn strip_leading_spaces(line: &str, count: usize) -> String {
+    let removable = leading_spaces(line).min(count);
+    line[removable..].to_string()
+}
+
+fn update_fence(fence: &mut Option<(char, usize)>, line: &str) {
+    let trimmed = line.trim_start();
+    let Some(marker) = trimmed.chars().next() else {
+        return;
+    };
+    let length = trimmed.chars().take_while(|&c| c == marker).count();
+    if !matches!(marker, '`' | '~') || length < 3 {
+        return;
+    }
+    match fence {
+        Some((current, opening_length)) if *current == marker && length >= *opening_length => {
+            *fence = None;
+        }
+        None => *fence = Some((marker, length)),
+        Some(_) => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -605,6 +1024,86 @@ mod tests {
         assert_eq!(
             route_topic_id(&f, "Dependency management", &path, &topics),
             Some(55)
+        );
+    }
+
+    #[test]
+    fn quote_callouts_round_trip_nested_and_foldable_admonitions() {
+        let source = concat!(
+            "Before.\n\n",
+            "!!! note \"Outer\"\n",
+            "    First line.\n",
+            "    \n",
+            "    ??? warning \"Inner\"\n",
+            "        Check this.\n\n",
+            "???+ tip \"Open\"\n",
+            "    Second.\n"
+        );
+        let expected_discourse = concat!(
+            "Before.\n\n",
+            "> [!note] Outer\n",
+            "> First line.\n",
+            ">\n",
+            "> > [!warning]- Inner\n",
+            "> > Check this.\n\n",
+            "> [!tip]+ Open\n",
+            "> Second.\n"
+        );
+
+        let discourse = convert_mkdocs_admonitions(source, AdmonitionStyle::QuoteCallouts);
+        assert_eq!(discourse, expected_discourse);
+        assert_eq!(
+            convert_discourse_admonitions(&discourse, AdmonitionStyle::QuoteCallouts),
+            source
+        );
+    }
+
+    #[test]
+    fn plain_blockquotes_round_trip_to_canonical_mkdocs_types() {
+        let source = concat!(
+            "!!! info \"Heads up\"\n",
+            "    Read this.\n\n",
+            "??? warning \"Review\"\n",
+            "    Check this.\n"
+        );
+        let expected_discourse = concat!(
+            "> **📝 Note — Heads up**\n",
+            "> Read this.\n\n",
+            "> **⚠️ Warning — Review**\n",
+            "> Check this.\n"
+        );
+        let expected_mkdocs = concat!(
+            "!!! note \"Heads up\"\n",
+            "    Read this.\n\n",
+            "!!! warning \"Review\"\n",
+            "    Check this.\n"
+        );
+
+        let discourse = convert_mkdocs_admonitions(source, AdmonitionStyle::PlainBlockquote);
+        assert_eq!(discourse, expected_discourse);
+        assert_eq!(
+            convert_discourse_admonitions(&discourse, AdmonitionStyle::PlainBlockquote),
+            expected_mkdocs
+        );
+    }
+
+    #[test]
+    fn conversion_leaves_fenced_code_and_unrecognised_quotes_unchanged() {
+        let mkdocs = concat!(
+            "```markdown\n",
+            "!!! note \"An example, not a callout\"\n",
+            "    This must remain literal.\n",
+            "```\n"
+        );
+        assert_eq!(
+            convert_mkdocs_admonitions(mkdocs, AdmonitionStyle::QuoteCallouts),
+            mkdocs
+        );
+
+        let discourse = "> An ordinary quote\n> remains an ordinary quote.\n";
+        assert_eq!(
+            convert_discourse_admonitions(discourse, AdmonitionStyle::QuoteCallouts),
+            discourse
         );
     }
 }

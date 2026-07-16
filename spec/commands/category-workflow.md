@@ -315,47 +315,77 @@ creates friction when content moves between platforms.
 
 ### What is needed
 
-Two optional flags on `dsc category push` and `dsc category pull` that
-auto-convert between the two conventions. These are opt-in; the default
-behaviour is unchanged.
+Two optional conversions on `dsc category push` and `dsc category pull`.
+They are opt-in; without them the raw Markdown is preserved exactly.
 
-#### `--convert-admonitions` flag
+#### `--convert-admonitions <style>`
 
-On **push** (MkDocs → Discourse): convert admonitions to blockquotes.
+Convert MkDocs/Zensical admonitions to a chosen Discourse representation on
+**push**, and reverse only that representation on **pull**:
 
-```markdown
-# Input (MkDocs admonition)
-!!! note "Important"
-    Remember to commit before pushing.
-
-# Output (Discourse blockquote)
-> **📝 Note — Important**
-> Remember to commit before pushing.
+```text
+dsc category push forum 34 ./playbook --convert-admonitions=quote-callouts
+dsc category pull forum 34 ./playbook --convert-admonitions=plain-blockquote
 ```
 
-Admonition types and their suggested Discourse emoji mapping:
+`quote-callouts` is the recommended target where the [Quote
+Callouts](https://meta.discourse.org/t/quote-callouts/350962) theme component
+is installed and attached to the forum's active theme. It maps directly onto
+the component's Obsidian-style source syntax, retaining the authored type and
+custom title:
 
-| MkDocs type | Emoji | Bold label |
-|---|---|---|
-| `note` / `info` | 📝 | Note |
-| `warning` / `caution` | ⚠️ | Warning |
-| `danger` / `error` | 🚨 | Danger |
-| `tip` / `hint` | 💡 | Tip |
-| `success` / `check` | ✅ | Success |
-| `question` / `faq` | ❓ | FAQ |
-| `quote` | 💬 | Quote |
-| (other) | 📌 | (type name, capitalised) |
+```markdown
+# Input (MkDocs/Zensical)
+!!! warning "Protect production"
+    Take a backup before changing this setting.
 
-On **pull** (Discourse → MkDocs): convert blockquotes with bold emoji lead-ins
-back to admonitions. Match on `> **{emoji} {Type}` pattern. This conversion
-is best-effort — not all blockquotes are admonitions, so only match the
-specific emoji-prefixed bold pattern.
+# Output (`quote-callouts`)
+> [!warning] Protect production
+> Take a backup before changing this setting.
+```
 
-#### `--rewrite-links` flag
+The component supports the useful MkDocs types directly (`note`, `abstract`,
+`info`, `todo`, `tip`, `success`, `question`, `warning`, `failure`, `danger`,
+`bug`, `example`, and `quote`) and custom configured types. Unknown types are
+kept in the raw Markdown; the component applies its configured fallback
+appearance.
+
+Foldable MkDocs variants round-trip too:
+
+| MkDocs/Zensical | Quote Callouts |
+|---|---|
+| `!!! note "Title"` | `> [!note] Title` |
+| `??? warning "Title"` | `> [!warning]- Title` |
+| `???+ tip "Title"` | `> [!tip]+ Title` |
+
+The converter handles nested admonitions and leaves fenced code blocks alone.
+On pull it only recognises the precise `[!type]` form, so ordinary blockquotes
+remain ordinary blockquotes.
+
+`plain-blockquote` is the component-free, email-safe fallback. It writes a
+specific bold emoji lead-in, for example:
+
+```markdown
+> **⚠️ Warning — Protect production**
+> Take a backup before changing this setting.
+```
+
+Only this precise form is reversed on pull. It canonicalises aliases such as
+`info` → `note` and `caution` → `warning`, so use `quote-callouts` where
+preserving the authored type matters.
+
+`dsc` does not try to detect the Quote Callouts component: choosing
+`quote-callouts` explicitly is the operator's acknowledgement that it is
+deployed. Without the component, the post is still a readable ordinary
+blockquote. It is a theme component, not a server plugin, so email
+notifications do not receive its visual styling; email readers see the
+underlying quote content.
+
+#### `--rewrite-links` flag (planned)
 
 On **push** (MkDocs → Discourse): rewrite relative Markdown links to full
 forum URLs. Requires a resolved map of `{filename_stem}` → `{topic_id, slug}`
-(available from `<!--dsc-meta` blocks or from a fresh category listing).
+from the front matter in the same directory (or a fresh category listing).
 
 ```markdown
 # Input
@@ -368,8 +398,7 @@ forum URLs. Requires a resolved map of `{filename_stem}` → `{topic_id, slug}`
 Algorithm:
 1. Scan body for `[text](path)` where `path` does not start with `http` and ends in `.md`.
 2. Derive the stem: `path.rsplit('/').last().strip_suffix(".md")`.
-3. Look up the stem in the local `topic_id` map (built from `<!--dsc-meta` blocks
-   in the same directory, or by querying the category listing).
+3. Look up the stem in the local `topic_id` map.
 4. If found, rewrite the URL. If not found, emit a warning (do not silently drop the link).
 
 On **pull** (Discourse → MkDocs): rewrite full `forum.rcpch.tech/t/…` URLs
@@ -378,15 +407,13 @@ back to relative `.md` paths. This is best-effort; links to non-playbook topics
 
 ### Priority
 
-If implementation becomes complex, **prioritise Discourse output** (the push
-direction). The Discourse version is the canonical publication target, and
-conversion back to MkDocs format is a lower-frequency operation. The
-`--convert-admonitions` flag is more tractable than `--rewrite-links`; if
-only one ships first, prefer admonitions.
+Implement and test both directions of `--convert-admonitions` before link
+rewriting. The Discourse version is the canonical publication target, so if
+work must be staged, prioritise push before pull and link rewriting.
 
 ### Backward compatibility
 
-Both flags are opt-in. Default push/pull behaviour is unchanged.
+All conversion flags are opt-in. Default push/pull behaviour is unchanged.
 
 ---
 
@@ -494,11 +521,11 @@ From the Discourse source and Meta documentation:
 - [x] `updates_only: bool` parameter added to `category_push()` and wired from CLI.
 - [x] When `updates_only` is true and no match is found, a structured error is emitted instead of calling `create_topic()`.
 
-### Phase 5 — admonition/URL conversion (Gap 4)
+### Phase 5 — admonition/URL conversion (Gap 4) [~]
 
-- [ ] Add `--convert-admonitions` flag to `category push` and `category pull`.
-- [ ] Implement MkDocs admonition → Discourse blockquote conversion (push direction).
-- [ ] Implement Discourse blockquote → MkDocs admonition best-effort reversal (pull direction).
+- [x] Add `--convert-admonitions <quote-callouts|plain-blockquote>` to `category push` and `category pull`.
+- [x] Implement MkDocs/Zensical admonition → selected Discourse representation on push, including nested and foldable forms while preserving fenced code blocks.
+- [x] Implement selected Discourse representation → MkDocs/Zensical best-effort reversal on pull, matching only the specific generated syntax.
 - [ ] Add `--rewrite-links` flag to `category push` and `category pull`.
 - [ ] Implement relative-path → full-forum-URL rewriting on push (requires front-matter topic ID map).
 - [ ] Implement full-forum-URL → relative-path best-effort reversal on pull.

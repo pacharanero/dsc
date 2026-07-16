@@ -22,7 +22,7 @@ Flags:
 ## dsc category pull
 
 ```
-dsc category pull <discourse> <category-id-or-slug> [<local-path>]
+dsc category pull <discourse> <category-id-or-slug> [<local-path>] [--convert-admonitions <style>]
 ```
 
 Pulls the category into a directory of Markdown files. If `<local-path>` is omitted, writes to a new folder in the current directory (named from the category slug/name). Files are named from topic titles.
@@ -58,6 +58,28 @@ Flags:
 - `--updates-only` — only update existing topics; error with a hint instead of silently creating a new topic when a file has no remote match. Use for curated categories where accidental topic creation must be impossible.
 - `--no-bump` — update posts without bumping their topics to the top of the category activity feed (sends `post[no_bump]=true`). Use for silent bulk maintenance edits.
 - `--skip-revision` — update posts without recording an edit-history revision (sends `post[skip_revision]=true`). Suppresses the online audit trail; use sparingly.
+- `-a`, `--convert-admonitions <quote-callouts|plain-blockquote>` — convert MkDocs/Zensical admonitions while pushing, or the selected generated form back while pulling. Omit it to preserve raw Markdown.
+
+### Admonition conversion
+
+Use `quote-callouts` when the [Quote Callouts](https://meta.discourse.org/t/quote-callouts/350962) theme component is installed and attached to the forum's active theme:
+
+```text
+dsc category push forum 34 forum-export/ --convert-admonitions=quote-callouts
+dsc category pull forum 34 forum-export/ --convert-admonitions=quote-callouts
+```
+
+It converts `!!! warning "Title"` to `> [!warning] Title` (and reverses it), preserves supported/custom callout types, and carries MkDocs `???` / `???+` folding to Quote Callouts `-` / `+`. It does not transform fenced code examples or ordinary blockquotes.
+
+Choose `plain-blockquote` for a component-free target:
+
+```text
+dsc category push forum 34 forum-export/ --convert-admonitions=plain-blockquote
+```
+
+This generates a readable bold emoji lead-in inside a normal quote. It is the safer choice for email-heavy forums: Quote Callouts is browser-side theme styling, so email notifications contain the underlying quote rather than a styled callout. `dsc` does not detect component installation; selecting `quote-callouts` is an explicit deployment prerequisite.
+
+Relative Markdown-link rewriting is not yet available.
 
 ### Recommended workflow
 

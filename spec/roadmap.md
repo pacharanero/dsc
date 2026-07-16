@@ -24,7 +24,7 @@ The built surface, grouped - see CHANGELOG for the full per-release detail.
 
 ## In progress
 
-_(nothing currently in progress)_
+- [~] ⭐ **R10 - `category` Phase 5** - `--convert-admonitions=quote-callouts|plain-blockquote` carries MkDocs/Zensical callouts to and from category-topic Markdown. The Quote Callouts target is explicit because it requires the Arkshine theme component; the plain-blockquote target is portable and email-safe. Internal `--rewrite-links` remains. Spec: [category-workflow](commands/category-workflow.md).
 
 ## Pre-1.0 launch checklist
 
@@ -44,7 +44,7 @@ Polish before announcing on [meta.discourse.org](https://meta.discourse.org).
 
 ### Content sync
 
-- [ ] ⭐ **R10 - `category` Phase 5** - `--convert-admonitions` / `--rewrite-links` for MkDocs↔Discourse portability (the only remaining gap; phases 1-4, 6 shipped). Spec: [category-workflow](commands/category-workflow.md).
+
 - [~] ⭐ **R11 - `category` definition sync Phase 2/3** - Phase 1 shipped the blocking round-trip (`category def pull/push`, `category show/get/set`) for category definitions: description, permissions, position, topic template, and tag rules. Remaining work: rename, list `--append`/`--remove`, prune, and `def diff`. Spec: [category-definition-sync](commands/category-definition-sync.md).
 
 ### New command surfaces
