@@ -350,17 +350,20 @@ fn main() -> Result<()> {
                 discourse,
                 category,
                 local_path,
+                convert_admonitions,
             } => commands::category::category_pull(
                 &config,
                 &discourse,
                 &category,
                 local_path.as_deref(),
+                convert_admonitions,
             ),
 
             CategoryCommand::Push {
                 discourse,
                 local_path,
                 category,
+                convert_admonitions,
                 updates_only,
                 no_bump,
                 skip_revision,
@@ -370,10 +373,13 @@ fn main() -> Result<()> {
                 &category,
                 &local_path,
                 dry_run,
-                updates_only,
-                dsc::api::PostEditOptions {
-                    no_bump,
-                    skip_revision,
+                commands::category::CategoryPushOptions {
+                    updates_only,
+                    edit: dsc::api::PostEditOptions {
+                        no_bump,
+                        skip_revision,
+                    },
+                    admonition_style: convert_admonitions,
                 },
             ),
 

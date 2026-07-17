@@ -124,7 +124,8 @@ pub enum Commands {
     #[command(visible_alias = "cat")]
     #[command(after_help = "Examples:
   dsc category pull myforum 34 ./playbook/
-  dsc category push -n myforum 34 ./playbook/   # -n previews the plan")]
+  dsc category push -n myforum 34 ./playbook/   # -n previews the plan
+  dsc category push myforum 34 ./playbook/ --convert-admonitions=quote-callouts")]
     Category {
         #[command(subcommand)]
         command: CategoryCommand,
@@ -696,6 +697,15 @@ pub enum TopicCommand {
     },
 }
 
+/// The Discourse Markdown representation used for MkDocs/Zensical admonitions.
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdmonitionStyle {
+    /// Obsidian-style `[!type]` quotes rendered by the Quote Callouts theme component.
+    QuoteCallouts,
+    /// Normal Markdown quotes with bold emoji lead-ins; portable and email-safe.
+    PlainBlockquote,
+}
+
 #[derive(Subcommand)]
 #[command(next_display_order = None)]
 pub enum CategoryCommand {
@@ -734,6 +744,10 @@ pub enum CategoryCommand {
         category: String,
         /// Destination directory (auto-derived when omitted).
         local_path: Option<PathBuf>,
+        /// Convert the selected generated admonition representation back to
+        /// MkDocs/Zensical syntax. Omit to preserve raw Markdown.
+        #[arg(long, short = 'a', value_enum, value_name = "STYLE")]
+        convert_admonitions: Option<AdmonitionStyle>,
     },
     /// Push local Markdown files into a category.
     #[command(visible_alias = "ps")]
@@ -744,6 +758,10 @@ pub enum CategoryCommand {
         category: String,
         /// Local directory containing Markdown files.
         local_path: PathBuf,
+        /// Convert MkDocs/Zensical admonitions to the selected Discourse
+        /// representation. Omit to preserve raw Markdown.
+        #[arg(long, short = 'a', value_enum, value_name = "STYLE")]
+        convert_admonitions: Option<AdmonitionStyle>,
         /// Only update existing topics; error instead of creating a new topic
         /// when a local file has no remote match.
         #[arg(long)]
@@ -2016,4 +2034,57 @@ pub enum StructuredFormat {
     /// YAML.
     #[value(alias = "yml")]
     Yaml,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn category_admonition_style_accepts_both_explicit_modes() {
+        let cli = Cli::try_parse_from([
+            "dsc",
+            "category",
+            "push",
+            "forum",
+            "34",
+            "./playbook",
+            "--convert-admonitions=quote-callouts",
+        ])
+        .expect("quote-callouts mode parses");
+        let Commands::Category {
+            command:
+                CategoryCommand::Push {
+                    convert_admonitions,
+                    ..
+                },
+        } = cli.command
+        else {
+            panic!("expected category push command");
+        };
+        assert_eq!(convert_admonitions, Some(AdmonitionStyle::QuoteCallouts));
+
+        let cli = Cli::try_parse_from([
+            "dsc",
+            "category",
+            "pull",
+            "forum",
+            "34",
+            "./playbook",
+            "-a",
+            "plain-blockquote",
+        ])
+        .expect("plain-blockquote mode parses");
+        let Commands::Category {
+            command:
+                CategoryCommand::Pull {
+                    convert_admonitions,
+                    ..
+                },
+        } = cli.command
+        else {
+            panic!("expected category pull command");
+        };
+        assert_eq!(convert_admonitions, Some(AdmonitionStyle::PlainBlockquote));
+    }
 }
