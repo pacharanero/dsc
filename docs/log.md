@@ -12,12 +12,12 @@ Lists entries from the staff action log — the same audit trail behind `/admin/
 
 All filters are optional and combine (AND):
 
-- `--action` — symbolic action name, e.g. `change_site_setting`, `suspend_user`, `delete_post`, `grant_admin`.
+- `--action` — built-in Discourse action name, e.g. `change_site_setting`, `suspend_user`, `delete_post`, `grant_admin`. Unknown and custom/plugin names are rejected rather than risking an unfiltered query.
 - `--acting-user` — the staff member who performed the action.
 - `--target-user` — the user the action was performed on.
-- `--subject` — substring match on the subject field (often a setting name).
-- `--since` — relative duration (`7d`, `24h`) or an ISO-8601 date/timestamp; translated to Discourse's `start_date` filter.
-- `--limit` — rows to fetch, default 50; Discourse caps this server-side at 200.
+- `--subject` — exact match on the subject field (often a setting name).
+- `--since` — relative duration (`7d`, `24h`) or an ISO-8601 date/timestamp; sent to Discourse as a precise UTC `start_date` timestamp.
+- `--limit` — newest-first rows to fetch, default 50; must be from 1 through 200. If exactly this many are returned, `dsc` warns on stderr that older matching entries may exist.
 
 ```bash
 # Recent activity, most recent first
@@ -34,3 +34,4 @@ dsc log staff myforum --acting-user alice --since 7d -f json
 
 - Requires an admin API key — this is an admin-only endpoint.
 - Read-only: `dsc log staff` never writes anything, and ignores `--dry-run`.
+- This first version reads one page only; it does not yet paginate through the full audit history or support custom/plugin action types.

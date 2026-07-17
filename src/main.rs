@@ -503,13 +503,15 @@ fn main() -> Result<()> {
             } => commands::log::log_staff(
                 &config,
                 &discourse,
-                action.as_deref(),
-                acting_user.as_deref(),
-                target_user.as_deref(),
-                subject.as_deref(),
-                since.as_deref(),
-                limit,
-                format,
+                commands::log::StaffLogOptions {
+                    action: action.as_deref(),
+                    acting_user: acting_user.as_deref(),
+                    target_user: target_user.as_deref(),
+                    subject: subject.as_deref(),
+                    since: since.as_deref(),
+                    limit,
+                    format,
+                },
             ),
         },
 

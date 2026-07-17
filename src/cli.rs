@@ -1378,8 +1378,9 @@ pub enum LogCommand {
     Staff {
         /// Discourse name.
         discourse: String,
-        /// Only entries with this symbolic action name, e.g.
-        /// `change_site_setting`, `suspend_user`, `delete_post`.
+        /// Only entries with this built-in Discourse action name, e.g.
+        /// `change_site_setting`, `suspend_user`, `delete_post`. Unknown or
+        /// custom/plugin action names are rejected rather than mis-filtered.
         #[arg(long)]
         action: Option<String>,
         /// Only entries performed by this staff username.
@@ -1388,16 +1389,21 @@ pub enum LogCommand {
         /// Only entries targeting this username.
         #[arg(long = "target-user")]
         target_user: Option<String>,
-        /// Only entries whose subject contains this text (e.g. a setting name).
+        /// Only entries whose subject exactly matches this text (e.g. a
+        /// setting name).
         #[arg(long)]
         subject: Option<String>,
         /// Only entries within this window (e.g. `7d`, `24h`) or since an
         /// ISO-8601 date/timestamp.
         #[arg(long, value_name = "DUR")]
         since: Option<String>,
-        /// Max rows to fetch (Discourse caps this server-side at 200).
-        #[arg(long, default_value_t = 50)]
-        limit: u32,
+        /// Max newest-first rows to fetch (1–200; older entries may exist).
+        #[arg(
+            long,
+            default_value_t = 50,
+            value_parser = clap::value_parser!(u16).range(1..=200)
+        )]
+        limit: u16,
         /// Output format.
         #[arg(long, short = 'f', value_enum, default_value = "text")]
         format: ListFormat,
@@ -2086,5 +2092,22 @@ mod tests {
             panic!("expected category pull command");
         };
         assert_eq!(convert_admonitions, Some(AdmonitionStyle::PlainBlockquote));
+    }
+
+    #[test]
+    fn log_staff_limit_rejects_values_outside_discourse_page_bounds() {
+        let base = ["dsc", "log", "staff", "forum", "--limit"];
+        assert!(Cli::try_parse_from(base.into_iter().chain(["0"])).is_err());
+        assert!(Cli::try_parse_from(base.into_iter().chain(["201"])).is_err());
+
+        let cli = Cli::try_parse_from(base.into_iter().chain(["200"]))
+            .expect("Discourse maximum limit parses");
+        let Commands::Log {
+            command: LogCommand::Staff { limit, .. },
+        } = cli.command
+        else {
+            panic!("expected log staff command");
+        };
+        assert_eq!(limit, 200);
     }
 }

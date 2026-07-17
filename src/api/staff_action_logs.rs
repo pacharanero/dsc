@@ -3,6 +3,7 @@ use super::error::http_error;
 use super::search::urlencode_form;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// The acting or target user embedded in a staff action log entry —
 /// Discourse's `BasicUserSerializer`, distilled to what callers need.
@@ -27,10 +28,14 @@ pub struct StaffActionLog {
     pub subject: Option<String>,
     #[serde(default)]
     pub details: Option<String>,
+    /// A string for ordinary changes or structured JSON for theme and tag-group
+    /// changes, matching Discourse's `UserHistorySerializer`.
     #[serde(default)]
-    pub previous_value: Option<String>,
+    pub previous_value: Option<Value>,
+    /// A string for ordinary changes or structured JSON for theme and tag-group
+    /// changes, matching Discourse's `UserHistorySerializer`.
     #[serde(default)]
-    pub new_value: Option<String>,
+    pub new_value: Option<Value>,
     pub created_at: String,
 }
 
@@ -48,10 +53,10 @@ pub struct StaffActionLogFilter<'a> {
     pub acting_user: Option<&'a str>,
     pub target_user: Option<&'a str>,
     pub subject: Option<&'a str>,
-    /// Only entries at or after this date (`YYYY-MM-DD`).
+    /// Only entries at or after this RFC 3339 timestamp.
     pub start_date: Option<&'a str>,
-    /// Rows to fetch; Discourse caps this server-side at 200.
-    pub limit: u32,
+    /// Rows to fetch. The CLI validates the server's `1..=200` range.
+    pub limit: u16,
 }
 
 impl DiscourseClient {
@@ -78,7 +83,7 @@ impl DiscourseClient {
 /// Build the `application/x-www-form-urlencoded` query string for
 /// `/admin/logs/staff_action_logs.json` from a filter.
 fn build_query(filter: &StaffActionLogFilter) -> String {
-    let mut params = vec![format!("limit={}", filter.limit.min(200))];
+    let mut params = vec![format!("limit={}", filter.limit)];
     if let Some(v) = filter.action_name {
         params.push(format!("action_name={}", urlencode_form(v)));
     }
@@ -111,9 +116,9 @@ mod tests {
     }
 
     #[test]
-    fn limit_is_capped_at_200() {
+    fn limit_is_sent_without_silent_clamping() {
         let filter = StaffActionLogFilter {
-            limit: 5000,
+            limit: 200,
             ..Default::default()
         };
         assert_eq!(build_query(&filter), "limit=200");
@@ -126,17 +131,17 @@ mod tests {
             acting_user: Some("alice"),
             target_user: Some("bob smith"),
             subject: Some("login required"),
-            start_date: Some("2026-07-01"),
+            start_date: Some("2026-07-01T12:30:00Z"),
             limit: 10,
         };
         assert_eq!(
             build_query(&filter),
-            "limit=10&action_name=change_site_setting&acting_user=alice&target_user=bob+smith&subject=login+required&start_date=2026-07-01"
+            "limit=10&action_name=change_site_setting&acting_user=alice&target_user=bob+smith&subject=login+required&start_date=2026-07-01T12%3A30%3A00Z"
         );
     }
 
     #[test]
-    fn deserializes_entry_with_null_users() {
+    fn deserializes_entry_with_null_users_and_scalar_values() {
         let raw = r#"{
             "staff_action_logs": [
                 {
@@ -158,5 +163,26 @@ mod tests {
         assert_eq!(entry.action_name, "change_site_setting");
         assert_eq!(entry.acting_user.as_ref().unwrap().username, "system");
         assert!(entry.target_user.is_none());
+        assert_eq!(entry.previous_value, Some(Value::String("Old".to_string())));
+        assert_eq!(entry.new_value, Some(Value::String("New".to_string())));
+    }
+
+    #[test]
+    fn deserializes_structured_theme_values() {
+        let raw = r#"{
+            "staff_action_logs": [
+                {
+                    "id": 2,
+                    "action_name": "change_theme",
+                    "created_at": "2026-07-01T00:00:00.000Z",
+                    "previous_value": {"name": "Old theme", "color": "red"},
+                    "new_value": {"name": "New theme", "color": "blue"}
+                }
+            ]
+        }"#;
+        let body: StaffActionLogsResponse = serde_json::from_str(raw).expect("parse");
+        let entry = body.staff_action_logs.first().expect("one entry");
+        assert_eq!(entry.previous_value.as_ref().unwrap()["name"], "Old theme");
+        assert_eq!(entry.new_value.as_ref().unwrap()["color"], "blue");
     }
 }
