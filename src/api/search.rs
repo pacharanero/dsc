@@ -75,7 +75,7 @@ where
 
 /// Minimal `application/x-www-form-urlencoded` encoder for the query string.
 /// Avoids pulling in an extra crate just for one field.
-fn urlencode_form(input: &str) -> String {
+pub(super) fn urlencode_form(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for byte in input.as_bytes() {
         let b = *byte;

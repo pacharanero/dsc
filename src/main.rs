@@ -490,6 +490,31 @@ fn main() -> Result<()> {
             } => commands::pm::pm_list(&config, &discourse, &username, &direction, format),
         },
 
+        Commands::Log { command } => match command {
+            LogCommand::Staff {
+                discourse,
+                action,
+                acting_user,
+                target_user,
+                subject,
+                since,
+                limit,
+                format,
+            } => commands::log::log_staff(
+                &config,
+                &discourse,
+                commands::log::StaffLogOptions {
+                    action: action.as_deref(),
+                    acting_user: acting_user.as_deref(),
+                    target_user: target_user.as_deref(),
+                    subject: subject.as_deref(),
+                    since: since.as_deref(),
+                    limit,
+                    format,
+                },
+            ),
+        },
+
         Commands::ApiKey { command } => match command {
             ApiKeyCommand::List { discourse, format } => {
                 commands::api_key::api_key_list(&config, &discourse, format)

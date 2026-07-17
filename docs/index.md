@@ -114,7 +114,7 @@ Browse by area:
 - **Content** — [`topic`](topic.md), [`post`](post.md), [`category`](category.md), [`search`](search.md), [`upload`](upload.md), [`tag`](tag.md), [`emoji`](emoji.md)
 - **Users & access** — [`user`](user.md), [`group`](group.md), [`invite`](invite.md), [`pm`](pm.md), [`api-key`](api-key.md)
 - **Install management** — [`list`](list.md), [`add`](add.md), [`import`](import.md), [`open`](open.md), [`update`](update.md), [`config`](config.md)
-- **Site admin** — [`setting`](setting.md), [`backup`](backup.md), [`theme`](theme.md), [`plugin`](plugin.md), [`palette`](palette.md)
+- **Site admin** — [`setting`](setting.md), [`log`](log.md), [`backup`](backup.md), [`theme`](theme.md), [`plugin`](plugin.md), [`palette`](palette.md)
 - **Meta** — [Shell completions](completions.md), [Development](development.md)
 
 ## Safe by default
