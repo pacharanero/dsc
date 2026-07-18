@@ -123,3 +123,9 @@ There is no separate `s/release` step - `s/version++` does everything, in the co
 - Utility helpers (slugify, I/O): [src/utils.rs](../src/utils.rs)
 - Example configuration: [dsc.example.toml](../dsc.example.toml)
 - CLI design standards: [spec/cli-design.md](../spec/cli-design.md); internals/release: [spec/spec.md](../spec/spec.md)
+- Project scripts: [s/](../s) (house style - see below)
+- Windows installer sources: [wix/](../wix) - MSI build artefacts consumed by the cargo-dist Windows target, not invoked directly during development
+
+### `s/` scripts
+
+Repo-local dev scripts live under `s/` (not `scripts/`) and are run as `s/<name>`, e.g. `s/lint`, `s/docs`, `s/version++`. This is a deliberate house-style convention, not a typo: `s/` keeps the invocation short and greppable. See the scripts themselves for what each does; the ones referenced elsewhere in this doc are `s/test-fmt-clippy` (CI-mirroring gate), `s/docs` (docs preview server), and `s/version++` (release).

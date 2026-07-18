@@ -33,7 +33,7 @@ Polish before announcing on [meta.discourse.org](https://meta.discourse.org).
 
 - [ ] **R2 - Bump to 1.0.0** with a written back-compat policy ("the `dsc --help` surface is stable; flags won't be removed without a deprecation cycle"). 0.x undersells the maturity (213 lib tests + e2e + CI gate, 5-target distribution, 9 months shipping).
 - [ ] **R3 - Record an asciinema** (~30s) of the pull → edit → push → diff loop; embed in README.
-- [ ] **R4 - `s/` and `wix/` naming** - keep `s/` (house style) but document it in [docs/development.md](../docs/development.md); note `wix/` holds MSI build artefacts.
+- [x] **R4 - `s/` and `wix/` naming** - keep `s/` (house style) but document it in [docs/development.md](../docs/development.md); note `wix/` holds MSI build artefacts.
 - [ ] **R5 - Pre-circulate the Meta post** to a couple of Discourse regulars before posting.
 - [ ] **R6 - Evaluate `dsc open` and `dsc import`** - keep, deprecate, or justify before locking the surface.
 
