@@ -22,6 +22,7 @@ The built surface, grouped - see CHANGELOG for the full per-release detail.
 - [x] **R8 - Rebuild-lock pre-flight** - skips a forum with a `./launcher rebuild` in flight before reboot; `--force` overrides.
 - [x] ⭐ **R9 - Update log + skip-recent** - append-only update log plus `dsc update log` and `--skip-recent [dur]` for safe fleet re-runs. Specs: [update-concurrency](commands/update-concurrency.md), [update-log](commands/update-log.md).
 - [x] **R15 - `dsc log staff`** - staff action log access: filter by `--action`, `--acting-user`, `--target-user`, `--subject`, `--since`; `--format text|json|yaml`. Spec: [staff-action-log](commands/staff-action-log.md).
+- [x] **R18 - `dsc notification list|read`** - notification inspection and marking read: `list --filter read|unread --type <names> --limit`; `read --id|--type|--all`. Spec: [notification](commands/notification.md).
 
 ## In progress
 
@@ -58,7 +59,6 @@ Polish before announcing on [meta.discourse.org](https://meta.discourse.org).
 
 - [ ] **R16 - `dsc report <name> [--period]`** - dashboard reports such as signups, DAU, posts, and likes; distinct from `analytics`.
 - [ ] **R17 - `dsc webhook list|create|delete|ping`** - basic webhook administration.
-- [ ] **R18 - `dsc notification list|read`** - notification inspection and marking read.
 
 ### Cross-forum (the multi-install headline)
 

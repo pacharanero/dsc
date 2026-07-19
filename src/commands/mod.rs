@@ -16,6 +16,7 @@ pub mod invite;
 pub mod list;
 pub mod log;
 pub mod manpages;
+pub mod notification;
 pub mod open;
 pub mod palette;
 pub mod plugin;

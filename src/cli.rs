@@ -185,6 +185,16 @@ pub enum Commands {
         #[command(subcommand)]
         command: LogCommand,
     },
+    /// List and mark read the API user's own Discourse notifications.
+    #[command(after_help = "Examples:
+  dsc notification list myforum
+  dsc notification list myforum --filter unread --type liked,mentioned
+  dsc notification read myforum --id 12345
+  dsc notification read myforum --all")]
+    Notification {
+        #[command(subcommand)]
+        command: NotificationCommand,
+    },
     /// Create/list/restore backups.
     #[command(visible_alias = "bk")]
     #[command(after_help = "Examples:
@@ -1407,6 +1417,51 @@ pub enum LogCommand {
         /// Output format.
         #[arg(long, short = 'f', value_enum, default_value = "text")]
         format: ListFormat,
+    },
+}
+
+#[derive(Subcommand)]
+#[command(next_display_order = None)]
+pub enum NotificationCommand {
+    /// List the API user's notifications, newest first.
+    #[command(visible_alias = "ls")]
+    List {
+        /// Discourse name.
+        discourse: String,
+        /// Only `read` or `unread` notifications.
+        #[arg(long)]
+        filter: Option<String>,
+        /// Only notifications of these comma-separated built-in Discourse
+        /// notification type names, e.g. `liked,mentioned`.
+        #[arg(long = "type", value_name = "TYPES")]
+        r#type: Option<String>,
+        /// Max newest-first rows to fetch (1–60; older entries may exist).
+        #[arg(
+            long,
+            default_value_t = 30,
+            value_parser = clap::value_parser!(u16).range(1..=60)
+        )]
+        limit: u16,
+        /// Output format.
+        #[arg(long, short = 'f', value_enum, default_value = "text")]
+        format: ListFormat,
+    },
+    /// Mark notification(s) read: one `--id`, every unread notification of
+    /// the given `--type`(s), or (with `--all`) every unread notification.
+    /// Honours `--dry-run`.
+    Read {
+        /// Discourse name.
+        discourse: String,
+        /// Mark this single notification ID read.
+        #[arg(long)]
+        id: Option<u64>,
+        /// Mark all unread notifications of these comma-separated built-in
+        /// Discourse notification type names read, e.g. `liked,mentioned`.
+        #[arg(long = "type", value_name = "TYPES")]
+        r#type: Option<String>,
+        /// Mark every unread notification read.
+        #[arg(long)]
+        all: bool,
     },
 }
 
