@@ -85,6 +85,14 @@ fn main() -> Result<()> {
         return Ok(());
     }
     let cli = Cli::parse();
+    if cli.dry_run
+        && let Some(command) = cli.command.dry_run_refusal_reason()
+    {
+        return Err(anyhow!(
+            "[dry-run] {command}: a complete dry-run plan is not implemented; refusing before configuration or side effects.\nhint: remove --dry-run only after reviewing this command's documentation and inputs"
+        ));
+    }
+
     let config_source = resolve_config_source(cli.config)?;
     let config_path = config_source.path().to_path_buf();
     let mut config = load_config(&config_path)?;

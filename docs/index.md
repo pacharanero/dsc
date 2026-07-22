@@ -119,6 +119,6 @@ Browse by area:
 
 ## Safe by default
 
-- Destructive operations (`backup restore`, `setting set`, `topic push`, plugin/theme install/remove, and more) honour a global `--dry-run` / `-n` flag.
+- Side-effecting operations (`backup restore`, `setting set`, `topic push`, plugin/theme install/remove, and more) honour a global `--dry-run` / `-n` flag. Commands without a complete plan refuse rather than executing.
 - HTTP 429 responses are retried automatically with the Retry-After header the server returns.
 - Read-only commands like `user activity` work without an API key on forums that allow public reads.

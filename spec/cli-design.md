@@ -47,7 +47,7 @@ Anything managing stateful server resources follows the sync loop, not one-off s
 
 ### `--dry-run` / `-n`
 
-Global flag. Every mutating command honours it and prints the **complete** plan it would execute (resolved names, the diff, the requests) while touching nothing - the review gate before acting on a production forum. Read-only commands accept and ignore it so scripts can pass it uniformly. Provisioning flows (`backup setup-s3`) print the whole plan offline under `--dry-run`, including the exact external commands.
+Global flag. Every mutating command honours it and prints the **complete** plan it would execute (resolved names, the diff, the requests) while touching nothing - the review gate before acting on a production forum. If a command cannot yet construct such a plan, it fails non-zero before configuration resolution or any side effect; it must never silently execute. Read-only commands accept and ignore it so scripts can pass it uniformly. Provisioning flows (`backup setup-s3`) print the whole plan offline under `--dry-run`, including the exact external commands.
 
 ### Guard destructive / irreversible actions
 
