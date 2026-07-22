@@ -515,6 +515,38 @@ fn main() -> Result<()> {
             ),
         },
 
+        Commands::Notification { command } => match command {
+            NotificationCommand::List {
+                discourse,
+                filter,
+                r#type,
+                limit,
+                format,
+            } => commands::notification::notification_list(
+                &config,
+                &discourse,
+                commands::notification::NotificationListOptions {
+                    filter: filter.as_deref(),
+                    types: r#type.as_deref(),
+                    limit,
+                    format,
+                },
+            ),
+            NotificationCommand::Read {
+                discourse,
+                id,
+                r#type,
+                all,
+            } => commands::notification::notification_read(
+                &config,
+                &discourse,
+                id,
+                r#type.as_deref(),
+                all,
+                dry_run,
+            ),
+        },
+
         Commands::ApiKey { command } => match command {
             ApiKeyCommand::List { discourse, format } => {
                 commands::api_key::api_key_list(&config, &discourse, format)

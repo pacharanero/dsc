@@ -82,6 +82,7 @@ nav:
       - plugin: plugin.md
       - palette: palette.md
       - log: log.md
+      - notification: notification.md
   - Reports:
       - analytics: analytics.md
   - Provisioning:
