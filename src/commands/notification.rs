@@ -1,7 +1,7 @@
 //! `dsc notification list|read` — inspect and mark read the API user's own
 //! Discourse notifications (`/notifications.json`).
 
-use crate::api::{DiscourseClient, NotificationFilter};
+use crate::api::{DiscourseClient, Notification, NotificationFilter};
 use crate::cli::ListFormat;
 use crate::commands::common::{ensure_api_credentials, select_discourse};
 use crate::config::Config;
@@ -13,7 +13,8 @@ pub struct NotificationListOptions<'a> {
     /// `"read"` or `"unread"`. Validated before the request is sent.
     pub filter: Option<&'a str>,
     /// Comma-separated `Notification.types` symbolic names, e.g.
-    /// `liked,mentioned`. Validated before the request is sent.
+    /// `liked,mentioned`. Validated before the history pages are filtered
+    /// locally, because Discourse only honours this filter in `recent` mode.
     pub types: Option<&'a str>,
     /// Max newest-first rows to fetch, from 1 through 60.
     pub limit: u16,
@@ -111,11 +112,86 @@ fn validate_types(types: Option<&str>) -> Result<Option<&str>> {
     Ok(Some(types))
 }
 
+fn requested_type_ids(types: &str) -> Vec<u32> {
+    types
+        .split(',')
+        .filter_map(|name| {
+            NOTIFICATION_TYPES
+                .iter()
+                .find(|(known_name, _)| *known_name == name)
+                .map(|(_, id)| *id)
+        })
+        .collect()
+}
+
+fn retain_requested_types(
+    notifications: Vec<Notification>,
+    requested_type_ids: &[u32],
+    limit: usize,
+) -> Vec<Notification> {
+    notifications
+        .into_iter()
+        .filter(|notification| requested_type_ids.contains(&notification.notification_type))
+        .take(limit)
+        .collect()
+}
+
+/// Fetch normal, read-only history pages until the requested number of type
+/// matches has been collected or the server reports that history is exhausted.
+/// Discourse's server-side `filter_by_types` is restricted to the `recent`
+/// endpoint mode, which has different ordering and seen-state semantics.
+fn fetch_history_notifications(
+    client: &DiscourseClient,
+    filter: Option<&str>,
+    types: Option<&str>,
+    requested_limit: u16,
+) -> Result<Vec<Notification>> {
+    const HISTORY_PAGE_LIMIT: u16 = 60;
+
+    let requested_type_ids = types.map(requested_type_ids);
+    let page_limit = if requested_type_ids.is_some() {
+        HISTORY_PAGE_LIMIT
+    } else {
+        requested_limit
+    };
+    let mut notifications = Vec::with_capacity(usize::from(requested_limit));
+    let mut offset = 0;
+
+    loop {
+        let page = client.fetch_notifications_page(&NotificationFilter {
+            filter,
+            limit: page_limit,
+            offset,
+        })?;
+        let remaining = usize::from(requested_limit).saturating_sub(notifications.len());
+        if let Some(type_ids) = requested_type_ids.as_deref() {
+            notifications.extend(retain_requested_types(
+                page.notifications,
+                type_ids,
+                remaining,
+            ));
+        } else {
+            notifications.extend(page.notifications.into_iter().take(remaining));
+        }
+
+        if notifications.len() == usize::from(requested_limit) || requested_type_ids.is_none() {
+            break;
+        }
+        let next_offset = offset.saturating_add(u64::from(page_limit));
+        if next_offset >= page.total_rows {
+            break;
+        }
+        offset = next_offset;
+    }
+
+    Ok(notifications)
+}
+
 /// List the API user's notifications.
 ///
-/// The endpoint returns one newest-first page. `limit` is deliberately
-/// bounded to Discourse's documented maximum of 60 so callers are never
-/// silently given fewer rows than they requested.
+/// Without `--type`, this reads one newest-first history page. With `--type`,
+/// it scans the same read-only history pages locally until enough matching
+/// notifications are found or the history is exhausted.
 pub fn notification_list(
     config: &Config,
     discourse_name: &str,
@@ -127,12 +203,7 @@ pub fn notification_list(
     ensure_api_credentials(discourse)?;
     let client = DiscourseClient::new(discourse)?;
 
-    let query = NotificationFilter {
-        filter,
-        filter_by_types: types,
-        limit: options.limit,
-    };
-    let notifications = client.fetch_notifications(&query)?;
+    let notifications = fetch_history_notifications(&client, filter, types, options.limit)?;
 
     if notifications.len() == usize::from(options.limit) {
         eprintln!(
@@ -260,6 +331,40 @@ mod tests {
     fn unknown_type_is_rejected() {
         let error = validate_types(Some("liked,bogus")).unwrap_err();
         assert!(error.to_string().contains("unknown notification type"));
+    }
+
+    #[test]
+    fn requested_types_filter_mixed_notification_pages() {
+        let notifications = vec![
+            notification(1, 5),
+            notification(2, 6),
+            notification(3, 1),
+            notification(4, 5),
+        ];
+        let kept = retain_requested_types(notifications, &[1, 5], 2);
+        assert_eq!(
+            kept.iter()
+                .map(|notification| notification.id)
+                .collect::<Vec<_>>(),
+            vec![1, 3]
+        );
+    }
+
+    fn notification(id: u64, notification_type: u32) -> Notification {
+        Notification {
+            id,
+            notification_type,
+            read: false,
+            high_priority: false,
+            created_at: "2026-07-01T00:00:00Z".to_string(),
+            topic_id: None,
+            post_number: None,
+            fancy_title: None,
+            slug: None,
+            acting_user_name: None,
+            is_warning: false,
+            data: None,
+        }
     }
 
     #[test]

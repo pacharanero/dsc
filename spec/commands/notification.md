@@ -25,12 +25,14 @@ dsc notification read <discourse> (--id <id> | --type <names> | --all)
   Discourse itself silently ignores unrecognised values, which would
   otherwise return an unfiltered page and look like the flag worked.
 - `--type` - comma-separated `Notification.types` symbolic names (e.g.
-  `liked,mentioned`), matching Discourse's own `filter_by_types` param
-  exactly (same param name, same comma-joined symbol list). Each name is
-  validated against the built-in type table before requesting; Discourse
-  raises a 400 on an unrecognised type; catching it client-side gives a more
-  specific error before the request is sent. Custom/plugin notification
-  types are not supported in this phase.
+  `liked,mentioned`). Discourse validates `filter_by_types` but only applies
+  it in its stateful `recent` view; this command deliberately uses normal
+  history so it can preserve newest-first ordering and `--filter read|unread`
+  semantics without updating the account's seen state. `dsc` therefore pages
+  normal history with `offset` and filters the returned numeric type IDs
+  locally until it has the requested number of matches or history is
+  exhausted. Each name is validated against the built-in type table before any
+  request; custom/plugin notification types are not supported in this phase.
 - `--limit` - newest-first rows to fetch, default 30, validated to `1..=60`
   (Discourse's own `NotificationsController::INDEX_LIMIT`) rather than
   silently clamped. When the response reaches the requested limit, `dsc`
@@ -50,9 +52,10 @@ dsc notification read <discourse> (--id <id> | --type <names> | --all)
 Passing zero or more than one of `--id`/`--type`/`--all` is a validation
 error before any request is sent. Honours `--dry-run`.
 
-This first cut makes one `list` request only; it does not paginate through
-older notifications. Fleet-wide aggregation is out of scope for this
-command.
+Without `--type`, this first cut makes one `list` request only. With
+`--type`, it follows normal-history `offset` pages to find the requested rows.
+Full unfiltered-history pagination and fleet-wide aggregation are out of scope
+for this command.
 
 ## Output
 

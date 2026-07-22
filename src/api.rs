@@ -27,7 +27,7 @@ pub use client::{DiscourseClient, VersionInfo};
 pub use groups::AddMembersOutcome;
 pub use invites::InviteResult;
 pub use models::*;
-pub use notifications::{Notification, NotificationFilter};
+pub use notifications::{Notification, NotificationFilter, NotificationPage};
 pub use reports::{AdminReport, ReportPoint};
 pub use search::SearchHit;
 pub use settings::SiteSettingDetail;

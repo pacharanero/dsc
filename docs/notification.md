@@ -13,7 +13,7 @@ dsc notification list <discourse> [--filter read|unread] [--type <names>] [--lim
 Lists notifications newest first.
 
 - `--filter` — only `read` or `unread` notifications.
-- `--type` — only notifications of these comma-separated built-in Discourse notification type names, e.g. `liked,mentioned,private_message`. Unknown and custom/plugin names are rejected rather than risking an unfiltered query.
+- `--type` — only notifications of these comma-separated built-in Discourse notification type names, e.g. `liked,mentioned,private_message`. `dsc` filters normal history pages locally because Discourse applies its server-side type filter only to a different, stateful `recent` view. It scans history until it has the requested number of matches or reaches the end; unknown and custom/plugin names are rejected.
 - `--limit` — newest-first rows to fetch, default 30; must be from 1 through 60 (Discourse's own maximum). If exactly this many are returned, `dsc` warns on stderr that older matching notifications may exist.
 
 ```bash
@@ -52,5 +52,5 @@ dsc notification read myforum --all
 ## Notes
 
 - Uses the standard user-facing `/notifications.json` endpoint, so it works with any valid API key/username pair — no admin scope required.
-- `--type` and `notification_type` in JSON/YAML output use Discourse's built-in `Notification.types` names; custom/plugin notification types are not supported yet and render as their raw numeric ID.
-- This first version reads one page only; it does not yet paginate through older notifications.
+- Text output renders built-in notification type names. JSON/YAML preserve Discourse's numeric `notification_type` field; unknown/custom types therefore remain visible as their raw numeric ID.
+- Without `--type`, this first version reads one history page. With `--type`, it pages through read-only history as needed to collect matching rows; full unfiltered-history pagination is not yet available.

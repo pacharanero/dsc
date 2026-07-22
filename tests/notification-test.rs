@@ -7,7 +7,7 @@ fn notification_list_returns_a_json_array_without_mutating_the_forum() {
     let Some(test) = test_discourse() else {
         return;
     };
-    vprintln("e2e_notification_list: fetch one notification as JSON");
+    vprintln("e2e_notification_list: fetch one liked notification as JSON");
     let dir = TempDir::new().expect("tempdir");
     let config_path = write_temp_config(
         &dir,
@@ -22,6 +22,8 @@ fn notification_list_returns_a_json_array_without_mutating_the_forum() {
             "notification",
             "list",
             &test.name,
+            "--type",
+            "liked",
             "--limit",
             "1",
             "--format",
@@ -37,7 +39,14 @@ fn notification_list_returns_a_json_array_without_mutating_the_forum() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value =
         serde_json::from_str(&stdout).expect("notification list --format json must emit JSON");
-    assert!(parsed.is_array(), "expected JSON array, got: {stdout}");
+    let entries = parsed.as_array().expect("expected JSON array");
+    assert!(
+        entries.iter().all(|entry| entry
+            .get("notification_type")
+            .and_then(|value| value.as_u64())
+            == Some(5)),
+        "--type liked returned a non-liked notification: {stdout}"
+    );
 }
 
 #[test]
