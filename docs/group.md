@@ -5,10 +5,10 @@ List, inspect, and copy groups.
 ## dsc group list
 
 ```
-dsc group list <discourse> [--format text|json|yaml]
+dsc group list <discourse> [--format text|json|yaml] [--verbose]
 ```
 
-Lists all groups with their IDs, names, and full names.
+Lists all groups with their IDs, names, and full names. `-v`/`--verbose` includes additional fields where supported.
 
 ## dsc group info
 

@@ -31,7 +31,7 @@ If you consistently hit rate limits on large batches, raise `DISCOURSE_MAX_ADMIN
 ## dsc emoji list
 
 ```
-dsc emoji list <discourse> [--format text|json|yaml] [--inline]
+dsc emoji list <discourse> [--format text|json|yaml] [--inline] [--verbose]
 ```
 
 Lists custom emojis (name + URL).
@@ -40,3 +40,4 @@ Flags:
 
 - `--inline` (or `-i`) — render emoji images inline in supported terminals.
   - Override detection with `DSC_EMOJI_INLINE_PROTOCOL=iterm2|kitty|off`.
+- `-v`, `--verbose` — include additional fields where supported.

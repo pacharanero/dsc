@@ -5,10 +5,10 @@ Get and set site settings on a Discourse install. Requires an admin API key and 
 ## dsc setting list
 
 ```
-dsc setting list <discourse> [--format text|json|yaml]
+dsc setting list <discourse> [--format text|json|yaml] [--verbose]
 ```
 
-Lists all site settings (name and value only). For a richer snapshot including defaults, descriptions, and types, see `dsc setting pull` below.
+Lists all site settings (name and value only). For a richer snapshot including defaults, descriptions, and types, see `dsc setting pull` below. `-v`/`--verbose` shows output even when the list is empty.
 
 ## dsc setting get
 

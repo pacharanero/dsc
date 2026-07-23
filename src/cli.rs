@@ -295,10 +295,11 @@ pub enum Commands {
     },
     /// Harden a fresh Ubuntu server reachable via `ssh root@host`.
     ///
-    /// **Stage 1 (current):** creates a non-root sudo user, installs the
-    /// given pubkey to their authorized_keys, and verifies the new-user
-    /// SSH login works. Does NOT yet tighten sshd_config, install Docker
-    /// / fail2ban / etc — those come in follow-up releases.
+    /// **Stage 1:** creates a non-root sudo user, installs the given pubkey
+    /// to their authorized_keys, and verifies the new-user SSH login works.
+    /// **Stage 2:** tightens sshd_config (moves the SSH port, disables root
+    /// login and password auth) and runs automatically after stage 1.
+    /// Installing Docker / fail2ban / etc (stage 3) is not yet implemented.
     ///
     /// Defaults can be overridden in the `[harden]` block of dsc.toml;
     /// the flags below override that block on a per-run basis.
@@ -317,8 +318,7 @@ pub enum Commands {
         #[arg(long)]
         new_user: Option<String>,
         /// SSH port to move the daemon to in stage 2. Overrides
-        /// `[harden].ssh_port`. Built-in default: 2227. Parsed now so the
-        /// CLI is stable; not yet applied in stage 1.
+        /// `[harden].ssh_port`. Built-in default: 2227.
         #[arg(long)]
         ssh_port: Option<u16>,
         /// Path to an SSH public key file whose contents will be added to
@@ -2099,8 +2099,9 @@ pub enum SettingCommand {
     ///
     /// Each source can be a Discourse name (live fetch) or a path to a
     /// snapshot file produced by `dsc setting pull`. Sources are detected
-    /// by whether the argument refers to an existing file on disk; if not,
-    /// it is treated as a Discourse name.
+    /// by whether the argument refers to an existing file on disk, or has
+    /// a `.yaml`/`.yml`/`.json` extension; otherwise it is treated as a
+    /// Discourse name.
     #[command(visible_alias = "df")]
     Diff {
         /// First source: Discourse name or snapshot file path.

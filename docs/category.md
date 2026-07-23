@@ -10,7 +10,7 @@ Two distinct kinds of sync live under `dsc category`:
 ## dsc category list
 
 ```
-dsc category list <discourse> [--format text|json|yaml] [--tree]
+dsc category list <discourse> [--format text|json|yaml] [--tree] [--verbose]
 ```
 
 Lists all categories with their IDs and names.
@@ -18,6 +18,7 @@ Lists all categories with their IDs and names.
 Flags:
 
 - `--tree` — print categories in a hierarchy, with subcategories indented under parents.
+- `-v`, `--verbose` — include additional fields where supported.
 
 ## dsc category pull
 
