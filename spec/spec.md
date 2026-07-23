@@ -18,7 +18,7 @@ See [docs/configuration.md](../docs/configuration.md) for the user-facing refere
   - `x86_64-apple-darwin`
   - `aarch64-apple-darwin`
   - `x86_64-pc-windows-msvc`
-- crates.io publishing is automated in CI on `v*` tags (requires `CARGO_REGISTRY_TOKEN`).
+- crates.io publishing is automated in CI on `v*` tags through crates.io Trusted Publishing, which exchanges the publish job's GitHub OIDC identity for a short-lived token.
 - `CHANGELOG.md` is updated for each release (git-cliff).
 - Team workflow: commit regularly during active work.
 - Team workflow: bump the crate version at least once per day when working on `dsc` (use `s/version++`).
