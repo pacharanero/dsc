@@ -51,7 +51,7 @@ Suggested change:
 Remediation status (2026-07-23):
 
 - [x] `HSA-P1-02A` Replace local tagging with `s/version++` creating a release PR for protected `main`, a CI `auto-tag.yml` workflow, and reusable release/publish workflows.
-- [ ] `HSA-P1-02B` Enable the intended `main` branch protection/ruleset and require the CI gate before merge.
+- [x] `HSA-P1-02B` Enable the intended `main` branch protection/ruleset and require the CI gate before merge. Confirmed active on 2026-07-23.
 - [ ] `HSA-P1-02C` Rehearse a protected release PR through auto-tagging, cargo-dist, and crates.io publication.
 
 Evidence:
