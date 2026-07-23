@@ -27,7 +27,7 @@ Main improvements:
 
 ### [x] `HSA-P1-01` - The documented global dry-run safety guarantee is false
 
-Status (2026-07-23): implemented and verified on `feat/r30-dry-run-guard` at `935aa6a`; it still requires merge to `origin/main`.
+Status (2026-07-23): implemented and verified on `feat/r30-dry-run-guard` at `935aa6a`, merged in PR #46, and released in `v0.10.31`.
 
 Evidence:
 
@@ -66,13 +66,13 @@ Suggested change:
 - Set workflow defaults to `contents: read`; give write permissions only to the tag/release job. Keep release PR and build jobs read-only.
 - Until that migration is complete, harden `s/version++`: use porcelain status (including untracked files), require `HEAD == origin/main`, fail on failed lockfile refresh, and document a recovery path for a partially pushed release.
 
-### [ ] `HSA-P1-03` - Crates.io Trusted Publishing is ready locally but not part of the published release path
+### [x] `HSA-P1-03` - Crates.io Trusted Publishing is ready locally but not part of the published release path
 
 Remediation status (2026-07-23):
 
 - [x] `HSA-P1-03A` Replace the long-lived GitHub secret with the SHA-pinned crates.io OIDC action, job-scoped `id-token: write`, and a read-only checkout. The workflow now runs locked release validation with live-forum tests disabled.
 - [x] `HSA-P1-03B` Configure crates.io Trusted Publishing for repository `pacharanero/dsc`, workflow `.github/workflows/publish-crates.yml`, and its GitHub Environment if one is selected. Confirmed by the maintainer on 2026-07-23.
-- [ ] `HSA-P1-03C` Make the first successful OIDC publication, then remove `CARGO_REGISTRY_TOKEN` from GitHub.
+- [x] `HSA-P1-03C` Publish `dsc-rs v0.10.31` through OIDC (workflow run `30040659535`), then remove `CARGO_REGISTRY_TOKEN` from GitHub.
 
 Evidence:
 
