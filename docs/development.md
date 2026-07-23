@@ -110,10 +110,10 @@ The `s/docs` script warns if the limit is at its stock 128 value.
 Releasing is **one action**: `s/version++`.
 
 1. Commit your feature work first, with a conventional-commit message (`feat(...)`, `fix:`, …) - git-cliff builds the changelog from committed history.
-2. Run `s/version++ [patch|minor|major]` (default `patch`). It bumps the version in `Cargo.toml`, regenerates `CHANGELOG.md` (git-cliff), makes the `chore(release): vX.Y.Z` commit, tags it, and pushes `main` + the tag. It refuses to run off `main` or on a dirty tree.
-3. The pushed `v*` tag triggers the `Release` workflow (cargo-dist: prebuilt binaries + GitHub Release) and `Publish to crates.io`. The latter obtains a short-lived token through crates.io Trusted Publishing; it does not require a long-lived `CARGO_REGISTRY_TOKEN` secret.
+2. Run `s/version++ [patch|minor|major]` (default `patch`). It refuses a dirty or unsynchronised `main`, runs the full local gate, bumps `Cargo.toml`, regenerates `CHANGELOG.md`, and creates `chore(release): vX.Y.Z`. With protected `main` it opens a `release/vX.Y.Z` PR; otherwise it pushes the release commit directly. `--pr` and `--direct` override automatic protection detection.
+3. `auto-tag.yml` creates `vX.Y.Z` only after the release commit reaches `main`, then invokes the cargo-dist `Release` and `Publish to crates.io` workflows. The latter obtains a short-lived token through crates.io Trusted Publishing; it does not require a long-lived `CARGO_REGISTRY_TOKEN` secret.
 
-There is no separate `s/release` step - `s/version++` does everything, in the correct order (commit before tag, so the tag contains the bump).
+There is no separate `s/release` step. If creating the release PR fails, the release commit remains only on the local `release/vX.Y.Z` branch; fix the failure and retry the push/PR creation. No tag or public release exists until that PR merges.
 
 ## Project layout
 

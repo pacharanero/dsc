@@ -1,0 +1,77 @@
+name: Auto-tag release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    name: Tag version bump
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: version
+        name: Detect version bump
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="${{ github.event.before }}"
+          current="$(awk -F'"' '/^version = / {print $2; exit}' Cargo.toml)"
+          previous=""
+          if [[ "$before" != "0000000000000000000000000000000000000000" ]]; then
+            previous="$(git show "$before:Cargo.toml" 2>/dev/null | awk -F'"' '/^version = / {print $2; exit}' || true)"
+          fi
+
+          if [[ -z "$current" || "$current" == "$previous" ]]; then
+            echo "Cargo.toml version did not change; no tag created."
+            exit 0
+          fi
+
+          tag="v$current"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "Tag $tag already exists; refusing to retag a version." >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Create annotated tag
+        if: steps.version.outputs.tag != ''
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+  release:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    secrets:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    permissions:
+      contents: write
+
+  publish-crates:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    uses: ./.github/workflows/publish-crates.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    permissions:
+      contents: read
+      id-token: write

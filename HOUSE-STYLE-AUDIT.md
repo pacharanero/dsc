@@ -48,6 +48,12 @@ Suggested change:
 
 ### [ ] `HSA-P1-02` - The 1.0 release path can publish from an unprotected local tag
 
+Remediation status (2026-07-23):
+
+- [x] `HSA-P1-02A` Replace local tagging with `s/version++` creating a release PR for protected `main`, a CI `auto-tag.yml` workflow, and reusable release/publish workflows.
+- [ ] `HSA-P1-02B` Enable the intended `main` branch protection/ruleset and require the CI gate before merge.
+- [ ] `HSA-P1-02C` Rehearse a protected release PR through auto-tagging, cargo-dist, and crates.io publication.
+
 Evidence:
 
 - GitHub reports that `main` has neither branch protection nor a ruleset.

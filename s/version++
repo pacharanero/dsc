@@ -1,39 +1,33 @@
 #!/usr/bin/env bash
 #
-# Usage: s/version++ [patch|minor|major]   (default: patch)
+# Usage: s/version++ [patch|minor|major] [--pr|--direct]   (default: patch)
 #
-# The one release action. In order: bumps the version in Cargo.toml,
-# regenerates CHANGELOG.md (git-cliff), commits the release, tags it, and
-# pushes main + the tag. The pushed tag triggers the cargo-dist release
-# workflow (prebuilt binaries + GitHub Release) and the crates.io publish.
+# The one release action. It bumps Cargo.toml, regenerates CHANGELOG.md, and
+# commits the release. On protected main it opens a release PR; otherwise it
+# pushes main directly. CI creates the tag only after the release commit lands
+# on main, then invokes cargo-dist and crates.io publishing.
 #
 # Commit your feature work FIRST, with a conventional-commit message
 # (`feat(...)`, `fix:`, ...). git-cliff reads *committed* history, so anything
 # uncommitted won't appear in the new CHANGELOG.md section; this script makes
 # only the release commit.
 #
-# Note on tagging (divergence from ~/code/house-style/distribution.md):
-# the house standard is s/version++ commits+pushes and a CI auto-tag.yml
-# creates the tag via `workflow_call`. That needs a workflow_call-able
-# release workflow. dsc's release.yml is cargo-dist-generated and is
-# *tag-driven* (it reads the version from the pushed tag ref and only
-# triggers on `push: tags`), and there's a second tag-triggered workflow
-# (publish-crates.yml). So the cascade doesn't fit here without a PAT
-# secret to push the tag from CI. Until then we tag locally, AFTER the
-# commit (fixing the tag-before-commit hazard the standard warns about);
-# with no auto-tag there's no duplicate-tag race.
-
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-bump="${1:-patch}"
-case "$bump" in
-  patch | minor | major) ;;
-  *)
-    echo "Usage: s/version++ [patch|minor|major]" >&2
+bump="patch"
+mode="auto"
+for arg in "$@"; do
+  case "$arg" in
+    patch | minor | major) bump="$arg" ;;
+    --pr) mode="pr" ;;
+    --direct) mode="direct" ;;
+    *)
+    echo "Usage: s/version++ [patch|minor|major] [--pr|--direct]" >&2
     exit 2
     ;;
-esac
+  esac
+done
 
 # Release from main only.
 branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -43,10 +37,35 @@ if [[ "$branch" != "main" ]]; then
 fi
 
 # The release commit must contain only the bump + changelog, so the tree must
-# be clean (feature work already committed).
-if ! git diff --quiet || ! git diff --cached --quiet; then
+# be clean, including untracked files (feature work already committed).
+if [[ -n "$(git status --porcelain)" ]]; then
   echo "Working tree not clean. Commit your feature work first, then release." >&2
   exit 1
+fi
+
+git fetch origin main --quiet
+if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+  echo "HEAD does not match origin/main. Update main before releasing." >&2
+  exit 1
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "gh is required to detect main protection and create a release PR." >&2
+  exit 1
+fi
+
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+protected=false
+if gh api "repos/$repo/branches/main/protection" >/dev/null 2>&1; then
+  protected=true
+fi
+
+if [[ "$mode" == "auto" ]]; then
+  if [[ "$protected" == true ]]; then
+    mode="pr"
+  else
+    mode="direct"
+  fi
 fi
 
 if ! command -v git-cliff >/dev/null 2>&1; then
@@ -55,18 +74,20 @@ if ! command -v git-cliff >/dev/null 2>&1; then
   exit 1
 fi
 
-# Pre-release gate: the shared fmt + clippy + full-test-suite check (which itself
-# mirrors .github/workflows/ci.yml), so we never cut and push a release that CI
-# would then reject *after* the tag has already triggered the irreversible
-# release. Runs before anything is modified, so a failure aborts cleanly.
+# Pre-release gate: the shared fmt + clippy + full-test-suite check mirrors CI.
+# Run it before modifying anything so a failure aborts cleanly.
 echo "Pre-release checks (mirror CI): fmt + clippy + full test suite..."
 s/test-fmt-clippy
+
+if [[ "$mode" == "pr" ]]; then
+  git switch -c release/pending
+fi
 
 cargo set-version --bump "$bump"
 version="$(awk -F\" '/^version = / {print $2; exit}' Cargo.toml)"
 tag="v$version"
 
-if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
   echo "Tag $tag already exists." >&2
   exit 1
 fi
@@ -75,15 +96,24 @@ fi
 git-cliff --tag "$tag" -o CHANGELOG.md
 
 # Sync Cargo.lock's own version to the bump (workspace members only, external
-# deps untouched), then commit the release and tag it AFTER the commit (so the
-# tag contains the bump).
-cargo update --workspace >/dev/null 2>&1 || true
+# deps untouched). A failure is a release failure; never continue with a stale
+# lockfile.
+cargo update --workspace
 git add Cargo.toml Cargo.lock CHANGELOG.md
 git commit -m "chore(release): $tag"
-git tag -a "$tag" -m "Release $tag"
+
+if [[ "$mode" == "pr" ]]; then
+  release_branch="release/$tag"
+  git branch -m "$release_branch"
+  git push --set-upstream origin "$release_branch"
+  pr_url="$(gh pr create --base main --head "$release_branch" --title "chore(release): $tag" --body "Release $tag. Merging this PR triggers CI auto-tagging and the release workflows.")"
+  echo
+  echo "Opened release PR: $pr_url"
+  echo "If the push or PR creation fails, the release commit remains only on $release_branch; fix the problem and retry. No tag was created."
+  exit 0
+fi
 
 git push origin main
-git push origin "$tag"
 
 echo
-echo "Released $tag. CI is building binaries + publishing to crates.io."
+echo "Release commit landed on main. CI will tag $tag and invoke the release workflows."
