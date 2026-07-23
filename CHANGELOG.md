@@ -5,6 +5,72 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.31] - 2026-07-23
+
+### Bug fixes
+
+- Fail closed on incomplete dry runs ([935aa6a](https://github.com/pacharanero/dsc/commit/935aa6a9c3145345f201f8e762469e1bfa0a9225))
+
+- Add local lint hook ([1cb0bec](https://github.com/pacharanero/dsc/commit/1cb0bec0c177bbca220ef4a58e58e1c4828a24f7))
+
+### Build
+
+- **deps**: Bump taiki-e/install-action from 2.82.11 to 2.83.2 ([#44](https://github.com/pacharanero/dsc/issues/44)) ([96a76cf](https://github.com/pacharanero/dsc/commit/96a76cfa9dfb88951d9fd0006b7b9499981b4d96))
+
+- **deps**: Bump clap_complete from 4.6.6 to 4.6.7 ([#43](https://github.com/pacharanero/dsc/issues/43)) ([4d9b2ba](https://github.com/pacharanero/dsc/commit/4d9b2baf6379cff7f6dbd003c51f9a6158299b96))
+
+- **deps**: Bump indicatif from 0.18.5 to 0.18.6 ([#42](https://github.com/pacharanero/dsc/issues/42)) ([fe6fd5a](https://github.com/pacharanero/dsc/commit/fe6fd5af6b96f565477d8416e97ec06c4702eed1))
+
+- **deps**: Bump toml from 1.1.2+spec-1.1.0 to 1.1.3+spec-1.1.0 ([#41](https://github.com/pacharanero/dsc/issues/41)) ([77ff880](https://github.com/pacharanero/dsc/commit/77ff8800f0b647ab8265ab63b0154090677cccfd))
+
+- **deps**: Bump uuid from 1.23.4 to 1.23.5 ([#40](https://github.com/pacharanero/dsc/issues/40)) ([b52d702](https://github.com/pacharanero/dsc/commit/b52d702b9d51fe7a0e3e7f1aef01ff99a3980b6e))
+
+- **deps**: Bump actions/cache from 6.0.0 to 6.1.0 ([#39](https://github.com/pacharanero/dsc/issues/39)) ([23ad86d](https://github.com/pacharanero/dsc/commit/23ad86dd58c13420235ea854071941e60eb76d8d))
+
+- **deps**: Bump taiki-e/install-action from 2.82.7 to 2.82.11 ([#35](https://github.com/pacharanero/dsc/issues/35)) ([f239fd2](https://github.com/pacharanero/dsc/commit/f239fd295e9a6c28ac1651f8290c0e5eb22a1cab))
+
+- **deps**: Bump actions/cache from 5.0.5 to 6.1.0 ([#23](https://github.com/pacharanero/dsc/issues/23)) ([bd85deb](https://github.com/pacharanero/dsc/commit/bd85debfba6a4442573c4c23d77dc99d45da3d6d))
+
+- **deps**: Bump actions/setup-python from 6.2.0 to 6.3.0 ([#22](https://github.com/pacharanero/dsc/issues/22)) ([3dac611](https://github.com/pacharanero/dsc/commit/3dac61134d497a35494dc8c24ab147f6c9dc1000))
+
+- **deps**: Bump chrono from 0.4.43 to 0.4.45 ([#25](https://github.com/pacharanero/dsc/issues/25)) ([49aa4bf](https://github.com/pacharanero/dsc/commit/49aa4bfc03b86e4cc53f9808095657a5d72e1770))
+
+- **deps**: Bump libc from 0.2.182 to 0.2.186 ([#34](https://github.com/pacharanero/dsc/issues/34)) ([7d086ed](https://github.com/pacharanero/dsc/commit/7d086ed6b5bdb908457ade9101791b9baea40031))
+
+- **deps**: Bump clap from 4.5.57 to 4.6.1 ([#33](https://github.com/pacharanero/dsc/issues/33)) ([6669081](https://github.com/pacharanero/dsc/commit/66690815b25b1027df40c8bc69947c26a1565323))
+
+- **deps**: Bump clap_complete from 4.5.65 to 4.6.6 ([#32](https://github.com/pacharanero/dsc/issues/32)) ([6d766b1](https://github.com/pacharanero/dsc/commit/6d766b1b4460f0755c2ef44481b8a0cf2240e686))
+
+- **deps**: Bump toml from 1.0.3+spec-1.1.0 to 1.1.2+spec-1.1.0 ([#31](https://github.com/pacharanero/dsc/issues/31)) ([4f5d826](https://github.com/pacharanero/dsc/commit/4f5d8263e44bc4958947ed6915104fe06b046965))
+
+- **deps**: Bump uuid from 1.21.0 to 1.23.4 ([#30](https://github.com/pacharanero/dsc/issues/30)) ([b7658b7](https://github.com/pacharanero/dsc/commit/b7658b7c9dab6b4ce1eff818661d0a87a8017d73))
+
+- **deps**: Bump indicatif from 0.18.3 to 0.18.5 ([#29](https://github.com/pacharanero/dsc/issues/29)) ([767ffd6](https://github.com/pacharanero/dsc/commit/767ffd6953916b9bdaef919c5bd012f972206213))
+
+- **deps**: Bump reqwest from 0.13.2 to 0.13.4 ([#28](https://github.com/pacharanero/dsc/issues/28)) ([35bf35b](https://github.com/pacharanero/dsc/commit/35bf35b71e039ccdd8e5a527dd82ba0b75da034d))
+
+- **deps**: Bump tempfile from 3.26.0 to 3.27.0 ([#27](https://github.com/pacharanero/dsc/issues/27)) ([1de8cf4](https://github.com/pacharanero/dsc/commit/1de8cf4ca070b961e965e0332a0348a05729786b))
+
+- **deps**: Bump serde_json from 1.0.149 to 1.0.150 ([#26](https://github.com/pacharanero/dsc/issues/26)) ([616ca2b](https://github.com/pacharanero/dsc/commit/616ca2bf14ed9df30b938b43bc9e6fa884adab8c))
+
+### CI
+
+- Adopt crates.io trusted publishing ([2502d11](https://github.com/pacharanero/dsc/commit/2502d11474f217b5d587379da360d32a948d03dc))
+
+### Documentation
+
+- Document s/ and wix/ naming conventions (R4) ([#37](https://github.com/pacharanero/dsc/issues/37)) ([4807a4c](https://github.com/pacharanero/dsc/commit/4807a4c6274098e995c94ccbcd431b5acf73dcda))
+
+### Features
+
+- Add `dsc notification list|read` for notification inspection and mark-read ([#38](https://github.com/pacharanero/dsc/issues/38)) ([12cedb6](https://github.com/pacharanero/dsc/commit/12cedb6feb17fb06b0a84b94fbce3ba1150c3fbe))
+
+- Add `dsc log staff` for staff action log access ([#36](https://github.com/pacharanero/dsc/issues/36)) ([a2b0bab](https://github.com/pacharanero/dsc/commit/a2b0babcbd3e5acab66b556a31c39abba228a4f1))
+
+- Convert category admonitions ([7640018](https://github.com/pacharanero/dsc/commit/764001836f5fbebfed9f7e3d5f62d2601fe2a76b))
+
+- Improve topic lifecycle and fleet operations ([d53b732](https://github.com/pacharanero/dsc/commit/d53b73299429c679a0e09ce56d5918bc792ac50f))
+
 ## [0.10.30] - 2026-07-01
 
 ### CI
@@ -517,22 +583,6 @@ Releases are grouped from conventional-commit messages by [git-cliff](https://gi
 
 - Add crates.io publish workflow ([4886464](https://github.com/pacharanero/dsc/commit/4886464a5bba2987cf63f098fc63eccdbf62b1ba))
 
-### Chores
-
-- Rename crate to dsc-rs and add crates.io metadata ([07d4f1e](https://github.com/pacharanero/dsc/commit/07d4f1e24c29de29fbc9a4ffe3c1b66184855dc0))
-
-### Features
-
-- **cli**: Add abbreviated aliases for all subcommands ([36c0846](https://github.com/pacharanero/dsc/commit/36c08462ce9883e4e8d1bfee7081a9369b92e8f2))
-
-- Add FUNDING.yml enable GitHub Sponsors ([42c91a5](https://github.com/pacharanero/dsc/commit/42c91a5339faede92f451a9a008df76a03654264))
-
-- Add theme management commands for pull, push, and duplicate ([70993e4](https://github.com/pacharanero/dsc/commit/70993e49b57b192b512ddcbece15e3ed43f71664))
-
-- Enhance site settings management in dsc CLI ([695334a](https://github.com/pacharanero/dsc/commit/695334a0772ac7fa7246022a958afb9a03c2bd2f))
-
-## [0.1.6] - 2026-03-04
-
 ### CI / dependencies
 
 - **deps**: Bump actions/upload-artifact from 6 to 7 ([d8f15f2](https://github.com/pacharanero/dsc/commit/d8f15f2021d2e834abc3691fad2092b0d89e4cef))
@@ -547,21 +597,9 @@ Releases are grouped from conventional-commit messages by [git-cliff](https://gi
 
 - **deps**: Update toml requirement from 0.9 to 1.0 ([db03400](https://github.com/pacharanero/dsc/commit/db034000e5231ae0cb1eeeefef4d5d07e63f0d59))
 
-### Features
-
-- Bump version to 0.1.5; enhance CLI help text for commands and flags ([2f02c7e](https://github.com/pacharanero/dsc/commit/2f02c7ec634f9ff997780c0d5deaef582fd5913c))
-
-## [0.1.5] - 2026-03-03
-
-### Features
-
-- Bump version to 0.1.4 and update dependencies; enhance update command flags and documentation ([209f3d5](https://github.com/pacharanero/dsc/commit/209f3d5abf8b6c5edec27399fdc771fa26a98631))
-
-- Add version bump script for automated tagging ([4e1c51c](https://github.com/pacharanero/dsc/commit/4e1c51c97dbe289840641c05ac177b45853d7666))
-
-## [0.1.3] - 2026-03-03
-
 ### Chores
+
+- Rename crate to dsc-rs and add crates.io metadata ([07d4f1e](https://github.com/pacharanero/dsc/commit/07d4f1e24c29de29fbc9a4ffe3c1b66184855dc0))
 
 - Update indicatif dependency to version 0.18 ([78d86b3](https://github.com/pacharanero/dsc/commit/78d86b3584702d892b38ca454bbd522c9a59cb1f))
 
@@ -572,6 +610,20 @@ Releases are grouped from conventional-commit messages by [git-cliff](https://gi
 - Update README with new environment variables for `dsc update` and name recommendations ([73d15a1](https://github.com/pacharanero/dsc/commit/73d15a173f374eff42c4acf4dc514757c91131a2))
 
 ### Features
+
+- **cli**: Add abbreviated aliases for all subcommands ([36c0846](https://github.com/pacharanero/dsc/commit/36c08462ce9883e4e8d1bfee7081a9369b92e8f2))
+
+- Add FUNDING.yml enable GitHub Sponsors ([42c91a5](https://github.com/pacharanero/dsc/commit/42c91a5339faede92f451a9a008df76a03654264))
+
+- Add theme management commands for pull, push, and duplicate ([70993e4](https://github.com/pacharanero/dsc/commit/70993e49b57b192b512ddcbece15e3ed43f71664))
+
+- Enhance site settings management in dsc CLI ([695334a](https://github.com/pacharanero/dsc/commit/695334a0772ac7fa7246022a958afb9a03c2bd2f))
+
+- Bump version to 0.1.5; enhance CLI help text for commands and flags ([2f02c7e](https://github.com/pacharanero/dsc/commit/2f02c7ec634f9ff997780c0d5deaef582fd5913c))
+
+- Bump version to 0.1.4 and update dependencies; enhance update command flags and documentation ([209f3d5](https://github.com/pacharanero/dsc/commit/209f3d5abf8b6c5edec27399fdc771fa26a98631))
+
+- Add version bump script for automated tagging ([4e1c51c](https://github.com/pacharanero/dsc/commit/4e1c51c97dbe289840641c05ac177b45853d7666))
 
 - Add --yes flag to update commands for auto-confirming changelog posts ([bc409c2](https://github.com/pacharanero/dsc/commit/bc409c201caf69820e22a01227a30226d934d707))
 
@@ -624,7 +676,5 @@ Releases are grouped from conventional-commit messages by [git-cliff](https://gi
 - Add common module to new tests ([b69a254](https://github.com/pacharanero/dsc/commit/b69a2544c1549cd7b32a84dae689eb9b7c8047a6))
 
 - Add completions e2e and refresh scripts ([333d2bb](https://github.com/pacharanero/dsc/commit/333d2bb2c76de5f84c2cf838da7c25b4750fbd01))
-
-## [0.1.1] - 2026-01-30
 
 
