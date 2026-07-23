@@ -15,8 +15,8 @@ pub struct Cli {
     /// See `dsc config` for the active selection.
     #[arg(long, short = 'c')]
     pub config: Option<PathBuf>,
-    /// Describe destructive actions without sending them. Read-only commands
-    /// ignore the flag.
+    /// Describe side effects without applying them. Read-only commands ignore
+    /// the flag; commands without a complete plan refuse before side effects.
     #[arg(long, short = 'n', global = true)]
     pub dry_run: bool,
     #[command(subcommand)]
@@ -455,6 +455,123 @@ pub enum Commands {
         #[arg(long, short = 'f', value_enum, default_value = "text")]
         format: ListFormat,
     },
+}
+
+impl Commands {
+    /// Returns the command path when global `--dry-run` must refuse before
+    /// dispatch because the handler has no complete no-side-effect plan.
+    ///
+    /// `None` means the command is read-only or its handler is safe to run in
+    /// dry-run mode.
+    pub fn dry_run_refusal_reason(&self) -> Option<&'static str> {
+        match self {
+            Commands::Add { .. } => Some("dsc add"),
+            Commands::Import { .. } => Some("dsc import"),
+            Commands::List { open: true, .. } => Some("dsc list --open"),
+            Commands::List {
+                command: Some(ListCommand::Tidy),
+                ..
+            } => Some("dsc list tidy"),
+            Commands::Update { command, .. } => match command {
+                Some(UpdateCommand::Log { .. }) => None,
+                None => Some("dsc update"),
+            },
+            Commands::Emoji {
+                command: EmojiCommand::Pull { .. },
+            } => Some("dsc emoji pull"),
+            Commands::Emoji {
+                command: EmojiCommand::Push { .. },
+            } => Some("dsc emoji push"),
+            Commands::Topic {
+                command: TopicCommand::Pull { .. },
+            } => Some("dsc topic pull"),
+            Commands::Topic {
+                command: TopicCommand::Sync { .. },
+            } => Some("dsc topic sync"),
+            Commands::Category {
+                command: CategoryCommand::Pull { .. },
+            } => Some("dsc category pull"),
+            Commands::Category {
+                command:
+                    CategoryCommand::Def {
+                        command: CategoryDefCommand::Pull { .. },
+                    },
+            } => Some("dsc category def pull"),
+            Commands::Backup {
+                command: BackupCommand::Create { .. },
+            } => Some("dsc backup create"),
+            Commands::Backup {
+                command: BackupCommand::Pull { .. },
+            } => Some("dsc backup pull"),
+            Commands::Palette {
+                command: PaletteCommand::Pull { .. },
+            } => Some("dsc palette pull"),
+            Commands::Palette {
+                command: PaletteCommand::Push { .. },
+            } => Some("dsc palette push"),
+            Commands::Theme {
+                command:
+                    ThemeCommand::Palette {
+                        command: PaletteCommand::Pull { .. },
+                    },
+            } => Some("dsc theme palette pull"),
+            Commands::Theme {
+                command:
+                    ThemeCommand::Palette {
+                        command: PaletteCommand::Push { .. },
+                    },
+            } => Some("dsc theme palette push"),
+            Commands::Theme {
+                command: ThemeCommand::Pull { .. },
+            } => Some("dsc theme pull"),
+            Commands::Theme {
+                command: ThemeCommand::Push { .. },
+            } => Some("dsc theme push"),
+            Commands::Theme {
+                command: ThemeCommand::Duplicate { .. },
+            } => Some("dsc theme duplicate"),
+            Commands::Theme {
+                command:
+                    ThemeCommand::Setting {
+                        command: ThemeSettingCommand::Pull { .. },
+                    },
+            } => Some("dsc theme setting pull"),
+            Commands::Theme {
+                command:
+                    ThemeCommand::Field {
+                        command: ThemeFieldCommand::Pull { .. },
+                    },
+            } => Some("dsc theme field pull"),
+            Commands::Theme {
+                command: ThemeCommand::Update { .. },
+            } => Some("dsc theme update"),
+            Commands::Setting {
+                command: SettingCommand::Pull { .. },
+            } => Some("dsc setting pull"),
+            Commands::Tag {
+                command: TagCommand::Pull { .. },
+            } => Some("dsc tag pull"),
+            Commands::Post {
+                command:
+                    PostCommand::Pull {
+                        local_path: Some(_),
+                        ..
+                    },
+            } => Some("dsc post pull"),
+            Commands::Open { .. } => Some("dsc open"),
+            Commands::Upload { .. } => Some("dsc upload"),
+            Commands::Config {
+                command: Some(ConfigCommand::Check { .. }),
+            } => Some("dsc config check"),
+            Commands::Completions { command, dir, .. } => match command {
+                Some(CompletionCommand::Install { .. }) => Some("dsc completions install"),
+                None if dir.is_some() => Some("dsc completions --dir"),
+                None => None,
+            },
+            Commands::Man { .. } => Some("dsc man --dir"),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -2164,5 +2281,157 @@ mod tests {
             panic!("expected log staff command");
         };
         assert_eq!(limit, 200);
+    }
+
+    fn command_from(args: &[&str]) -> Commands {
+        Cli::try_parse_from(args.iter().copied())
+            .unwrap_or_else(|error| panic!("{args:?} should parse: {error}"))
+            .command
+    }
+
+    #[test]
+    fn dry_run_refusal_reason_identifies_handlers_without_complete_dry_runs() {
+        let blocked: &[(&[&str], &str)] = &[
+            (&["dsc", "add", "forum"], "dsc add"),
+            (&["dsc", "import", "forums.csv"], "dsc import"),
+            (&["dsc", "list", "tidy"], "dsc list tidy"),
+            (&["dsc", "list", "--open"], "dsc list --open"),
+            (&["dsc", "open", "forum"], "dsc open"),
+            (&["dsc", "update", "forum"], "dsc update"),
+            (
+                &["dsc", "emoji", "pull", "forum", "emoji"],
+                "dsc emoji pull",
+            ),
+            (
+                &["dsc", "emoji", "push", "forum", "emoji.png"],
+                "dsc emoji push",
+            ),
+            (&["dsc", "topic", "pull", "forum", "1"], "dsc topic pull"),
+            (
+                &["dsc", "topic", "sync", "forum", "1", "topic.md"],
+                "dsc topic sync",
+            ),
+            (
+                &["dsc", "category", "pull", "forum", "1"],
+                "dsc category pull",
+            ),
+            (
+                &["dsc", "category", "def", "pull", "forum"],
+                "dsc category def pull",
+            ),
+            (&["dsc", "backup", "create", "forum"], "dsc backup create"),
+            (
+                &["dsc", "backup", "pull", "forum", "backup.tar.gz"],
+                "dsc backup pull",
+            ),
+            (
+                &["dsc", "palette", "pull", "forum", "1"],
+                "dsc palette pull",
+            ),
+            (
+                &["dsc", "palette", "push", "forum", "palette.json"],
+                "dsc palette push",
+            ),
+            (
+                &["dsc", "theme", "palette", "pull", "forum", "1"],
+                "dsc theme palette pull",
+            ),
+            (
+                &["dsc", "theme", "palette", "push", "forum", "palette.json"],
+                "dsc theme palette push",
+            ),
+            (&["dsc", "theme", "pull", "forum", "1"], "dsc theme pull"),
+            (
+                &["dsc", "theme", "push", "forum", "theme.json"],
+                "dsc theme push",
+            ),
+            (
+                &["dsc", "theme", "duplicate", "forum", "1"],
+                "dsc theme duplicate",
+            ),
+            (
+                &["dsc", "theme", "setting", "pull", "forum", "1"],
+                "dsc theme setting pull",
+            ),
+            (
+                &["dsc", "theme", "field", "pull", "forum", "1", "common/scss"],
+                "dsc theme field pull",
+            ),
+            (
+                &["dsc", "theme", "update", "forum", "1", "--check"],
+                "dsc theme update",
+            ),
+            (&["dsc", "setting", "pull", "forum"], "dsc setting pull"),
+            (&["dsc", "tag", "pull", "forum"], "dsc tag pull"),
+            (
+                &["dsc", "post", "pull", "forum", "1", "post.md"],
+                "dsc post pull",
+            ),
+            (&["dsc", "upload", "forum", "file.png"], "dsc upload"),
+            (
+                &["dsc", "completions", "bash", "--dir", "completions"],
+                "dsc completions --dir",
+            ),
+            (
+                &["dsc", "completions", "install"],
+                "dsc completions install",
+            ),
+            (&["dsc", "man", "--dir", "man"], "dsc man --dir"),
+            (&["dsc", "config", "check"], "dsc config check"),
+        ];
+
+        for &(args, expected) in blocked {
+            assert_eq!(command_from(args).dry_run_refusal_reason(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn dry_run_refusal_reason_allows_stdout_and_dry_run_protected_commands() {
+        let allowed: &[&[&str]] = &[
+            &["dsc", "list"],
+            &["dsc", "update", "log"],
+            &["dsc", "emoji", "list", "forum"],
+            &["dsc", "topic", "push", "forum", "1", "topic.md"],
+            &["dsc", "topic", "reply", "forum", "1"],
+            &["dsc", "category", "push", "forum", "1", "topics"],
+            &["dsc", "category", "def", "push", "forum", "categories.yaml"],
+            &["dsc", "backup", "push", "forum", "backup.tar.gz"],
+            &["dsc", "theme", "delete", "forum", "1"],
+            &[
+                "dsc",
+                "theme",
+                "setting",
+                "push",
+                "forum",
+                "1",
+                "settings.yaml",
+            ],
+            &[
+                "dsc",
+                "theme",
+                "field",
+                "push",
+                "forum",
+                "1",
+                "common/scss",
+                "style.scss",
+            ],
+            &["dsc", "setting", "set", "forum", "key", "value"],
+            &["dsc", "setting", "push", "forum", "settings.yaml"],
+            &["dsc", "tag", "push", "forum", "tags.yaml"],
+            &["dsc", "tag", "rename", "forum", "old", "new"],
+            &["dsc", "post", "pull", "forum", "1"],
+            &["dsc", "post", "push", "forum", "1"],
+            &["dsc", "post", "delete", "forum", "1"],
+            &["dsc", "post", "move", "forum", "1", "--to-topic", "2"],
+            &["dsc", "completions", "bash"],
+            &["dsc", "config"],
+            &["dsc", "sar", "forum", "user"],
+            &["dsc", "harden", "host", "--pubkey-file", "key.pub"],
+        ];
+
+        for &args in allowed {
+            assert_eq!(command_from(args).dry_run_refusal_reason(), None);
+        }
     }
 }

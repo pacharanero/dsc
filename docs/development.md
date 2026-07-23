@@ -111,7 +111,7 @@ Releasing is **one action**: `s/version++`.
 
 1. Commit your feature work first, with a conventional-commit message (`feat(...)`, `fix:`, …) - git-cliff builds the changelog from committed history.
 2. Run `s/version++ [patch|minor|major]` (default `patch`). It bumps the version in `Cargo.toml`, regenerates `CHANGELOG.md` (git-cliff), makes the `chore(release): vX.Y.Z` commit, tags it, and pushes `main` + the tag. It refuses to run off `main` or on a dirty tree.
-3. The pushed `v*` tag triggers the `Release` workflow (cargo-dist: prebuilt binaries + GitHub Release) and the `crates.io` publish (requires `CARGO_REGISTRY_TOKEN`).
+3. The pushed `v*` tag triggers the `Release` workflow (cargo-dist: prebuilt binaries + GitHub Release) and `Publish to crates.io`. The latter obtains a short-lived token through crates.io Trusted Publishing; it does not require a long-lived `CARGO_REGISTRY_TOKEN` secret.
 
 There is no separate `s/release` step - `s/version++` does everything, in the correct order (commit before tag, so the tag contains the bump).
 
