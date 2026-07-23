@@ -15,28 +15,32 @@ The built surface, grouped - see CHANGELOG for the full per-release detail.
 - **Ops** - `update` (skip-if-current, rootless Docker, parallel), `harden` (PQ-hybrid SSH), ⭐ `backup setup-s3` Phase 1. Spec: [backup-s3-setup](commands/backup-s3-setup.md).
 - **CLI / distribution** - universal `--format`, `completions install` (+ PowerShell), `man` pages, `version --format`, SIGPIPE-safe piping, config-path resolution, cargo-dist release + git-cliff changelog, `s/version++` one-command release, push/PR CI gate. Specs: [config-path-resolution](commands/config-path-resolution.md), [cli-design](cli-design.md).
 
-### Completed roadmap items
-
-- [x] **R1 - Tag-group permission name/ID round-trip** - taxonomy files use group names and semantic levels (`full`, `create_post`, `readonly`); `dsc` translates to and from the numeric API representation and detects permission-only updates. Spec: [tag-sync](commands/tag-sync.md).
-- [x] **R7 - Leaner `-p [N]`** - folded `-p`/`--parallel` + `-m`/`--max` into one optional-value flag (`-p` = width 3, `-p N` = N workers); `-m` dropped.
-- [x] **R8 - Rebuild-lock pre-flight** - skips a forum with a `./launcher rebuild` in flight before reboot; `--force` overrides.
-- [x] ⭐ **R9 - Update log + skip-recent** - append-only update log plus `dsc update log` and `--skip-recent [dur]` for safe fleet re-runs. Specs: [update-concurrency](commands/update-concurrency.md), [update-log](commands/update-log.md).
-- [x] **R15 - `dsc log staff`** - staff action log access: filter by `--action`, `--acting-user`, `--target-user`, `--subject`, `--since`; `--format text|json|yaml`. Spec: [staff-action-log](commands/staff-action-log.md).
-- [x] **R18 - `dsc notification list|read`** - notification inspection and marking read: `list --filter read|unread --type <names> --limit`; `read --id|--type|--all`. Spec: [notification](commands/notification.md).
 
 ## In progress
 
-- [~] ⭐ **R10 - `category` Phase 5** - `--convert-admonitions=quote-callouts|plain-blockquote` carries MkDocs/Zensical callouts to and from category-topic Markdown. The Quote Callouts target is explicit because it requires the Arkshine theme component; the plain-blockquote target is portable and email-safe. Internal `--rewrite-links` remains. Spec: [category-workflow](commands/category-workflow.md).
+- [~] ⭐ **R10 - `category` Phase 5 link rewriting** - admonition conversion now ships as `--convert-admonitions=quote-callouts|plain-blockquote`; internal `--rewrite-links` remains. The Quote Callouts target requires the Arkshine theme component; the plain-blockquote target is portable and email-safe. Spec: [category-workflow](commands/category-workflow.md).
 
-## Pre-1.0 launch checklist
+## 1.0 launch checklist
 
-Polish before announcing on [meta.discourse.org](https://meta.discourse.org).
+Required before announcing on [meta.discourse.org](https://meta.discourse.org). The stable `RXX` identifiers below are intentionally non-contiguous: completed items were removed rather than renumbered or reused.
 
-- [ ] **R2 - Bump to 1.0.0** with a written back-compat policy ("the `dsc --help` surface is stable; flags won't be removed without a deprecation cycle"). 0.x undersells the maturity (213 lib tests + e2e + CI gate, 5-target distribution, 9 months shipping).
+### Release blockers
+
+- [x] **R30 - Enforce the global `--dry-run` guarantee** - commands with a complete plan now preview it without side effects; all others fail closed before configuration resolution. Regression coverage verifies command classification and refusal. Spec: [cli-design](cli-design.md).
+- [ ] **R31 - Put 1.0 release authority behind protected `main`** - enable branch protection, migrate from locally-created release tags to the CI auto-tag cascade (`s/version++` → reviewed release commit/PR → `auto-tag.yml` → `workflow_call` release), and default release jobs to read-only permissions. Harden `s/version++` to reject untracked work, require `HEAD == origin/main`, and fail on a lockfile-refresh failure.
+- [x] **R32 - Publish through crates.io Trusted Publishing** - the OIDC workflow was verified by the successful `v0.10.31` publication, and the long-lived registry token was removed.
+- [ ] **R33 - Define the 1.0 compatibility contract** - publish CLI/output/exit-code and deprecation guarantees, decide the supported Rust API boundary (prefer private implementation modules), declare MSRV, and state tested/supported Discourse releases.
+- [ ] **R34 - Make operational guidance truthful and safe-first** - correct README claims about the shipped `harden` stages; lead quick start with protecting `dsc.toml`, `dsc config check`, read-only inspection, and `--dry-run` rather than a remote update.
+- [ ] **R35 - Record third-party asset provenance** - determine the licences and required notices for vendored Discourse/Font Awesome SVGs, then add REUSE/SPDX coverage and a regeneration/provenance record. Confirm the intended MIT exception for original `dsc` code/docs.
+
+### Contract, documentation, and launch package
+
+- [ ] **R6 - Decide `dsc open` and `dsc import`** - keep, deprecate, or justify both commands before freezing the CLI surface; feed the decision into R33.
+- [ ] **R23 - Docs/CLI reality pass** - verify remaining docs match the current CLI surface, including the feature matrix, command index, development links, and security-update/community links.
+- [ ] **R36 - Isolate live compatibility tests** - make tests that contact Discourse explicit opt-in, disposable-resource based, serialised where needed, and cleanup-safe; retain offline tests as the ordinary local/CI gate.
 - [ ] **R3 - Record an asciinema** (~30s) of the pull → edit → push → diff loop; embed in README.
-- [x] **R4 - `s/` and `wix/` naming** - keep `s/` (house style) but document it in [docs/development.md](../docs/development.md); note `wix/` holds MSI build artefacts.
 - [ ] **R5 - Pre-circulate the Meta post** to a couple of Discourse regulars before posting.
-- [ ] **R6 - Evaluate `dsc open` and `dsc import`** - keep, deprecate, or justify before locking the surface.
+- [ ] **R2 - Cut `v1.0.0`** from a fresh, clean, synchronised worktree after this checklist passes, with a release rehearsal (`s/test-fmt-clippy`, docs build, `cargo audit`, `cargo publish --dry-run`) and generated changelog review.
 
 ## Planned
 
@@ -47,6 +51,7 @@ Polish before announcing on [meta.discourse.org](https://meta.discourse.org).
 ### Content sync
 
 
+- [ ] ⭐ **R29 - `dsc render` template placeholder substitution** - render local Markdown template files against per-forum variables from `dsc.toml` (`[template.vars]` globals, `[discourse.template]` per-forum, built-in `forum_baseurl`/`forum_name`/`forum_fullname`), so anonymised content templates are ready to push without manual find-and-replace. `--render` flag on `topic new`/`push`/`reply`/`category push` applies the same inline. Tera 2.0 engine. Driver: 24-template content-templates library in the discourses workspace. Spec: [template-rendering](commands/template-rendering.md).
 - [~] ⭐ **R11 - `category` definition sync Phase 2/3** - Phase 1 shipped the blocking round-trip (`category def pull/push`, `category show/get/set`) for category definitions: description, permissions, position, topic template, and tag rules. Remaining work: rename, list `--append`/`--remove`, prune, and `def diff`. Spec: [category-definition-sync](commands/category-definition-sync.md).
 
 ### New command surfaces
@@ -67,9 +72,7 @@ Polish before announcing on [meta.discourse.org](https://meta.discourse.org).
 - [ ] **R21 - `dsc user find <email>`** - GDPR "which forum has this person" lookup.
 - [ ] **R22 - `dsc backup create --all`** - reuse the `update all` parallel pattern for fleet backups.
 
-### Doc accuracy
 
-- [ ] **R23 - Docs/CLI reality pass** - verify remaining docs match the current CLI surface.
 
 ## Stretch / exploratory
 
