@@ -36,7 +36,7 @@ Required before announcing on [meta.discourse.org](https://meta.discourse.org). 
 ### Contract, documentation, and launch package
 
 - [ ] **R6 - Decide `dsc open` and `dsc import`** - keep, deprecate, or justify both commands before freezing the CLI surface; feed the decision into R33.
-- [ ] **R23 - Docs/CLI reality pass** - verify remaining docs match the current CLI surface, including the feature matrix, command index, development links, and security-update/community links.
+- [x] **R23 - Docs/CLI reality pass** - reconciled the docs and help surface, including the feature matrix, command index, development links, and security-update/community links.
 - [ ] **R36 - Isolate live compatibility tests** - make tests that contact Discourse explicit opt-in, disposable-resource based, serialised where needed, and cleanup-safe; retain offline tests as the ordinary local/CI gate.
 - [ ] **R3 - Record an asciinema** (~30s) of the pull → edit → push → diff loop; embed in README.
 - [ ] **R5 - Pre-circulate the Meta post** to a couple of Discourse regulars before posting.
@@ -71,7 +71,6 @@ Required before announcing on [meta.discourse.org](https://meta.discourse.org). 
 - [ ] **R20 - `dsc report all <name>`** - aggregate a report across forums.
 - [ ] **R21 - `dsc user find <email>`** - GDPR "which forum has this person" lookup.
 - [ ] **R22 - `dsc backup create --all`** - reuse the `update all` parallel pattern for fleet backups.
-
 
 
 ## Stretch / exploratory

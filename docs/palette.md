@@ -10,10 +10,10 @@ List, pull, and push colour palettes (color schemes).
 ## dsc theme palette list
 
 ```
-dsc theme palette list <discourse> [--format text|json|yaml]
+dsc theme palette list <discourse> [--format text|json|yaml] [--verbose]
 ```
 
-Lists available colour palettes on the specified Discourse.
+Lists available colour palettes on the specified Discourse. `-v`/`--verbose` includes additional fields where supported.
 
 ## dsc theme palette pull
 

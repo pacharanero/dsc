@@ -5,10 +5,10 @@ Install (from git or a local bundle), delete, list, pull, push, and duplicate th
 ## dsc theme list
 
 ```
-dsc theme list <discourse> [--format text|json|yaml]
+dsc theme list <discourse> [--format text|json|yaml] [--verbose]
 ```
 
-Lists installed themes on the specified Discourse.
+Lists installed themes on the specified Discourse. `-v`/`--verbose` includes additional fields where supported.
 
 ## dsc theme install
 

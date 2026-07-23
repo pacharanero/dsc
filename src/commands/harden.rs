@@ -2,11 +2,12 @@
 //! into a hardened box with a non-root sudo user, SSH locked down, rootless
 //! Docker, fail2ban, unattended upgrades, swap, and a firewall.
 //!
-//! **Stage 1 (this file, v0.10.0-alpha):** everything up to and including
-//! verifying that new-user SSH actually works. Stops *before* touching
-//! sshd_config so a bad pubkey can't self-lockout the operator. Stages 2
-//! (sshd tightening) and 3 (fail2ban / upgrades / timezone / swap / docker
-//! / ufw) land in follow-up commits.
+//! **Stage 1 (this file):** everything up to and including verifying that
+//! new-user SSH actually works. Stops *before* touching sshd_config so a
+//! bad pubkey can't self-lockout the operator. **Stage 2** (sshd
+//! tightening, also this file) runs automatically right after. Stage 3
+//! (fail2ban / upgrades / timezone / swap / docker / ufw) lands in a
+//! follow-up commit.
 
 use crate::config::HardenConfig;
 use anyhow::{Context, Result, anyhow};

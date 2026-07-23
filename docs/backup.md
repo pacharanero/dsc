@@ -13,10 +13,10 @@ Triggers a backup on the specified Discourse. The backup is created server-side;
 ## dsc backup list
 
 ```
-dsc backup list <discourse> [--format text|markdown|markdown-table|json|yaml|csv]
+dsc backup list <discourse> [--format text|markdown|markdown-table|json|yaml|csv|urls] [--verbose]
 ```
 
-Lists all backups on the specified Discourse. Supports the same formats as `dsc list`.
+Lists all backups on the specified Discourse. Supports the same formats as `dsc list`. `-v`/`--verbose` includes additional fields where supported.
 
 ## dsc backup pull
 

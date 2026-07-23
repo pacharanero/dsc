@@ -5,10 +5,10 @@ List, install, and remove plugins via SSH.
 ## dsc plugin list
 
 ```
-dsc plugin list <discourse> [--format text|json|yaml]
+dsc plugin list <discourse> [--format text|json|yaml] [--verbose]
 ```
 
-Lists installed plugins on the specified Discourse.
+Lists installed plugins on the specified Discourse. `-v`/`--verbose` includes additional fields where supported.
 
 ## dsc plugin install
 
