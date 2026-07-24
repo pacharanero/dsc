@@ -26,7 +26,6 @@ Required before announcing on [meta.discourse.org](https://meta.discourse.org). 
 
 ### Release blockers
 
-- [~] **R31 - Put 1.0 release authority behind protected `main`** - `s/version++` now creates a release PR when `main` is protected; `auto-tag.yml` tags the merged release commit and invokes reusable release/publish workflows with job-scoped write permission. Enable and verify branch protection before treating this item as complete.
 - [ ] **R35 - Record third-party asset provenance** - determine the licences and required notices for vendored Discourse/Font Awesome SVGs, then add REUSE/SPDX coverage and a regeneration/provenance record. Confirm the intended MIT exception for original `dsc` code/docs.
 - [ ] **R38 - Make workflow security a blocking CI gate** - resolve Zizmor's release-workflow findings: eliminate the publish-time cache poisoning risk, replace or constrain cargo-dist's dynamic matrix shell fragments and container images, then add `zizmor --strict-collection .` as a blocking read-only CI job. REUSE validation follows R35's licence/provenance decision.
 
