@@ -117,6 +117,8 @@ Releasing is **one action**: `s/version++`.
 
 There is no separate `s/release` step. If creating the release PR fails, the release commit remains only on the local `release/vX.Y.Z` branch; fix the failure and retry the push/PR creation. No tag or public release exists until that PR merges.
 
+If auto-tag fails before pushing its tag, repair the workflow in a normal PR, then use its manual dispatch with the exact tag and the merged release commit. Recovery refuses a mismatched version, a pre-existing tag, or a commit outside `main`, and invokes the same release and publication workflows as the ordinary cascade.
+
 ## Project layout
 
 - CLI entrypoint and commands: [src/main.rs](../src/main.rs)
