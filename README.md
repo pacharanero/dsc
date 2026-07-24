@@ -29,7 +29,7 @@ A glance at where `dsc` is, so you can tell whether it covers your use case befo
 | **Users & access** | list / info, suspend / silence, promote / demote, group membership, activity export, create, password reset, email change; invites; private messages; API keys; **one-shot SAR / GDPR export** | scoped API keys, find-user-by-email |
 | **Backups, emoji, uploads** | backup create / list / pull / push / restore, bulk emoji, file upload | backup-all |
 | **Fleet (multi-install)** | one config for N forums, tag filtering, write a setting across matching installs, audit a setting across all, update-all over SSH | cross-forum search & aggregate reports |
-| **Server lifecycle** | `harden` a fresh box (firewall, SSH, Docker, swap, fail2ban); `update` over SSH with skip-if-current | one-shot `dsc install` provisioning; `harden` stage-3 finishing |
+| **Server lifecycle** | `harden` a fresh box, stages 1-2 (new sudo user, pubkey auth, sshd lockdown to a non-standard port); `update` over SSH with skip-if-current | `harden` stage 3 - firewall, Docker, swap, fail2ban (config keys wired, SSH execution pending); one-shot `dsc install` provisioning |
 | **Reporting** | analytics snapshot (growth / activity / health); `log staff` audit-trail inspection | dashboard reports, webhooks, notifications |
 
 Exploratory (not committed): `dsc chat`, a TUI, and an MCP server mode. See [spec/roadmap.md](spec/roadmap.md) for the full picture.
@@ -105,16 +105,25 @@ ssh_host = "forum.example.com"
 changelog_topic_id = 123
 EOF
 
-# List configured forums
+# dsc.toml holds a live API key in plain text - keep it readable only by you
+chmod 600 dsc.toml
+
+# Verify API (and SSH, if configured) connectivity before doing anything else
+dsc config check
+
+# List configured forums (read-only)
 dsc list
 
-# Pull a topic into Markdown for editing
+# Pull a topic into Markdown for editing (read-only)
 dsc topic pull myforum 42
 
-# Push the edited topic back up
+# Preview a push before it touches the live forum
+dsc --dry-run topic push myforum 42 ./topic-title.md
+
+# Push the edited topic back up for real
 dsc topic push myforum 42 ./topic-title.md
 
-# Update a forum over SSH
+# Update a forum over SSH - a real remote rebuild, no dry-run preview for this one
 dsc update myforum
 ```
 
@@ -148,7 +157,7 @@ dsc update myforum
   - [tag](docs/tag.md) — list, pull, push, and rename the tag taxonomy (per-topic tagging lives under `dsc topic tag`/`untag`)
   - [config](docs/config.md) — inspect and validate the dsc config itself
   - [version](docs/version.md) — dsc's own version, or a forum's live Discourse version + commit
-  - [harden](docs/harden.md) — provision a fresh Ubuntu server (firewall, SSH hardening, Docker, swap, journald, fail2ban)
+  - [harden](docs/harden.md) — provision a fresh Ubuntu server: new sudo user + pubkey auth, sshd lockdown (stages 1-2, shipped); firewall/Docker/swap/fail2ban is stage 3, still WIP
 - [Shell completions](docs/completions.md) — bash, zsh, and fish
 - [Man pages](docs/manpages.md) — generate Unix man pages for `dsc` and every subcommand
 - [Development](docs/development.md) — building, testing, releasing, project layout
