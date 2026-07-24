@@ -48,6 +48,6 @@ The project follows a "fix, then announce" model. Where a vulnerability requires
 
 1. The patched version is released to crates.io, GitHub Releases, and the Homebrew tap.
 2. A short advisory is published on GitHub Security Advisories with a CVSS score.
-3. Major issues additionally get a brief note on the [Discourse Meta announcement thread](https://github.com/pacharanero/dsc#community).
+3. Major issues additionally get a brief note on [Discourse Meta](https://meta.discourse.org) once the project announcement thread exists.
 
 For advance notice of advisories before they go public, watch the repo for "Security advisories" notifications (Settings → Notifications → Custom → Security advisories).

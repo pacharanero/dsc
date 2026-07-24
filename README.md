@@ -165,6 +165,10 @@ dsc update myforum
 - [Contributing](CONTRIBUTING.md) — bug vs spec request, code conventions, support stance
 - [For LLMs and agents](AGENTS.md) — using `dsc` from another AI session, and how to file a useful feature spec
 
+## Support
+
+For questions about administering Discourse, ask on [Discourse Meta](https://meta.discourse.org). For `dsc` bugs, feature requests, or proposed command surfaces, follow the routes in [Contributing](CONTRIBUTING.md). Security vulnerabilities belong in a private [GitHub Security Advisory](https://github.com/pacharanero/dsc/security/advisories/new) or email, never a public issue.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

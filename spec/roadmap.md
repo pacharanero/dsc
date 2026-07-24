@@ -32,12 +32,14 @@ Required before announcing on [meta.discourse.org](https://meta.discourse.org). 
 - [x] **R33 - Define the 1.0 compatibility contract** - [Compatibility](../docs/compatibility.md) defines the 1.x CLI/output/exit-status and deprecation guarantees, retains `open` and `import`, declares a binary-only Rust API boundary and Rust 1.95.0 MSRV, and records the supported/tested Discourse range. CI tests both MSRV and stable Rust.
 - [x] **R34 - Make operational guidance truthful and safe-first** - README's feature matrix and command index now describe `harden` as shipping stages 1-2 only (new sudo user, pubkey auth, sshd lockdown), with stage 3 (firewall/Docker/swap/fail2ban) marked pending; quick start now leads with `chmod 600 dsc.toml`, `dsc config check`, read-only inspection, and a `--dry-run` preview before the first live write, with the remote `update` moved last and flagged as having no dry-run.
 - [ ] **R35 - Record third-party asset provenance** - determine the licences and required notices for vendored Discourse/Font Awesome SVGs, then add REUSE/SPDX coverage and a regeneration/provenance record. Confirm the intended MIT exception for original `dsc` code/docs.
+- [ ] **R38 - Make workflow security a blocking CI gate** - resolve Zizmor's release-workflow findings: eliminate the publish-time cache poisoning risk, replace or constrain cargo-dist's dynamic matrix shell fragments and container images, then add `zizmor --strict-collection .` as a blocking read-only CI job. REUSE validation follows R35's licence/provenance decision.
 
 ### Contract, documentation, and launch package
 
 - [x] **R6 - Decide `dsc open` and `dsc import`** - retain `open` as an explicitly interactive browser helper and `import` as the supported bulk-onboarding path; both are covered by the 1.x compatibility contract.
 - [x] **R23 - Docs/CLI reality pass** - reconciled the docs and help surface, including the feature matrix, command index, development links, and security-update/community links.
 - [ ] **R36 - Isolate live compatibility tests** - make tests that contact Discourse explicit opt-in, disposable-resource based, serialised where needed, and cleanup-safe; retain offline tests as the ordinary local/CI gate.
+- [ ] **R37 - Post-1.0 CLI ergonomics** - make bare `dsc` exit successfully after showing its command summary, add shared `~` path expansion and Clap path hints, report `dsc version` without config resolution, set an HTTP timeout, and review cargo-binstall metadata and release checksum naming.
 - [ ] **R3 - Record an asciinema** (~30s) of the pull → edit → push → diff loop; embed in README.
 - [ ] **R5 - Pre-circulate the Meta post** to a couple of Discourse regulars before posting.
 - [ ] **R2 - Cut `v1.0.0`** from a fresh, clean, synchronised worktree after this checklist passes, with a release rehearsal (`s/test-fmt-clippy`, docs build, `cargo audit`, `cargo publish --dry-run`) and generated changelog review.
