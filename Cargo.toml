@@ -1,6 +1,6 @@
 [package]
 name = "dsc-rs"
-version = "0.10.31"
+version = "0.10.32"
 edition = "2024"
 rust-version = "1.95"
 authors = ["Marcus Baw <marcus@bawmedical.co.uk>"]
