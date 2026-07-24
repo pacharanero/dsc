@@ -63,3 +63,4 @@ tags = ["production", "client-a"]
 - Empty strings and `0` values are treated as "unset" (most commands behave as if the key is missing).
 - Most forum read/write commands require `apikey` and `api_username`. If they are missing, `dsc` will fail with a clear message.
 - SSH credentials are not stored in `dsc.toml`; set up SSH keys and use an SSH config file.
+- `apikey` is stored in plain text. Restrict the file to your own user (`chmod 600 dsc.toml`) and keep it out of version control.
