@@ -29,13 +29,13 @@ Required before announcing on [meta.discourse.org](https://meta.discourse.org). 
 - [x] **R30 - Enforce the global `--dry-run` guarantee** - commands with a complete plan now preview it without side effects; all others fail closed before configuration resolution. Regression coverage verifies command classification and refusal. Spec: [cli-design](cli-design.md).
 - [~] **R31 - Put 1.0 release authority behind protected `main`** - `s/version++` now creates a release PR when `main` is protected; `auto-tag.yml` tags the merged release commit and invokes reusable release/publish workflows with job-scoped write permission. Enable and verify branch protection before treating this item as complete.
 - [x] **R32 - Publish through crates.io Trusted Publishing** - the OIDC workflow was verified by the successful `v0.10.31` publication, and the long-lived registry token was removed.
-- [ ] **R33 - Define the 1.0 compatibility contract** - publish CLI/output/exit-code and deprecation guarantees, decide the supported Rust API boundary (prefer private implementation modules), declare MSRV, and state tested/supported Discourse releases.
+- [x] **R33 - Define the 1.0 compatibility contract** - [Compatibility](../docs/compatibility.md) defines the 1.x CLI/output/exit-status and deprecation guarantees, retains `open` and `import`, declares a binary-only Rust API boundary and Rust 1.95.0 MSRV, and records the supported/tested Discourse range. CI tests both MSRV and stable Rust.
 - [x] **R34 - Make operational guidance truthful and safe-first** - README's feature matrix and command index now describe `harden` as shipping stages 1-2 only (new sudo user, pubkey auth, sshd lockdown), with stage 3 (firewall/Docker/swap/fail2ban) marked pending; quick start now leads with `chmod 600 dsc.toml`, `dsc config check`, read-only inspection, and a `--dry-run` preview before the first live write, with the remote `update` moved last and flagged as having no dry-run.
 - [ ] **R35 - Record third-party asset provenance** - determine the licences and required notices for vendored Discourse/Font Awesome SVGs, then add REUSE/SPDX coverage and a regeneration/provenance record. Confirm the intended MIT exception for original `dsc` code/docs.
 
 ### Contract, documentation, and launch package
 
-- [ ] **R6 - Decide `dsc open` and `dsc import`** - keep, deprecate, or justify both commands before freezing the CLI surface; feed the decision into R33.
+- [x] **R6 - Decide `dsc open` and `dsc import`** - retain `open` as an explicitly interactive browser helper and `import` as the supported bulk-onboarding path; both are covered by the 1.x compatibility contract.
 - [x] **R23 - Docs/CLI reality pass** - reconciled the docs and help surface, including the feature matrix, command index, development links, and security-update/community links.
 - [ ] **R36 - Isolate live compatibility tests** - make tests that contact Discourse explicit opt-in, disposable-resource based, serialised where needed, and cleanup-safe; retain offline tests as the ordinary local/CI gate.
 - [ ] **R3 - Record an asciinema** (~30s) of the pull → edit → push → diff loop; embed in README.

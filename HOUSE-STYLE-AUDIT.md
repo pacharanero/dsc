@@ -96,26 +96,21 @@ Suggested change:
 - Remove the long-lived registry token once the first OIDC publication succeeds.
 - Use the full non-live test suite and `--locked` build/publish preflight in the publishing workflow.
 
-### [ ] `HSA-P1-04` - The 1.0 compatibility boundary is still undecided
+### [x] `HSA-P1-04` - The 1.0 compatibility boundary is defined
 
 Evidence:
 
-- The roadmap's explicit launch item `R2` remains incomplete: a stable `dsc --help` surface and a deprecation policy have not been written. `R6` also leaves `dsc open` and `dsc import` undecided before the surface is locked.
-- `src/lib.rs` publicly exports `api`, `cli`, `commands`, `config`, and `utils`. At 1.0 this unintentionally promises semver stability for a large implementation surface, not just the `dsc` binary.
-- `Cargo.toml` has no declared `rust-version`, and the project has no supported-Discourse-version policy despite the upstream admin API being unversioned.
+- [Compatibility](docs/compatibility.md) defines the stable CLI grammar, stdout/stderr and exit-status behaviour, structured-output rules, and deprecation policy for 1.x. It retains `open` and `import` as supported commands.
+- The crate is explicitly a binary distribution rather than a supported Rust library; its implementation modules do not form a stable Rust API.
+- `Cargo.toml` declares Rust 1.95.0 as the MSRV, and CI tests it alongside stable Rust. The compatibility page records the current supported Discourse release and observed live versions.
 
 House style:
 
 - `distribution.md`, `rust-cli.md`, and `specs.md` require an intentional stable contract rather than freezing accidental implementation details.
 
-Suggested change:
+Resolution:
 
-- Decide the public contract before `v1.0.0`:
-  1. state which CLI commands, flags, text output, JSON/YAML structures, and exit behaviours are stable;
-  2. document deprecation and removal policy;
-  3. either make Rust implementation modules private or explicitly commit to maintaining an intentionally small supported Rust API;
-  4. state MSRV and the tested/supported Discourse release range.
-- Keep incomplete field-driven features on the roadmap. They do not need to delay 1.0 unless they are within the stated stable contract.
+- The contract applies from `v1.0.0`. Incomplete field-driven features remain on the roadmap and are outside the frozen 1.x command surface until shipped.
 
 ### [ ] `HSA-P1-05` - Public hardening guidance overstates what ships
 

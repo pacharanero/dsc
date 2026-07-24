@@ -53,6 +53,7 @@ nav:
   - Getting started:
       - Configuration: configuration.md
       - Shell completions: completions.md
+      - Compatibility: compatibility.md
   - Content commands:
       - topic: topic.md
       - post: post.md

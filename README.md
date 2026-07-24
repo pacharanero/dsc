@@ -83,7 +83,7 @@ Prebuilt archives for Linux, macOS, and Windows are attached to every [GitHub re
 
 ### From source
 
-Requires a recent Rust toolchain (edition 2024; install via [rustup](https://rustup.rs)).
+Requires Rust 1.95.0 or newer (install via [rustup](https://rustup.rs)).
 
 ```bash
 git clone https://github.com/pacharanero/dsc.git
@@ -130,6 +130,7 @@ dsc update myforum
 ## Documentation
 
 - [Configuration](docs/configuration.md) — config file format, search order, field reference
+- [Compatibility](docs/compatibility.md) — the 1.x CLI, Rust, and Discourse support contract
 - **Commands:**
   - [list](docs/list.md) — list and filter installs
   - [open](docs/open.md) — open a Discourse in the browser

@@ -1,5 +1,7 @@
 # Development
 
+The supported Rust toolchain and 1.x CLI, library, and Discourse compatibility commitments are recorded in [Compatibility](compatibility.md).
+
 ## Building
 
 ```bash

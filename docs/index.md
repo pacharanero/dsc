@@ -46,7 +46,7 @@ Most functionality uses the Discourse REST API; `dsc update` runs remote rebuild
 
 === ":simple-rust: Cargo"
 
-    If you already have a Rust toolchain (edition 2024):
+    If you already have Rust 1.95.0 or newer:
 
     ```bash
     cargo install dsc-rs
@@ -115,7 +115,7 @@ Browse by area:
 - **Users & access** — [`user`](user.md), [`group`](group.md), [`invite`](invite.md), [`pm`](pm.md), [`api-key`](api-key.md)
 - **Install management** — [`list`](list.md), [`add`](add.md), [`import`](import.md), [`open`](open.md), [`update`](update.md), [`config`](config.md)
 - **Site admin** — [`setting`](setting.md), [`log`](log.md), [`backup`](backup.md), [`theme`](theme.md), [`plugin`](plugin.md), [`palette`](palette.md)
-- **Meta** — [Shell completions](completions.md), [Development](development.md)
+- **Meta** — [Shell completions](completions.md), [Compatibility](compatibility.md), [Development](development.md)
 
 ## Safe by default
 

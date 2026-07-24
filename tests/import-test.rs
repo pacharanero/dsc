@@ -42,3 +42,20 @@ fn import_stdin() {
     let raw = fs::read_to_string(config_path).expect("read config");
     assert!(raw.contains("example.org"));
 }
+
+#[test]
+fn import_title_lookup_diagnostic_uses_stderr() {
+    let dir = TempDir::new().expect("tempdir");
+    let import_path = dir.path().join("import.txt");
+    fs::write(&import_path, "not a URL\n").expect("write import");
+    let config_path = write_temp_config(&dir, "");
+
+    let output = run_dsc(&["import", import_path.to_str().unwrap()], &config_path);
+
+    assert!(output.status.success(), "import failed");
+    assert!(
+        output.stdout.is_empty(),
+        "import diagnostic leaked to stdout"
+    );
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Failed to query site title"));
+}

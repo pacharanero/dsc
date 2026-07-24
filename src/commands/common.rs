@@ -72,7 +72,7 @@ pub fn fetch_fullname_from_url(baseurl: &str) -> Option<String> {
     let client = match DiscourseClient::new(&temp) {
         Ok(client) => client,
         Err(err) => {
-            println!("Failed to query site title for {}: {}", baseurl, err);
+            eprintln!("Failed to query site title for {}: {}", baseurl, err);
             return None;
         }
     };
@@ -82,7 +82,7 @@ pub fn fetch_fullname_from_url(baseurl: &str) -> Option<String> {
             if title.is_empty() { None } else { Some(title) }
         }
         Err(err) => {
-            println!("Failed to query site title for {}: {}", baseurl, err);
+            eprintln!("Failed to query site title for {}: {}", baseurl, err);
             None
         }
     }
