@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to recover, for example v1.2.3.
+        required: false
+        type: string
+      commit:
+        description: Merged release commit to tag.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -24,36 +34,62 @@ jobs:
       - id: version
         name: Detect version bump
         shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+          REQUESTED_COMMIT: ${{ inputs.commit }}
         run: |
           set -euo pipefail
-          before="${{ github.event.before }}"
-          current="$(awk -F'"' '/^version = / {print $2; exit}' Cargo.toml)"
-          previous=""
-          if [[ "$before" != "0000000000000000000000000000000000000000" ]]; then
-            previous="$(git show "$before:Cargo.toml" 2>/dev/null | awk -F'"' '/^version = / {print $2; exit}' || true)"
+          commit="$GITHUB_SHA"
+
+          if [[ -n "$REQUESTED_TAG$REQUESTED_COMMIT" ]]; then
+            if [[ -z "$REQUESTED_TAG" || -z "$REQUESTED_COMMIT" ]]; then
+              echo "Both tag and commit are required for recovery." >&2
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$REQUESTED_COMMIT" origin/main; then
+              echo "Recovery commit $REQUESTED_COMMIT is not reachable from main." >&2
+              exit 1
+            fi
+            commit="$REQUESTED_COMMIT"
+            current="$(git show "$commit:Cargo.toml" | awk -F'"' '/^version = / {print $2; exit}')"
+            if [[ "$REQUESTED_TAG" != "v$current" ]]; then
+              echo "Recovery tag $REQUESTED_TAG does not match $commit's version v$current." >&2
+              exit 1
+            fi
+            tag="$REQUESTED_TAG"
+          else
+            before="${{ github.event.before }}"
+            current="$(awk -F'"' '/^version = / {print $2; exit}' Cargo.toml)"
+            previous=""
+            if [[ "$before" != "0000000000000000000000000000000000000000" ]]; then
+              previous="$(git show "$before:Cargo.toml" 2>/dev/null | awk -F'"' '/^version = / {print $2; exit}' || true)"
+            fi
+
+            if [[ -z "$current" || "$current" == "$previous" ]]; then
+              echo "Cargo.toml version did not change; no tag created."
+              exit 0
+            fi
+            tag="v$current"
           fi
 
-          if [[ -z "$current" || "$current" == "$previous" ]]; then
-            echo "Cargo.toml version did not change; no tag created."
-            exit 0
-          fi
-
-          tag="v$current"
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
             echo "Tag $tag already exists; refusing to retag a version." >&2
             exit 1
           fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
       - name: Create annotated tag
         if: steps.version.outputs.tag != ''
         env:
           TAG: ${{ steps.version.outputs.tag }}
+          COMMIT: ${{ steps.version.outputs.commit }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
+          git tag -a "$TAG" "$COMMIT" -m "Release $TAG"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/$TAG"
 
   release:
     needs: tag
