@@ -5,6 +5,34 @@ All notable changes to `dsc` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases are grouped from conventional-commit messages by [git-cliff](https://git-cliff.org).
 
+## [0.10.32] - 2026-07-24
+
+### CI
+
+- Harden launch gates and retire audit ([debe518](https://github.com/pacharanero/dsc/commit/debe518911542bb04682d6a15287ab39d831ce41))
+
+- Move releases behind protected main ([f181724](https://github.com/pacharanero/dsc/commit/f181724f0429cb511ef83eae61b8f729e732991b))
+
+### Documentation
+
+- Tidy release roadmap ([9cc1913](https://github.com/pacharanero/dsc/commit/9cc1913e028956419802900f53f64f617a4cf640))
+
+- R34 - correct harden claims, safety-first quick start ([e3fbb5e](https://github.com/pacharanero/dsc/commit/e3fbb5e2cb1e9b31228eb6b2cde091092813b940))
+
+- Record remaining R31 protection gate ([cfd3ca8](https://github.com/pacharanero/dsc/commit/cfd3ca810232be3ec9a8b93ffe4e70ab5087b7d9))
+
+- Record main protection activation ([f9fc1ab](https://github.com/pacharanero/dsc/commit/f9fc1ab02443feed9a8908c28466a59babb0c941))
+
+- R23 - reconcile docs and --help with actual CLI behavior ([9e39bd4](https://github.com/pacharanero/dsc/commit/9e39bd4ad2279640d0f7591ac6cf1a66bcafec2f))
+
+- Add template rendering roadmap ([ba83aae](https://github.com/pacharanero/dsc/commit/ba83aaedb1e457b8babe35f9bbe2579e6f19a906))
+
+- Record trusted publishing validation ([bee7ecb](https://github.com/pacharanero/dsc/commit/bee7ecbd7fe665e8a02935a82c30fc4d173d9c0c))
+
+### Features
+
+- **release**: Define 1.0 compatibility contract ([dd82535](https://github.com/pacharanero/dsc/commit/dd825359ac9f54fde838992ab9d6b6d1e4bc65fe))
+
 ## [0.10.31] - 2026-07-23
 
 ### Bug fixes
@@ -583,6 +611,22 @@ Releases are grouped from conventional-commit messages by [git-cliff](https://gi
 
 - Add crates.io publish workflow ([4886464](https://github.com/pacharanero/dsc/commit/4886464a5bba2987cf63f098fc63eccdbf62b1ba))
 
+### Chores
+
+- Rename crate to dsc-rs and add crates.io metadata ([07d4f1e](https://github.com/pacharanero/dsc/commit/07d4f1e24c29de29fbc9a4ffe3c1b66184855dc0))
+
+### Features
+
+- **cli**: Add abbreviated aliases for all subcommands ([36c0846](https://github.com/pacharanero/dsc/commit/36c08462ce9883e4e8d1bfee7081a9369b92e8f2))
+
+- Add FUNDING.yml enable GitHub Sponsors ([42c91a5](https://github.com/pacharanero/dsc/commit/42c91a5339faede92f451a9a008df76a03654264))
+
+- Add theme management commands for pull, push, and duplicate ([70993e4](https://github.com/pacharanero/dsc/commit/70993e49b57b192b512ddcbece15e3ed43f71664))
+
+- Enhance site settings management in dsc CLI ([695334a](https://github.com/pacharanero/dsc/commit/695334a0772ac7fa7246022a958afb9a03c2bd2f))
+
+## [0.1.6] - 2026-03-04
+
 ### CI / dependencies
 
 - **deps**: Bump actions/upload-artifact from 6 to 7 ([d8f15f2](https://github.com/pacharanero/dsc/commit/d8f15f2021d2e834abc3691fad2092b0d89e4cef))
@@ -597,9 +641,21 @@ Releases are grouped from conventional-commit messages by [git-cliff](https://gi
 
 - **deps**: Update toml requirement from 0.9 to 1.0 ([db03400](https://github.com/pacharanero/dsc/commit/db034000e5231ae0cb1eeeefef4d5d07e63f0d59))
 
-### Chores
+### Features
 
-- Rename crate to dsc-rs and add crates.io metadata ([07d4f1e](https://github.com/pacharanero/dsc/commit/07d4f1e24c29de29fbc9a4ffe3c1b66184855dc0))
+- Bump version to 0.1.5; enhance CLI help text for commands and flags ([2f02c7e](https://github.com/pacharanero/dsc/commit/2f02c7ec634f9ff997780c0d5deaef582fd5913c))
+
+## [0.1.5] - 2026-03-03
+
+### Features
+
+- Bump version to 0.1.4 and update dependencies; enhance update command flags and documentation ([209f3d5](https://github.com/pacharanero/dsc/commit/209f3d5abf8b6c5edec27399fdc771fa26a98631))
+
+- Add version bump script for automated tagging ([4e1c51c](https://github.com/pacharanero/dsc/commit/4e1c51c97dbe289840641c05ac177b45853d7666))
+
+## [0.1.3] - 2026-03-03
+
+### Chores
 
 - Update indicatif dependency to version 0.18 ([78d86b3](https://github.com/pacharanero/dsc/commit/78d86b3584702d892b38ca454bbd522c9a59cb1f))
 
@@ -610,20 +666,6 @@ Releases are grouped from conventional-commit messages by [git-cliff](https://gi
 - Update README with new environment variables for `dsc update` and name recommendations ([73d15a1](https://github.com/pacharanero/dsc/commit/73d15a173f374eff42c4acf4dc514757c91131a2))
 
 ### Features
-
-- **cli**: Add abbreviated aliases for all subcommands ([36c0846](https://github.com/pacharanero/dsc/commit/36c08462ce9883e4e8d1bfee7081a9369b92e8f2))
-
-- Add FUNDING.yml enable GitHub Sponsors ([42c91a5](https://github.com/pacharanero/dsc/commit/42c91a5339faede92f451a9a008df76a03654264))
-
-- Add theme management commands for pull, push, and duplicate ([70993e4](https://github.com/pacharanero/dsc/commit/70993e49b57b192b512ddcbece15e3ed43f71664))
-
-- Enhance site settings management in dsc CLI ([695334a](https://github.com/pacharanero/dsc/commit/695334a0772ac7fa7246022a958afb9a03c2bd2f))
-
-- Bump version to 0.1.5; enhance CLI help text for commands and flags ([2f02c7e](https://github.com/pacharanero/dsc/commit/2f02c7ec634f9ff997780c0d5deaef582fd5913c))
-
-- Bump version to 0.1.4 and update dependencies; enhance update command flags and documentation ([209f3d5](https://github.com/pacharanero/dsc/commit/209f3d5abf8b6c5edec27399fdc771fa26a98631))
-
-- Add version bump script for automated tagging ([4e1c51c](https://github.com/pacharanero/dsc/commit/4e1c51c97dbe289840641c05ac177b45853d7666))
 
 - Add --yes flag to update commands for auto-confirming changelog posts ([bc409c2](https://github.com/pacharanero/dsc/commit/bc409c201caf69820e22a01227a30226d934d707))
 
@@ -676,5 +718,7 @@ Releases are grouped from conventional-commit messages by [git-cliff](https://gi
 - Add common module to new tests ([b69a254](https://github.com/pacharanero/dsc/commit/b69a2544c1549cd7b32a84dae689eb9b7c8047a6))
 
 - Add completions e2e and refresh scripts ([333d2bb](https://github.com/pacharanero/dsc/commit/333d2bb2c76de5f84c2cf838da7c25b4750fbd01))
+
+## [0.1.1] - 2026-01-30
 
 
